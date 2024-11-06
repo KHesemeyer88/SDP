@@ -1,0 +1,32 @@
+Cloning repo to local
+- green code button -> copy https link
+- create a new folder on your local computer
+- Open VS code and a bash terminal or I used wsl
+- (skip)Click on "start clone repo" on VS code open page to download extensions? (github codespaces, gitlens)
+- "git clone copied https" in the terminal
+- should see the folder on your local inside the folder you created
+- open that folder
+- download git, should see a prompt from vscode
+
+
+go to the source control tab on the left, it will also prompt you to download git, then refresh
+- can commit, change branch, pull, etc from here or the bash cmd line
+
+
+commit changes then push then to github
+- commit in source control, a commit message is required
+
+pushing (pushes commits to the cloud)
+- either "git push" or through source control
+
+pulling
+- git pull, grabs any changes from the cloud
+
+right now we only have the main branch
+
+GIT login on VScode
+- when attemping to push or pull it will ask for github username and password, you can type it in there
+- Can set it inside as a config  from the bash
+  git config --global user.email "you@example.com"
+  git config --global user.name "Your Name"
+- will be prompted to login through git
