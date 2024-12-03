@@ -34,16 +34,14 @@ def determine_direction(current_bearing, target_bearing):
     """
     difference = (target_bearing - current_bearing + 360) % 360
 
-    return difference
-
-    if difference < 10 or difference > 350:
+    if difference == 0:
         return "Go straight"
     elif difference > 180:
-        return "Turn left"
-    elif difference < 180:
-        return "Turn right"
+        turn_angle = 360 - difference
+        return f"Turn left {turn_angle:.1f} degrees"
     else:
-        return "U-turn"
+        turn_angle = difference
+        return f"Turn right {turn_angle:.1f} degrees"
 
 def load_coordinates(file_path):
     """
@@ -88,7 +86,6 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     return distance
 
 
-
 # Load coordinates from file and generate directions
 file_path = 'marcus_loop.TXT'  # Path to your file
 coordinates = load_coordinates(file_path)
@@ -101,21 +98,21 @@ while True:
     ser_bytes = ser.readline().decode().strip()
     if ser_bytes: # new data
         current_lat, current_long, current_heading, current_pace = map(float, ser_bytes.split(" "))
-        print(f"\ngnss data: {current_lat} {current_long} {current_heading} {current_pace}")
+        print(f"\ngnss data: {current_lat} {current_long} {current_heading}")# {current_pace}")
         
-        lat_diff = current_lat - coordinates[i][0]
-        long_diff = current_long - coordinates[i][1]
+        lat_diff = abs(current_lat - coordinates[i][0])
+        long_diff = abs(current_long - coordinates[i][1])
         tolerance = 0.00001
-        print(f"\nlat_diff: {lat_diff}, long_diff: {long_diff}")
+        print(f"lat_diff: {lat_diff:.7}, long_diff: {long_diff:.7}")
         if lat_diff < tolerance and long_diff < tolerance:
             #reached waypoint
             i = i + 1 # look at next waypoint
-            print(f"\nReached waypoint #{i}")
+            print(f"Reached waypoint #{i}")
         else:
             #get distance to next waypoint from current posistion
             distanceToNext = haversine_distance(current_lat, current_long, coordinates[i][0], coordinates[i][1])
             #get direction to next wapoint
             headingToNextWaypoint = calculate_bearing(current_lat, current_long, coordinates[i][0], coordinates[i][1])
             directionToNext = determine_direction(current_heading, headingToNextWaypoint)
-            print(f"\nTo next waypoint {i}: Distance {distanceToNext:.7f}, Direction {directionToNext}")
+            print(f"To waypoint {i}: Distance {distanceToNext:.7f}, {directionToNext}\n\n")
 
