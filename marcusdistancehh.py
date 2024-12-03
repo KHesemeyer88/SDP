@@ -1,5 +1,5 @@
 import math
-import serial
+import serial # type: ignore
 
 def calculate_bearing(lat1, lon1, lat2, lon2):
     """
