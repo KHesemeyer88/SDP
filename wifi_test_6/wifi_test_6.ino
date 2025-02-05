@@ -5,6 +5,8 @@
 #include <TinyGPS++.h>
 #include <HardwareSerial.h>
 #include <Wire.h>
+#include <iostream>
+#include <cmath>
 
 // Motor A (Front) control pins
 const int MOTOR_A_PWM = 23;
@@ -276,6 +278,23 @@ void setSteeringAngle(int angle) {
     steering.write(angle);
 }
 
+static double haversineDistance(double lat1, double lon1, double lat2, double lon2) {
+    double R = 6371.137 // Radius of the Earth in kilometers
+
+    // Convert to rad
+    double dlat = (lat2 - lat1) * M_PI / 180.0;
+    double dlon = (lon2 - lon1) * M_PI / 180.0;
+
+    // formulas
+    double a = pow(sin(dLat / 2), 2) + pow(sin(dLon / 2), 2) * cos(lat1) * cos(lat2);
+    double rad = 6371;
+    double c = 2 * asin(sqrt(a));
+    return rad * c * 1000.0; // return distance and convert to meters
+}
+
+static double 
+
+
 void loop() {
     //Serial.println("Loop running");
     //Serial.println("Scanning...");
@@ -297,13 +316,18 @@ void loop() {
       //Serial.print(gps.satellites.value());
       //Serial.print("\n");
     }
-
     server.handleClient();
+
+    if()
+    setMotorSpeed(1, 1);
+    setSteeringAngle(90);
+
+
 
     // Check if the timeout period has elapsed
     if (millis() - lastUpdateTime > TIMEOUT_MS) {
         // Stop the motors and reset the steering angle
         setMotorSpeed(0, 0);  // Stop the car
         setSteeringAngle(90);  // Center the steering
-    }
+    } 
 }
