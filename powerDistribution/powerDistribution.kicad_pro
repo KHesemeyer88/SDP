@@ -53,15 +53,13 @@
       },
       "diff_pair_dimensions": [],
       "drc_exclusions": [
-        "duplicate_footprints|139500000|103500000|8e0e1489-3b59-4e0f-85cb-10b2aedade2d|8d6c3067-7c72-4af7-962e-35e1de9fd023",
-        "duplicate_footprints|139500000|184000000|99e32c4a-d924-4bc2-b150-9c2756359de5|8d6c3067-7c72-4af7-962e-35e1de9fd023",
-        "duplicate_footprints|80500000|184000000|f313a48e-e600-482e-9281-3e1384836e1a|8d6c3067-7c72-4af7-962e-35e1de9fd023",
-        "extra_footprint|139500000|103500000|8e0e1489-3b59-4e0f-85cb-10b2aedade2d|00000000-0000-0000-0000-000000000000",
-        "extra_footprint|139500000|184000000|99e32c4a-d924-4bc2-b150-9c2756359de5|00000000-0000-0000-0000-000000000000",
-        "extra_footprint|80500000|103500000|8d6c3067-7c72-4af7-962e-35e1de9fd023|00000000-0000-0000-0000-000000000000",
-        "extra_footprint|80500000|184000000|f313a48e-e600-482e-9281-3e1384836e1a|00000000-0000-0000-0000-000000000000",
-        "footprint_symbol_mismatch|112000000|128410850|0889575e-3f1e-40f7-a70b-d31fa202cad1|00000000-0000-0000-0000-000000000000",
-        "footprint_symbol_mismatch|81000000|163500000|fdbfa49f-ae54-4e6c-b6f1-df581bb38bad|00000000-0000-0000-0000-000000000000"
+        "duplicate_footprints|132000000|111000000|8e0e1489-3b59-4e0f-85cb-10b2aedade2d|8d6c3067-7c72-4af7-962e-35e1de9fd023",
+        "duplicate_footprints|134000000|184000000|99e32c4a-d924-4bc2-b150-9c2756359de5|8d6c3067-7c72-4af7-962e-35e1de9fd023",
+        "duplicate_footprints|80000000|184000000|f313a48e-e600-482e-9281-3e1384836e1a|8d6c3067-7c72-4af7-962e-35e1de9fd023",
+        "extra_footprint|132000000|111000000|8e0e1489-3b59-4e0f-85cb-10b2aedade2d|00000000-0000-0000-0000-000000000000",
+        "extra_footprint|134000000|184000000|99e32c4a-d924-4bc2-b150-9c2756359de5|00000000-0000-0000-0000-000000000000",
+        "extra_footprint|80000000|111000000|8d6c3067-7c72-4af7-962e-35e1de9fd023|00000000-0000-0000-0000-000000000000",
+        "extra_footprint|80000000|184000000|f313a48e-e600-482e-9281-3e1384836e1a|00000000-0000-0000-0000-000000000000"
       ],
       "meta": {
         "version": 2
@@ -492,7 +490,24 @@
         "name": "+3.3V",
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "schematic_color": "rgba(0, 0, 0, 0.000)",
-        "track_width": 0.2,
+        "track_width": 1.0,
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.2,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "+5V",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 1.0,
         "via_diameter": 0.6,
         "via_drill": 0.3,
         "wire_width": 6
@@ -507,6 +522,23 @@
         "microvia_diameter": 0.3,
         "microvia_drill": 0.1,
         "name": "+7V",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 1.5,
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.2,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "CHG12V",
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "schematic_color": "rgba(0, 0, 0, 0.000)",
         "track_width": 1.5,
@@ -544,6 +576,40 @@
         "pcb_color": "rgba(0, 0, 0, 0.000)",
         "schematic_color": "rgba(0, 0, 0, 0.000)",
         "track_width": 0.2,
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.2,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "Net-(J5-Pin_1)",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 1.5,
+        "via_diameter": 0.6,
+        "via_drill": 0.3,
+        "wire_width": 6
+      },
+      {
+        "bus_width": 12,
+        "clearance": 0.2,
+        "diff_pair_gap": 0.25,
+        "diff_pair_via_gap": 0.25,
+        "diff_pair_width": 0.2,
+        "line_style": 0,
+        "microvia_diameter": 0.3,
+        "microvia_drill": 0.1,
+        "name": "Net-(J5-Pin_2)",
+        "pcb_color": "rgba(0, 0, 0, 0.000)",
+        "schematic_color": "rgba(0, 0, 0, 0.000)",
+        "track_width": 1.5,
         "via_diameter": 0.6,
         "via_drill": 0.3,
         "wire_width": 6
@@ -628,6 +694,30 @@
       {
         "netclass": "+12V",
         "pattern": "/Vout_12V"
+      },
+      {
+        "netclass": "+12V",
+        "pattern": "Net-(J5-Pin_1)"
+      },
+      {
+        "netclass": "+12V",
+        "pattern": "Net-(J5-Pin_2)"
+      },
+      {
+        "netclass": "+12V",
+        "pattern": "/CHG12V"
+      },
+      {
+        "netclass": "+5V",
+        "pattern": "Net-(D2-K)"
+      },
+      {
+        "netclass": "+5V",
+        "pattern": "/Vout_5V"
+      },
+      {
+        "netclass": "+7V",
+        "pattern": "/Vout_7V_brk"
       }
     ]
   },

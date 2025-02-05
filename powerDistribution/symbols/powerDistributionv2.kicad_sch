@@ -3112,6 +3112,12 @@
 		(uuid "18419109-64b4-4e2c-b891-86bb0bed33a7")
 	)
 	(junction
+		(at 198.12 67.31)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "19761507-fb03-4a85-baa5-80fcdffd1b75")
+	)
+	(junction
 		(at 165.1 102.87)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -3140,12 +3146,6 @@
 		(diameter 0)
 		(color 0 0 0 0)
 		(uuid "24a71427-b4a2-417f-b690-f70cc4e0818a")
-	)
-	(junction
-		(at 81.28 67.31)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "373abe43-4a36-4619-804e-d177c737b4b7")
 	)
 	(junction
 		(at 195.58 124.46)
@@ -3226,10 +3226,16 @@
 		(uuid "88708d2c-ab64-4671-9f85-1a022c3e1acf")
 	)
 	(junction
-		(at 198.12 67.31)
+		(at 90.17 124.46)
 		(diameter 0)
 		(color 0 0 0 0)
-		(uuid "95092b1b-230d-4336-8cb7-b840db2ce9ba")
+		(uuid "8b3bc253-a2e5-4e4f-9574-896eec4141bc")
+	)
+	(junction
+		(at 81.28 67.31)
+		(diameter 0)
+		(color 0 0 0 0)
+		(uuid "95285575-6018-4e84-adde-760e3d2ae569")
 	)
 	(junction
 		(at 67.31 93.98)
@@ -3457,7 +3463,7 @@
 	)
 	(wire
 		(pts
-			(xy 83.82 124.46) (xy 95.25 124.46)
+			(xy 83.82 124.46) (xy 90.17 124.46)
 		)
 		(stroke
 			(width 0)
@@ -3807,6 +3813,16 @@
 	)
 	(wire
 		(pts
+			(xy 81.28 67.31) (xy 83.82 67.31)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "800ebdb8-023c-4f3e-836f-184c5edac4b1")
+	)
+	(wire
+		(pts
 			(xy 146.05 124.46) (xy 165.1 124.46)
 		)
 		(stroke
@@ -4137,6 +4153,16 @@
 	)
 	(wire
 		(pts
+			(xy 90.17 124.46) (xy 95.25 124.46)
+		)
+		(stroke
+			(width 0)
+			(type default)
+		)
+		(uuid "cff1da3e-0724-4353-853c-071f4f3527fd")
+	)
+	(wire
+		(pts
 			(xy 107.95 124.46) (xy 120.65 124.46)
 		)
 		(stroke
@@ -4154,16 +4180,6 @@
 			(type default)
 		)
 		(uuid "d757c766-ed59-4584-aa2c-108f43b2ce5d")
-	)
-	(wire
-		(pts
-			(xy 81.28 67.31) (xy 83.82 67.31)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "e6fb7ffc-826e-4747-9112-5da6b32c04d8")
 	)
 	(wire
 		(pts
@@ -4304,7 +4320,7 @@
 		)
 		(uuid "d99a612e-ea0f-440d-a426-0461aee34cff")
 	)
-	(label "CHG12V"
+	(label "Vin_12V"
 		(at 71.12 72.39 0)
 		(fields_autoplaced yes)
 		(effects
@@ -4348,7 +4364,7 @@
 		)
 		(uuid "72d1ff49-0b49-4424-a62a-77599423b370")
 	)
-	(label "Vout_7V_brk"
+	(label "Vout_7V"
 		(at 214.63 59.69 0)
 		(fields_autoplaced yes)
 		(effects
@@ -4380,6 +4396,126 @@
 			(justify left bottom)
 		)
 		(uuid "ce927929-3479-4f81-8419-bb0d34030b6a")
+	)
+	(symbol
+		(lib_id "fz_holder:3557-10")
+		(at 81.28 59.69 90)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(uuid "04a6ded7-1f84-4962-a420-5b78230b45d1")
+		(property "Reference" "F2"
+			(at 82.804 61.214 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Value" "~"
+			(at 85.09 60.96 90)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify right)
+			)
+		)
+		(property "Footprint" "3557-10:FUSE_3557-10"
+			(at 81.28 59.69 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 81.28 59.69 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 81.28 59.69 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "PARTREV" "D"
+			(at 81.28 59.69 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "STANDARD" "Manufacturer Recommendation"
+			(at 81.28 59.69 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "SNAPEDA_PN" "3557-2"
+			(at 81.28 59.69 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "MAXIMUM_PACKAGE_HEIGHT" "7.37mm"
+			(at 81.28 59.69 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "MANUFACTURER" "Keystone"
+			(at 81.28 59.69 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(pin "2_1"
+			(uuid "f3f2dbab-d082-4727-ae85-8ac920664e42")
+		)
+		(pin "1_1"
+			(uuid "d497d317-86ba-4fc5-a451-4ebf99c99f59")
+		)
+		(instances
+			(project ""
+				(path "/a5d888e0-d394-4a9f-8539-f136f21e533f"
+					(reference "F2")
+					(unit 1)
+				)
+			)
+		)
 	)
 	(symbol
 		(lib_id "power:PWR_FLAG")
@@ -4657,31 +4793,32 @@
 	)
 	(symbol
 		(lib_id "fz_holder:3557-10")
-		(at 205.74 67.31 0)
+		(at 205.74 67.31 180)
 		(unit 1)
 		(exclude_from_sim no)
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "29e22be9-a0ca-4ef2-b76b-e125e85dafc3")
+		(uuid "2a01193d-820d-4af8-8591-89ade7409661")
 		(property "Reference" "F1"
-			(at 205.74 60.96 0)
+			(at 207.264 65.786 0)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(justify right)
 			)
 		)
-		(property "Value" "3557-10"
-			(at 205.74 63.5 0)
+		(property "Value" "~"
+			(at 207.01 63.5 90)
 			(effects
 				(font
 					(size 1.27 1.27)
 				)
+				(justify right)
 			)
 		)
-		(property "Footprint" "_footprints:fz_holder_3557-10"
+		(property "Footprint" "3557-10:FUSE_3557-10"
 			(at 205.74 67.31 0)
 			(effects
 				(font
@@ -4760,13 +4897,13 @@
 			)
 		)
 		(pin "2_1"
-			(uuid "f2182762-9138-4e74-9cf8-ad42cc65c3b4")
+			(uuid "9d8f9a88-05c5-4027-b161-8255a9d827ae")
 		)
 		(pin "1_1"
-			(uuid "00153520-a113-4a82-a11a-c2313bf0e872")
+			(uuid "c79e83de-f5f4-4f7b-b1df-17187f28b5dc")
 		)
 		(instances
-			(project ""
+			(project "powerDistribution"
 				(path "/a5d888e0-d394-4a9f-8539-f136f21e533f"
 					(reference "F1")
 					(unit 1)
@@ -4800,7 +4937,7 @@
 				)
 			)
 		)
-		(property "Footprint" "_footprints:inductor_1A_100uH"
+		(property "Footprint" "_footprints:1410454C_MUR"
 			(at 132.08 116.84 0)
 			(effects
 				(font
@@ -5351,7 +5488,7 @@
 				)
 			)
 		)
-		(property "Footprint" "_footprints:5V_lm2576"
+		(property "Footprint" "_footprints:T05A_TEX"
 			(at 195.58 120.65 0)
 			(effects
 				(font
@@ -5547,6 +5684,7 @@
 		(in_bom yes)
 		(on_board yes)
 		(dnp no)
+		(fields_autoplaced yes)
 		(uuid "6067e280-db25-487c-9994-07eb739a91ef")
 		(property "Reference" "#PWR01"
 			(at 76.2 71.12 0)
@@ -5675,127 +5813,6 @@
 		)
 	)
 	(symbol
-		(lib_id "fz_holder:3557-10")
-		(at 81.28 59.69 90)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "6587c97b-4796-45d3-8bc9-d94522acf46d")
-		(property "Reference" "F2"
-			(at 85.09 58.4199 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Value" "3557-10"
-			(at 85.09 60.9599 90)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify right)
-			)
-		)
-		(property "Footprint" "_footprints:fz_holder_3557-10"
-			(at 81.28 59.69 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 81.28 59.69 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" ""
-			(at 81.28 59.69 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "PARTREV" "D"
-			(at 81.28 59.69 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(property "STANDARD" "Manufacturer Recommendation"
-			(at 81.28 59.69 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(property "SNAPEDA_PN" "3557-2"
-			(at 81.28 59.69 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(property "MAXIMUM_PACKAGE_HEIGHT" "7.37mm"
-			(at 81.28 59.69 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(property "MANUFACTURER" "Keystone"
-			(at 81.28 59.69 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(pin "1_1"
-			(uuid "8ae50da5-20db-450a-b51f-36d34cfed535")
-		)
-		(pin "2_1"
-			(uuid "e3358952-447e-4954-82d5-8d801c25d7fb")
-		)
-		(instances
-			(project ""
-				(path "/a5d888e0-d394-4a9f-8539-f136f21e533f"
-					(reference "F2")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "Device:L")
 		(at 218.44 116.84 90)
 		(unit 1)
@@ -5821,7 +5838,7 @@
 				)
 			)
 		)
-		(property "Footprint" "_footprints:inductor_1A_100uH"
+		(property "Footprint" "_footprints:1410454C_MUR"
 			(at 218.44 116.84 0)
 			(effects
 				(font
@@ -6343,7 +6360,7 @@
 				)
 			)
 		)
-		(property "Footprint" "_footprints:3.3V_lm2576"
+		(property "Footprint" "_footprints:T05A_TEX"
 			(at 107.95 120.65 0)
 			(effects
 				(font
@@ -6873,6 +6890,72 @@
 			(project ""
 				(path "/a5d888e0-d394-4a9f-8539-f136f21e533f"
 					(reference "C4")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "power:PWR_FLAG")
+		(at 90.17 124.46 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "f82ab8e0-dcfe-4dc0-87a8-f1f6d4a01ab2")
+		(property "Reference" "#FLG01"
+			(at 90.17 122.555 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Value" "PWR_FLAG"
+			(at 90.17 119.38 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" ""
+			(at 90.17 124.46 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "~"
+			(at 90.17 124.46 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" "Special symbol for telling ERC where power comes from"
+			(at 90.17 124.46 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "71c4262b-1f1f-43d8-944a-92570a3eabb2")
+		)
+		(instances
+			(project ""
+				(path "/a5d888e0-d394-4a9f-8539-f136f21e533f"
+					(reference "#FLG01")
 					(unit 1)
 				)
 			)

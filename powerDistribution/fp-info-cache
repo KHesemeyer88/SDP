@@ -1,4 +1,4 @@
-24130219620469325
+24133681446504861
 Audio_Module
 Reverb_BTDR-1H
 Digital Reverberation Unit, http://www.belton.co.kr/inc/downfile.php?seq=17&file=pdf (footprint from http://www.uk-electronic.de/PDF/BTDR-1.pdf)
@@ -97691,6 +97691,20 @@ RNF14FTD1K00
 0
 2
 2
+_footprints
+SWITCHCRAFT_RAPC722X
+
+
+0
+3
+3
+_footprints
+SW_100DP3T1B1M2QEH
+
+
+0
+6
+6
 _footprints
 T05A_TEX
 

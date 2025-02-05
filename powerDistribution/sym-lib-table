@@ -18,4 +18,7 @@
   (lib (name "LM338T")(type "KiCad")(uri "${KIPRJMOD}/symbols/LM338T.kicad_sym")(options "")(descr ""))
   (lib (name "LM2678T-ADJ_NOPB")(type "KiCad")(uri "${KIPRJMOD}/symbols/LM2678T-ADJ_NOPB.kicad_sym")(options "")(descr ""))
   (lib (name "TB002-500-02BE")(type "KiCad")(uri "${KIPRJMOD}/symbols/TB002-500-02BE.kicad_sym")(options "")(descr ""))
+  (lib (name "DPDT")(type "KiCad")(uri "${KIPRJMOD}/symbols/100DP3T1B1M2QEH.kicad_sym")(options "")(descr ""))
+  (lib (name "barrel")(type "KiCad")(uri "${KIPRJMOD}/symbols/RAPC722X.kicad_sym")(options "")(descr ""))
+  (lib (name "fz_holder")(type "KiCad")(uri "${KIPRJMOD}/symbols/fz_holder_3557-10.kicad_sym")(options "")(descr ""))
 )
