@@ -51,7 +51,7 @@ def load_coordinates(file_path):
     :return: List of (latitude, longitude) tuples
     """
     coordinates = []
-    with open('C:/Users/Minh/Downloads/marcus_loop.txt', 'r') as file:
+    with open('marcus_loop.txt', 'r') as file:
         for line_number, line in enumerate(file, start=1):
             line = line.strip()
             if not line:
@@ -150,7 +150,7 @@ def generate_directions_and_distance(coordinates):
 
 
 # Load coordinates from file and generate directions
-file_path = '/mnt/data/marcus_loop.TXT'  # Path to your file
+file_path = 'marcus_loop.TXT'  # Path to your file
 coordinates = load_coordinates(file_path)
 directions, total_distance, total_distance = generate_directions_and_distance(coordinates)
 
