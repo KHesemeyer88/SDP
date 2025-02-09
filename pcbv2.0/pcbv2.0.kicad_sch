@@ -2062,46 +2062,45 @@
 				)
 			)
 		)
-		(symbol "WE-RSTV:471002268143"
+		(symbol "S101031MS02Q_SPST:S101031MS02Q"
 			(pin_names
-				(offset 1.016)
+				(offset 0.254)
 			)
 			(exclude_from_sim no)
 			(in_bom yes)
 			(on_board yes)
-			(property "Reference" "S"
-				(at 0.07 2.54 0)
+			(property "Reference" "SW"
+				(at 7.62 3.81 0)
 				(effects
 					(font
-						(size 1.27 1.27)
+						(size 1.524 1.524)
 					)
-					(justify bottom)
 				)
 			)
-			(property "Value" "471002268143"
+			(property "Value" "S101031MS02Q"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.524 1.524)
+					)
+				)
+			)
+			(property "Footprint" "SW2_S101031MS02Q_CNK"
 				(at 0 0 0)
 				(effects
 					(font
 						(size 1.27 1.27)
-					)
-					(justify bottom)
-					(hide yes)
-				)
-			)
-			(property "Footprint" ""
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
+						(italic yes)
 					)
 					(hide yes)
 				)
 			)
-			(property "Datasheet" ""
+			(property "Datasheet" "S101031MS02Q"
 				(at 0 0 0)
 				(effects
 					(font
 						(size 1.27 1.27)
+						(italic yes)
 					)
 					(hide yes)
 				)
@@ -2115,59 +2114,71 @@
 					(hide yes)
 				)
 			)
-			(property "FRAME-COLOR" "Black"
+			(property "ki_locked" ""
 				(at 0 0 0)
 				(effects
 					(font
 						(size 1.27 1.27)
 					)
-					(justify bottom)
-					(hide yes)
 				)
 			)
-			(property "QTY" "100"
+			(property "ki_keywords" "S101031MS02Q"
 				(at 0 0 0)
 				(effects
 					(font
 						(size 1.27 1.27)
 					)
-					(justify bottom)
 					(hide yes)
 				)
 			)
-			(property "ACTUATOR-COLOR" "Black"
+			(property "ki_fp_filters" "SW2_S101031MS02Q_CNK"
 				(at 0 0 0)
 				(effects
 					(font
 						(size 1.27 1.27)
 					)
-					(justify bottom)
 					(hide yes)
 				)
 			)
-			(property "DATASHEET-URL" "https://www.we-online.com/redexpert/spec/471002268143?ae"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
+			(symbol "S101031MS02Q_0_1"
+				(polyline
+					(pts
+						(xy 2.54 0) (xy 3.81 0)
 					)
-					(justify bottom)
-					(hide yes)
-				)
-			)
-			(property "PART-NUMBER" "471002268143"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
+					(stroke
+						(width 0.2032)
+						(type default)
 					)
-					(justify bottom)
-					(hide yes)
+					(fill
+						(type none)
+					)
 				)
-			)
-			(symbol "471002268143_0_0"
+				(polyline
+					(pts
+						(xy 4.445 0) (xy 11.43 1.905)
+					)
+					(stroke
+						(width 0.2032)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 12.7 0) (xy 11.43 0)
+					)
+					(stroke
+						(width 0.2032)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
 				(circle
-					(center -1.27 0)
+					(center 4.445 0)
 					(radius 0.635)
 					(stroke
 						(width 0.254)
@@ -2177,44 +2188,8 @@
 						(type none)
 					)
 				)
-				(polyline
-					(pts
-						(xy -2.54 0) (xy -1.905 0)
-					)
-					(stroke
-						(width 0.254)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 1.36 0.64) (xy -1.36 1.03)
-					)
-					(stroke
-						(width 0.254)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy 2.54 0) (xy 1.905 0)
-					)
-					(stroke
-						(width 0.254)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
 				(circle
-					(center 1.27 0)
+					(center 10.795 0)
 					(radius 0.635)
 					(stroke
 						(width 0.254)
@@ -2224,38 +2199,38 @@
 						(type none)
 					)
 				)
-				(pin passive line
-					(at 5.08 0 180)
+				(pin unspecified line
+					(at 0 0 0)
 					(length 2.54)
-					(name "~"
+					(name "1"
 						(effects
 							(font
-								(size 1.016 1.016)
+								(size 1.27 1.27)
 							)
 						)
 					)
 					(number "1"
 						(effects
 							(font
-								(size 1.016 1.016)
+								(size 1.27 1.27)
 							)
 						)
 					)
 				)
-				(pin passive line
-					(at -5.08 0 0)
+				(pin unspecified line
+					(at 15.24 0 180)
 					(length 2.54)
-					(name "~"
+					(name "2"
 						(effects
 							(font
-								(size 1.016 1.016)
+								(size 1.27 1.27)
 							)
 						)
 					)
 					(number "2"
 						(effects
 							(font
-								(size 1.016 1.016)
+								(size 1.27 1.27)
 							)
 						)
 					)
@@ -3029,7 +3004,7 @@
 	)
 	(wire
 		(pts
-			(xy 107.95 41.91) (xy 113.03 41.91)
+			(xy 107.95 41.91) (xy 115.57 41.91)
 		)
 		(stroke
 			(width 0)
@@ -3376,6 +3351,76 @@
 			(type default)
 		)
 		(uuid "f892223d-be24-4aa4-9608-7583df57e5aa")
+	)
+	(symbol
+		(lib_id "S101031MS02Q_SPST:S101031MS02Q")
+		(at 115.57 41.91 0)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "095b608e-b446-45bb-9acf-dd353a62c58b")
+		(property "Reference" "SW1"
+			(at 123.19 35.56 0)
+			(effects
+				(font
+					(size 1.524 1.524)
+				)
+			)
+		)
+		(property "Value" "S101031MS02Q"
+			(at 123.19 38.1 0)
+			(effects
+				(font
+					(size 1.524 1.524)
+				)
+			)
+		)
+		(property "Footprint" "S101031MS02Q:SW2_S101031MS02Q_CNK"
+			(at 115.57 41.91 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+					(italic yes)
+				)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" "S101031MS02Q"
+			(at 115.57 41.91 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+					(italic yes)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 115.57 41.91 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(pin "2"
+			(uuid "190bce62-b4d9-487d-af1c-44b9b83502e7")
+		)
+		(pin "1"
+			(uuid "b3663638-f42a-47e5-b5eb-e8db136e5b6c")
+		)
+		(instances
+			(project ""
+				(path "/0203021d-7c2b-4845-bf22-22fcccedbbe3"
+					(reference "SW1")
+					(unit 1)
+				)
+			)
+		)
 	)
 	(symbol
 		(lib_id "Connector:Screw_Terminal_01x02")
@@ -3740,7 +3785,7 @@
 		(on_board yes)
 		(dnp no)
 		(uuid "48dc6a00-5cb3-4f90-af4e-08bf7151ceb6")
-		(property "Reference" "J3"
+		(property "Reference" "J2"
 			(at 140.97 62.23 0)
 			(effects
 				(font
@@ -3792,7 +3837,7 @@
 		(instances
 			(project "pcbv2.0"
 				(path "/0203021d-7c2b-4845-bf22-22fcccedbbe3"
-					(reference "J3")
+					(reference "J2")
 					(unit 1)
 				)
 			)
@@ -4246,8 +4291,8 @@
 				)
 			)
 		)
-		(property "Value" "100uH"
-			(at 98.552 39.37 0)
+		(property "Value" "1245_7447715101 (100uH)"
+			(at 105.156 39.624 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -4709,134 +4754,6 @@
 		)
 	)
 	(symbol
-		(lib_id "WE-RSTV:471002268143")
-		(at 118.11 41.91 0)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "85086fc4-ba1d-4473-b469-2e84c9749d87")
-		(property "Reference" "S1"
-			(at 118.11 35.56 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "471002268143"
-			(at 118.11 38.1 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "WE-RSTV:switch_471002268143_actual"
-			(at 118.11 41.91 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" ""
-			(at 118.11 41.91 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" ""
-			(at 118.11 41.91 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "FRAME-COLOR" "Black"
-			(at 118.11 41.91 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(property "VALUE" "471002268143"
-			(at 118.11 41.91 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(property "QTY" "100"
-			(at 118.11 41.91 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(property "ACTUATOR-COLOR" "Black"
-			(at 118.11 41.91 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(property "DATASHEET-URL" "https://www.we-online.com/redexpert/spec/471002268143?ae"
-			(at 118.11 41.91 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(property "PART-NUMBER" "471002268143"
-			(at 118.11 41.91 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify bottom)
-				(hide yes)
-			)
-		)
-		(pin "1"
-			(uuid "2dcb84de-3362-4882-81ba-a13d7d5af495")
-		)
-		(pin "2"
-			(uuid "a0e32597-1982-4180-9465-74ffe33fc446")
-		)
-		(instances
-			(project ""
-				(path "/0203021d-7c2b-4845-bf22-22fcccedbbe3"
-					(reference "S1")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
 		(lib_id "PCM_Espressif:ESP32-DevKitC")
 		(at 67.31 152.4 0)
 		(unit 1)
@@ -5024,7 +4941,7 @@
 		(dnp no)
 		(uuid "9374c3dd-6d48-4f76-9a9a-306d7e18b5d7")
 		(property "Reference" "L2"
-			(at 97.536 66.04 0)
+			(at 97.536 64.262 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -5032,7 +4949,7 @@
 			)
 		)
 		(property "Value" "1245_7447715101 (100uH)"
-			(at 105.664 70.612 0)
+			(at 105.41 65.786 0)
 			(effects
 				(font
 					(size 1.27 1.27)
