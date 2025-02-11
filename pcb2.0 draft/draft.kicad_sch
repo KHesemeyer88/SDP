@@ -474,193 +474,6 @@
 				)
 			)
 		)
-		(symbol "Connector:Screw_Terminal_01x02"
-			(pin_names
-				(offset 1.016) hide)
-			(exclude_from_sim no)
-			(in_bom yes)
-			(on_board yes)
-			(property "Reference" "J"
-				(at 0 2.54 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Value" "Screw_Terminal_01x02"
-				(at 0 -5.08 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-				)
-			)
-			(property "Footprint" ""
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Datasheet" "~"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "Description" "Generic screw terminal, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "ki_keywords" "screw terminal"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(property "ki_fp_filters" "TerminalBlock*:*"
-				(at 0 0 0)
-				(effects
-					(font
-						(size 1.27 1.27)
-					)
-					(hide yes)
-				)
-			)
-			(symbol "Screw_Terminal_01x02_1_1"
-				(rectangle
-					(start -1.27 1.27)
-					(end 1.27 -3.81)
-					(stroke
-						(width 0.254)
-						(type default)
-					)
-					(fill
-						(type background)
-					)
-				)
-				(circle
-					(center 0 -2.54)
-					(radius 0.635)
-					(stroke
-						(width 0.1524)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -0.5334 -2.2098) (xy 0.3302 -3.048)
-					)
-					(stroke
-						(width 0.1524)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -0.5334 0.3302) (xy 0.3302 -0.508)
-					)
-					(stroke
-						(width 0.1524)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -0.3556 -2.032) (xy 0.508 -2.8702)
-					)
-					(stroke
-						(width 0.1524)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(polyline
-					(pts
-						(xy -0.3556 0.508) (xy 0.508 -0.3302)
-					)
-					(stroke
-						(width 0.1524)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(circle
-					(center 0 0)
-					(radius 0.635)
-					(stroke
-						(width 0.1524)
-						(type default)
-					)
-					(fill
-						(type none)
-					)
-				)
-				(pin passive line
-					(at -5.08 0 0)
-					(length 3.81)
-					(name "Pin_1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "1"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-				(pin passive line
-					(at -5.08 -2.54 0)
-					(length 3.81)
-					(name "Pin_2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-					(number "2"
-						(effects
-							(font
-								(size 1.27 1.27)
-							)
-						)
-					)
-				)
-			)
-		)
 		(symbol "Connector_Generic:Conn_01x04"
 			(pin_names
 				(offset 1.016) hide)
@@ -1234,6 +1047,232 @@
 						(effects
 							(font
 								(size 1.27 1.27)
+							)
+						)
+					)
+				)
+			)
+		)
+		(symbol "JST_XH-A:B2B-XH-A"
+			(pin_names
+				(offset 1.016)
+			)
+			(exclude_from_sim no)
+			(in_bom yes)
+			(on_board yes)
+			(property "Reference" "J"
+				(at -2.54 6.35 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left bottom)
+				)
+			)
+			(property "Value" "B2B-XH-A"
+				(at -2.54 -5.08 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify left bottom)
+				)
+			)
+			(property "Footprint" "B2B-XH-A:JST_B2B-XH-A"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "Datasheet" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "Description" ""
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(hide yes)
+				)
+			)
+			(property "PARTREV" "N/A"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "STANDARD" "Manufacturer Recommendations"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "MAXIMUM_PACKAGE_HEIGHT" "7 mm"
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(property "MANUFACTURER" "JST Sales America Inc."
+				(at 0 0 0)
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+					(justify bottom)
+					(hide yes)
+				)
+			)
+			(symbol "B2B-XH-A_0_0"
+				(rectangle
+					(start -3.175 -0.3175)
+					(end -1.5875 0.3175)
+					(stroke
+						(width 0.1)
+						(type default)
+					)
+					(fill
+						(type outline)
+					)
+				)
+				(rectangle
+					(start -3.175 2.2225)
+					(end -1.5875 2.8575)
+					(stroke
+						(width 0.1)
+						(type default)
+					)
+					(fill
+						(type outline)
+					)
+				)
+				(polyline
+					(pts
+						(xy -3.81 -1.27) (xy -2.54 -2.54)
+					)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -3.81 3.81) (xy -3.81 -1.27)
+					)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -3.81 3.81) (xy -2.54 5.08)
+					)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy -2.54 -2.54) (xy 3.81 -2.54)
+					)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 3.81 -2.54) (xy 3.81 5.08)
+					)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(polyline
+					(pts
+						(xy 3.81 5.08) (xy -2.54 5.08)
+					)
+					(stroke
+						(width 0.254)
+						(type default)
+					)
+					(fill
+						(type none)
+					)
+				)
+				(pin passive line
+					(at -7.62 2.54 0)
+					(length 5.08)
+					(name "1"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "1"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+				)
+				(pin passive line
+					(at -7.62 0 0)
+					(length 5.08)
+					(name "2"
+						(effects
+							(font
+								(size 1.016 1.016)
+							)
+						)
+					)
+					(number "2"
+						(effects
+							(font
+								(size 1.016 1.016)
 							)
 						)
 					)
@@ -7751,12 +7790,6 @@
 		(uuid "a9ddbf7d-1538-4174-a6bb-38b6815dea19")
 	)
 	(junction
-		(at 95.25 24.13)
-		(diameter 0)
-		(color 0 0 0 0)
-		(uuid "b1174d11-21a8-4d40-b830-6c973cf1deb3")
-	)
-	(junction
 		(at 35.56 127)
 		(diameter 0)
 		(color 0 0 0 0)
@@ -7973,12 +8006,20 @@
 		(uuid "90f300d0-d185-4d90-b2c6-9c276d872f8f")
 	)
 	(no_connect
+		(at 123.19 41.91)
+		(uuid "9891360b-50f6-43e1-939a-6dce5fd5c311")
+	)
+	(no_connect
 		(at 264.16 27.94)
 		(uuid "9c0c3359-78a6-42ed-8024-b8c7484a41e1")
 	)
 	(no_connect
 		(at 138.43 168.91)
 		(uuid "9c29dddb-a045-407f-8c01-5fa06e08aaca")
+	)
+	(no_connect
+		(at 123.19 31.75)
+		(uuid "9ded02e3-e54a-4f5c-a7fe-b1a7e9859fd4")
 	)
 	(no_connect
 		(at 171.45 40.64)
@@ -8212,7 +8253,7 @@
 	)
 	(wire
 		(pts
-			(xy 95.25 24.13) (xy 102.87 24.13)
+			(xy 88.9 24.13) (xy 102.87 24.13)
 		)
 		(stroke
 			(width 0)
@@ -9452,16 +9493,6 @@
 	)
 	(wire
 		(pts
-			(xy 95.25 20.32) (xy 95.25 24.13)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "9d28ef76-0cc7-4dba-a30c-0cabe9d84bad")
-	)
-	(wire
-		(pts
 			(xy 133.35 26.67) (xy 133.35 19.05)
 		)
 		(stroke
@@ -9702,16 +9733,6 @@
 	)
 	(wire
 		(pts
-			(xy 88.9 24.13) (xy 95.25 24.13)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "b4420d8e-c818-460d-93c5-e58b2c34626f")
-	)
-	(wire
-		(pts
 			(xy 105.41 93.98) (xy 105.41 102.87)
 		)
 		(stroke
@@ -9839,16 +9860,6 @@
 			(type default)
 		)
 		(uuid "c308b22a-85a6-47e2-9d62-dd1d6c4343ab")
-	)
-	(wire
-		(pts
-			(xy 96.52 20.32) (xy 95.25 20.32)
-		)
-		(stroke
-			(width 0)
-			(type default)
-		)
-		(uuid "c30ca6c6-92c0-426b-825e-8f9c17e9abd8")
 	)
 	(wire
 		(pts
@@ -10542,28 +10553,6 @@
 			)
 		)
 	)
-	(global_label "3V3"
-		(shape input)
-		(at 102.87 45.72 0)
-		(fields_autoplaced yes)
-		(effects
-			(font
-				(size 1.27 1.27)
-			)
-			(justify left)
-		)
-		(uuid "4cb1ffbf-06af-4af1-aae6-6268bf21db67")
-		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 109.3628 45.72 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(justify left)
-				(hide yes)
-			)
-		)
-	)
 	(global_label "BTRY"
 		(shape input)
 		(at 43.18 20.32 0)
@@ -10608,9 +10597,9 @@
 			)
 		)
 	)
-	(global_label "5V"
+	(global_label "3V30"
 		(shape input)
-		(at 96.52 20.32 0)
+		(at 102.87 50.8 0)
 		(fields_autoplaced yes)
 		(effects
 			(font
@@ -10618,9 +10607,9 @@
 			)
 			(justify left)
 		)
-		(uuid "63bcc156-1800-4928-9f79-d766aa1812a0")
+		(uuid "5a7e2361-67cb-4ee0-8294-44f5d2073fe5")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
-			(at 101.8033 20.32 0)
+			(at 110.5723 50.8 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -10755,6 +10744,28 @@
 		(uuid "eb723a35-9556-45ae-879d-e05a0d5b3163")
 		(property "Intersheetrefs" "${INTERSHEET_REFS}"
 			(at 51.3057 31.75 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify left)
+				(hide yes)
+			)
+		)
+	)
+	(global_label "5V0"
+		(shape input)
+		(at 102.87 24.13 0)
+		(fields_autoplaced yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+		(uuid "efd616be-a7e4-4729-95dd-349e3070abc9")
+		(property "Intersheetrefs" "${INTERSHEET_REFS}"
+			(at 109.3628 24.13 0)
 			(effects
 				(font
 					(size 1.27 1.27)
@@ -11179,7 +11190,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "G-188_MUR"
+		(property "Footprint" "cap_murata_0603:G-188_MUR-L"
 			(at 246.38 19.05 0)
 			(effects
 				(font
@@ -11462,7 +11473,7 @@
 				)
 			)
 		)
-		(property "Footprint" "32A_ATM"
+		(property "Footprint" "atmega328p-anr:32A_ATM-L"
 			(at 82.55 153.67 0)
 			(effects
 				(font
@@ -11694,7 +11705,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "CONN_SM04B-SRSS-TB_JST"
+		(property "Footprint" "quiic_jst:CONN_SM04B-SRSS-TB_JST"
 			(at 137.16 85.09 0)
 			(effects
 				(font
@@ -11769,7 +11780,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Inductor_SMD_Wurth:L_Wurth_WE-PD-1245"
+		(property "Footprint" "WE-PD:L_Wurth_WE-PD-1245"
 			(at 92.71 21.59 0)
 			(effects
 				(font
@@ -12029,7 +12040,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "Capacitor_SMD_Wurth:CP_Wurth_WCAP-PSLP-D5L5.5"
+		(property "Footprint" "WurthE:CP_Wurth_WCAP-PSLP-D5L5.5"
 			(at 50.8 27.94 0)
 			(effects
 				(font
@@ -12235,7 +12246,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "Capacitor_SMD_Wurth:CP_Wurth_WCAP-ASLI-D12.5L14"
+		(property "Footprint" "WurthE:CP_Wurth_WCAP-ASLI-D12.5L14"
 			(at 95.25 33.02 0)
 			(effects
 				(font
@@ -12456,7 +12467,7 @@
 				)
 			)
 		)
-		(property "Footprint" "RES_CR0805_VEN"
+		(property "Footprint" "R_SMD:RES_CR0805_VEN-L"
 			(at 154.94 27.94 0)
 			(effects
 				(font
@@ -12528,7 +12539,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "RES_CR0805_VEN"
+		(property "Footprint" "R_SMD:RES_CR0805_VEN-L"
 			(at 261.62 161.29 0)
 			(effects
 				(font
@@ -12599,7 +12610,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "G-188_MUR"
+		(property "Footprint" "cap_murata_0603:G-188_MUR-L"
 			(at 64.77 166.37 0)
 			(effects
 				(font
@@ -12670,7 +12681,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "CAP_GRM21_MUR"
+		(property "Footprint" "cap_murata_0805:CAP_GRM21_MUR-L"
 			(at 127 55.88 0)
 			(effects
 				(font
@@ -12740,7 +12751,7 @@
 				)
 			)
 		)
-		(property "Footprint" "ERJU08J271V:RES_ERJU08J271V"
+		(property "Footprint" "r_erj_270:RES_ERJU08J271V"
 			(at 200.66 144.78 0)
 			(effects
 				(font
@@ -12851,7 +12862,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "Capacitor_SMD_Wurth:CP_Wurth_WCAP-PSLP-D5L5.5"
+		(property "Footprint" "WurthE:CP_Wurth_WCAP-PSLP-D5L5.5"
 			(at 50.8 54.61 0)
 			(effects
 				(font
@@ -13023,6 +13034,115 @@
 			(project "draft"
 				(path "/a99963fb-40dd-4f22-82d4-a7fb91c01204"
 					(reference "CP2")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
+		(lib_id "JST_XH-A:B2B-XH-A")
+		(at 24.13 45.72 180)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "3c62083a-3e44-48f1-8d4f-a3900430ae11")
+		(property "Reference" "J8"
+			(at 24.13 38.1 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "BTRY OUT"
+			(at 24.13 40.64 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "jst_xh:JST_B2B-XH-A"
+			(at 24.13 45.72 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 24.13 45.72 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 24.13 45.72 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "PARTREV" "N/A"
+			(at 24.13 45.72 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "STANDARD" "Manufacturer Recommendations"
+			(at 24.13 45.72 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "MAXIMUM_PACKAGE_HEIGHT" "7 mm"
+			(at 24.13 45.72 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "MANUFACTURER" "JST Sales America Inc."
+			(at 24.13 45.72 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "49e96c90-32ca-41d3-89a1-75efa8aa3ab1")
+		)
+		(pin "2"
+			(uuid "df1c65bb-5cc1-4bef-9794-9434d3e590e2")
+		)
+		(instances
+			(project "draft"
+				(path "/a99963fb-40dd-4f22-82d4-a7fb91c01204"
+					(reference "J8")
 					(unit 1)
 				)
 			)
@@ -13321,7 +13441,7 @@
 				)
 			)
 		)
-		(property "Footprint" "EG2201B:SW_EG2201B"
+		(property "Footprint" "switch_eg2201_dpdt:SW_EG2201B"
 			(at 228.6 153.67 0)
 			(effects
 				(font
@@ -13656,7 +13776,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "G-188_MUR"
+		(property "Footprint" "cap_murata_0603:G-188_MUR-L"
 			(at 113.03 128.27 0)
 			(effects
 				(font
@@ -13725,7 +13845,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Inductor_SMD_Wurth:L_Wurth_WE-PD-1245"
+		(property "Footprint" "WE-PD:L_Wurth_WE-PD-1245"
 			(at 92.71 48.26 0)
 			(effects
 				(font
@@ -13912,7 +14032,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "RES_CR0805_VEN"
+		(property "Footprint" "R_SMD:RES_CR0805_VEN-L"
 			(at 35.56 140.97 0)
 			(effects
 				(font
@@ -13984,7 +14104,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "RES_CR0805_VEN"
+		(property "Footprint" "R_SMD:RES_CR0805_VEN-L"
 			(at 261.62 151.13 0)
 			(effects
 				(font
@@ -14367,7 +14487,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "CAP_GRM21_MUR"
+		(property "Footprint" "cap_murata_0805:CAP_GRM21_MUR-L"
 			(at 128.27 26.67 0)
 			(effects
 				(font
@@ -14439,7 +14559,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "ERJU08J122V:RES_ERJU08J122V"
+		(property "Footprint" "r_erj_1p2k:RES_ERJU08J122V"
 			(at 41.91 71.12 0)
 			(effects
 				(font
@@ -14680,7 +14800,7 @@
 				)
 			)
 		)
-		(property "Footprint" "EG2201B:SW_EG2201B"
+		(property "Footprint" "switch_eg2201_dpdt:SW_EG2201B"
 			(at 115.57 34.29 0)
 			(effects
 				(font
@@ -14944,7 +15064,7 @@
 				)
 			)
 		)
-		(property "Footprint" "Capacitor_SMD_Wurth:CP_Wurth_WCAP-PSLP-D5L5.8"
+		(property "Footprint" "WurthE:CP_Wurth_WCAP-PSLP-D5L5.8"
 			(at 142.24 22.86 0)
 			(effects
 				(font
@@ -15149,7 +15269,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "RES_CR0805_VEN"
+		(property "Footprint" "R_SMD:RES_CR0805_VEN-L"
 			(at 59.69 165.1 0)
 			(effects
 				(font
@@ -15188,75 +15308,6 @@
 			(project "draft"
 				(path "/a99963fb-40dd-4f22-82d4-a7fb91c01204"
 					(reference "R9")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector:Screw_Terminal_01x02")
-		(at 26.67 45.72 0)
-		(mirror y)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "9a90f326-2fea-483d-9b92-40959afdd81f")
-		(property "Reference" "J8"
-			(at 26.67 39.37 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "BTRY OUT"
-			(at 26.67 41.91 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "terminal:CUI_TB002-500-02BE"
-			(at 26.67 45.72 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 26.67 45.72 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Generic screw terminal, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)"
-			(at 26.67 45.72 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "2"
-			(uuid "de14b247-8e7d-4c08-8a52-86a3b5a4e38e")
-		)
-		(pin "1"
-			(uuid "00bf701c-90fc-4d70-90cf-8589e14fc4c2")
-		)
-		(instances
-			(project "draft"
-				(path "/a99963fb-40dd-4f22-82d4-a7fb91c01204"
-					(reference "J8")
 					(unit 1)
 				)
 			)
@@ -15406,7 +15457,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "G-188_MUR"
+		(property "Footprint" "cap_murata_0603:G-188_MUR-L"
 			(at 161.29 184.15 0)
 			(effects
 				(font
@@ -15544,7 +15595,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "G-188_MUR"
+		(property "Footprint" "cap_murata_0603:G-188_MUR-L"
 			(at 52.07 161.29 0)
 			(effects
 				(font
@@ -15613,7 +15664,7 @@
 				)
 			)
 		)
-		(property "Footprint" "RES_CR0805_VEN"
+		(property "Footprint" "R_SMD:RES_CR0805_VEN-L"
 			(at 38.1 127 0)
 			(effects
 				(font
@@ -15684,7 +15735,7 @@
 				(justify left)
 			)
 		)
-		(property "Footprint" "G-188_MUR"
+		(property "Footprint" "cap_murata_0603:G-188_MUR-L"
 			(at 173.99 186.69 0)
 			(effects
 				(font
@@ -15823,7 +15874,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "RES_CR0805_VEN"
+		(property "Footprint" "R_SMD:RES_CR0805_VEN-L"
 			(at 35.56 196.85 0)
 			(effects
 				(font
@@ -15893,7 +15944,7 @@
 				)
 			)
 		)
-		(property "Footprint" "LEDC3215X110N"
+		(property "Footprint" "led_smd_1206:LEDC3215X110N"
 			(at 135.89 -53.01 0)
 			(effects
 				(font
@@ -16214,7 +16265,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "Capacitor_SMD_Wurth:CP_Wurth_WCAP-PSLP-D5L5.5"
+		(property "Footprint" "WurthE:CP_Wurth_WCAP-PSLP-D5L5.5"
 			(at 256.54 74.93 0)
 			(effects
 				(font
@@ -16419,7 +16470,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "RES_CR0805_VEN"
+		(property "Footprint" "R_SMD:RES_CR0805_VEN-L"
 			(at 57.15 137.16 0)
 			(effects
 				(font
@@ -16489,7 +16540,7 @@
 				)
 			)
 		)
-		(property "Footprint" "LEDC3215X110N"
+		(property "Footprint" "led_smd_1206:LEDC3215X110N"
 			(at 113.03 174.93 0)
 			(effects
 				(font
@@ -16743,7 +16794,7 @@
 				)
 			)
 		)
-		(property "Footprint" "RES_CR0805_VEN"
+		(property "Footprint" "R_SMD:RES_CR0805_VEN-L"
 			(at 38.1 154.94 0)
 			(effects
 				(font
@@ -16816,7 +16867,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "Capacitor_SMD_Wurth:CP_Wurth_WCAP-ASLI-D12.5L14"
+		(property "Footprint" "WurthE:CP_Wurth_WCAP-ASLI-D12.5L14"
 			(at 95.25 62.23 0)
 			(effects
 				(font
@@ -17037,7 +17088,7 @@
 				)
 			)
 		)
-		(property "Footprint" "LEDC3215X110N"
+		(property "Footprint" "led_smd_1206:LEDC3215X110N"
 			(at 177.8 51.13 0)
 			(effects
 				(font
@@ -17159,7 +17210,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "RES_CR0805_VEN"
+		(property "Footprint" "R_SMD:RES_CR0805_VEN-L"
 			(at 158.75 151.13 0)
 			(effects
 				(font
@@ -17198,75 +17249,6 @@
 			(project "draft"
 				(path "/a99963fb-40dd-4f22-82d4-a7fb91c01204"
 					(reference "R7")
-					(unit 1)
-				)
-			)
-		)
-	)
-	(symbol
-		(lib_id "Connector:Screw_Terminal_01x02")
-		(at 26.67 24.13 0)
-		(mirror y)
-		(unit 1)
-		(exclude_from_sim no)
-		(in_bom yes)
-		(on_board yes)
-		(dnp no)
-		(fields_autoplaced yes)
-		(uuid "cf941e38-80c9-47ea-9a41-2256ef6b3dc1")
-		(property "Reference" "J1"
-			(at 26.67 17.78 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Value" "BTRY IN"
-			(at 26.67 20.32 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-			)
-		)
-		(property "Footprint" "terminal:CUI_TB002-500-02BE"
-			(at 26.67 24.13 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Datasheet" "~"
-			(at 26.67 24.13 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(property "Description" "Generic screw terminal, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)"
-			(at 26.67 24.13 0)
-			(effects
-				(font
-					(size 1.27 1.27)
-				)
-				(hide yes)
-			)
-		)
-		(pin "2"
-			(uuid "159c0ea4-95de-4731-a5e2-86a4d6ca6ab5")
-		)
-		(pin "1"
-			(uuid "85aaf5d0-fc79-4427-b4d6-e6ef5993f66a")
-		)
-		(instances
-			(project "draft"
-				(path "/a99963fb-40dd-4f22-82d4-a7fb91c01204"
-					(reference "J1")
 					(unit 1)
 				)
 			)
@@ -17438,7 +17420,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "LEDC3215X110N"
+		(property "Footprint" "led_smd_1206:LEDC3215X110N"
 			(at 135.56 48.26 0)
 			(effects
 				(font
@@ -17623,7 +17605,7 @@
 				)
 			)
 		)
-		(property "Footprint" "RES_CR0805_VEN"
+		(property "Footprint" "R_SMD:RES_CR0805_VEN-L"
 			(at 38.1 182.88 0)
 			(effects
 				(font
@@ -17693,7 +17675,7 @@
 				)
 			)
 		)
-		(property "Footprint" "ERJU08J271V:RES_ERJU08J271V"
+		(property "Footprint" "r_erj_270:RES_ERJU08J271V"
 			(at 90.17 81.28 0)
 			(effects
 				(font
@@ -17845,6 +17827,115 @@
 		)
 	)
 	(symbol
+		(lib_id "JST_XH-A:B2B-XH-A")
+		(at 24.13 24.13 180)
+		(unit 1)
+		(exclude_from_sim no)
+		(in_bom yes)
+		(on_board yes)
+		(dnp no)
+		(fields_autoplaced yes)
+		(uuid "e875013a-ade8-4339-8f70-8419f295b96a")
+		(property "Reference" "J1"
+			(at 24.13 16.51 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Value" "BTRY IN"
+			(at 24.13 19.05 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+			)
+		)
+		(property "Footprint" "jst_xh:JST_B2B-XH-A"
+			(at 24.13 24.13 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "Datasheet" ""
+			(at 24.13 24.13 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "Description" ""
+			(at 24.13 24.13 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(hide yes)
+			)
+		)
+		(property "PARTREV" "N/A"
+			(at 24.13 24.13 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "STANDARD" "Manufacturer Recommendations"
+			(at 24.13 24.13 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "MAXIMUM_PACKAGE_HEIGHT" "7 mm"
+			(at 24.13 24.13 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(property "MANUFACTURER" "JST Sales America Inc."
+			(at 24.13 24.13 0)
+			(effects
+				(font
+					(size 1.27 1.27)
+				)
+				(justify bottom)
+				(hide yes)
+			)
+		)
+		(pin "1"
+			(uuid "951af2d6-9bd0-411d-a9d9-dbe717191a37")
+		)
+		(pin "2"
+			(uuid "395cc4b2-7c29-40f0-baca-0aeb47d4f342")
+		)
+		(instances
+			(project ""
+				(path "/a99963fb-40dd-4f22-82d4-a7fb91c01204"
+					(reference "J1")
+					(unit 1)
+				)
+			)
+		)
+	)
+	(symbol
 		(lib_id "Connector_Generic:Conn_01x04")
 		(at 22.86 127 180)
 		(unit 1)
@@ -17946,7 +18037,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "RC1206N_PAN"
+		(property "Footprint" "R_ERJ_620_1206:RC1206N_PAN-L"
 			(at 148.59 53.34 0)
 			(effects
 				(font
@@ -18084,7 +18175,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "RES_CR0805_VEN"
+		(property "Footprint" "R_SMD:RES_CR0805_VEN-L"
 			(at 58.42 193.04 0)
 			(effects
 				(font
@@ -18223,7 +18314,7 @@
 				(justify right)
 			)
 		)
-		(property "Footprint" "RES_CR0805_VEN"
+		(property "Footprint" "R_SMD:RES_CR0805_VEN-L"
 			(at 35.56 168.91 0)
 			(effects
 				(font
