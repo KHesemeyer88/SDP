@@ -3,6 +3,7 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <TinyGPS++.h>
+#include <HardwareSerial.h>
 #include <Wire.h>
 
 // Motor A (Front) control pins
