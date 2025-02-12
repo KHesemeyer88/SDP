@@ -139,15 +139,14 @@ const char webPage[] PROGMEM = R"rawliteral(
 
         <div id="autonomous-control">
             <h2>Set Destination</h2>
-            <input type="text" id="lat-input" class="coordinate-input" placeholder="Latitude (e.g. 37.7749)">
-            <input type="text" id="lng-input" class="coordinate-input" placeholder="Longitude (e.g. -122.4194)">
+            <input type="text" id="coords-input" class="coordinate-input" placeholder="Coordinates (e.g. 42.637088, -72.729328)">
             <button class="submit-btn" onclick="startAutonomousMode()">Start Navigation</button>
             <button class="submit-btn" style="background-color: #dc3545;" onclick="stopAutonomousMode()">Stop Navigation</button>
         </div>
 
         <div id="gps-data">
-            <p>Distance to Target: <span id="distance">--</span> meters</p>
-            <p>Current Bearing: <span id="bearing">--</span>°</p>
+            <p>Distance to Target: <span id="distance">--</span> m</p>
+            <p>Current Bearing: <span id="bearing">--</span>&deg;</p>
             <p>Fix Status: <span id="fix">No Fix</span></p>
             <p style="margin-top: 20px;">Target Location:</p>
             <p>Latitude: <span id="dest-lat">--</span></p>
@@ -199,13 +198,16 @@ const char webPage[] PROGMEM = R"rawliteral(
         }
 
         function startAutonomousMode() {
-            const lat = document.getElementById('lat-input').value;
-            const lng = document.getElementById('lng-input').value;
+            const coordsStr = document.getElementById('coords-input').value.trim();
+            const coords = coordsStr.split(',').map(coord => coord.trim());
             
-            if (!lat || !lng) {
-                alert('Please enter both latitude and longitude');
+            if (coords.length !== 2 || isNaN(coords[0]) || isNaN(coords[1])) {
+                alert('Please enter valid coordinates');
                 return;
             }
+            
+            const lat = parseFloat(coords[0]);
+            const lng = parseFloat(coords[1]);
 
             fetch(`/setDestination?lat=${lat}&lng=${lng}`)
                 .then(response => response.text())
@@ -287,17 +289,13 @@ const char webPage[] PROGMEM = R"rawliteral(
         // Initialize joystick and start GPS updates
         drawJoystick();
         setInterval(() => {
-            fetch('/gps')
+        fetch('/gps')
                 .then(response => response.json())
                 .then(data => {
-                    if (data.valid) {
-                        document.getElementById('lat').textContent = data.lat;
-                        document.getElementById('lng').textContent = data.lng;
-                    }
-                    document.getElementById('sats').textContent = data.sats;
+                    console.log('GPS Data received:', data);  // Debug line
                     document.getElementById('fix').textContent = data.fix;
-                    
-                    // Update destination coordinates
+                    document.getElementById('distance').textContent = data.distance;
+                    document.getElementById('bearing').textContent = data.bearing;
                     document.getElementById('dest-lat').textContent = data.destLat || '--';
                     document.getElementById('dest-lng').textContent = data.destLng || '--';
                 })
@@ -475,21 +473,22 @@ void loop() {
         if (headingError < -180) headingError += 360;
         
         // Convert heading error to steering angle (90 is center)
-        int steeringAngle = 90 + (headingError * 0.5); // Scale factor of 0.5 to dampen response
+        int steeringAngle = 90 + (headingError * 0.25); // Scale factor of 0.5 to dampen response
         steeringAngle = constrain(steeringAngle, 55, 125); // Limit steering range
         
         // Set speed based on distance and turn severity
-        int speed = 255;  // Base speed
-        if (distance < 2.0) {  // If within 2 meters
+        int speed = 128;  // Base speed
+        if (distance < 1.0) {  // If within 2 meters
             speed = 0;  // Stop at destination
             autonomousMode = false;  // Turn off autonomous mode
-        } else if (abs(headingError) > 90) {
-            speed = 128;  // Slow down for sharp turns
-        }
+        } //else if (abs(headingError) > 90) {
+            //speed = 128;  // Slow down for sharp turns
+        //}
         
         // Apply controls
         setSteeringAngle(steeringAngle);
         setMotorSpeed(speed, speed);
+        lastUpdateTime = millis();  // Add this line
         
         // Debug output
         Serial.print("Distance: ");
