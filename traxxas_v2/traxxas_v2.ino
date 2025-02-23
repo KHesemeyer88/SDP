@@ -1,7 +1,15 @@
-// Notes for improvement: consider implementing interrupt-driven sensor readings
-// or other non-blocking approaches to improve overall car responsiveness.
-// Try out the new sensor fusion code.
-// Get calibration status reported to the webpage!!!!!
+/* As of 2/22/25, calibration code seems to work in that user can pull fusion status 
+from webpage interface. But it hangs on "Initializing", which probably means the 
+car itself is not meeting the calibration requirements. Need to try:
+(1) take off the speed governor so it can go 100% speed
+(2) level out the plexiglass where the nav board sits
+(3) try it somewhere with more space to get fully up to speed
+(4) follow the datasheet and hookup guide exactly for procedure 
+
+2/22/25 trying to change the code so the user can pull waypoints directly from the car
+in manual mode. Start with one waypoint and prove out before moving on to multiple
+waypoints. */
+
 
 #include <Arduino.h>
 #include <ESP32Servo.h>
@@ -22,14 +30,26 @@ const int TRIGGER_PIN_RIGHT = 27;
 const int ECHO_PIN_RIGHT = 12;
 
 // Sonar thresholds (cm)
-const int FRONT_STOP_THRESHOLD = 50;
+const int FRONT_STOP_THRESHOLD = 50; // zero to suppress obst. avoidance
 const int SIDE_AVOID_THRESHOLD = 50;
 
 // GPS setup
 float targetLat = 0.0;
 float targetLon = 0.0;
+float recordedWaypointLat = 0.0;
+float recordedWaypointLon = 0.0;
+const int MAX_WAYPOINTS = 20;
+float waypointLats[MAX_WAYPOINTS] = {0};
+float waypointLons[MAX_WAYPOINTS] = {0};
+int waypointCount = 0;
+int currentWaypointIndex = 0;
+bool followingWaypoints = false;
+const float WAYPOINT_REACHED_RADIUS = 2.0;  // 2 meters radius
 bool autonomousMode = false;
 SFE_UBLOX_GNSS myGPS;
+bool destinationReached = false;
+unsigned long destinationReachedTime = 0;
+const unsigned long DESTINATION_MESSAGE_TIMEOUT = 5000;  // 5 seconds
 
 // Servo objects
 Servo steeringServo;
@@ -55,7 +75,7 @@ unsigned long avoidanceStartTime = 0;
 const unsigned long AVOIDANCE_DURATION = 1000; // Continue avoiding for 1 second
 
 unsigned long lastSonarUpdate = 0;
-const unsigned long SONAR_UPDATE_INTERVAL = 100; // 100ms between full sonar updates
+const unsigned long SONAR_UPDATE_INTERVAL = 200; // 100ms between full sonar updates
 
 // WiFi settings
 const char* ssid = "RC_Car_Control";
@@ -74,7 +94,7 @@ const int ESC_MAX_REV = 50;     // Max reverse allowed (~1.1ms pulse)
 const int ESC_MIN_FWD = 95;     // Minimum forward throttle
 const int ESC_MIN_REV = 85;     // Minimum reverse throttle
 const int STEERING_CENTER = 90;  // Center steering
-const int STEERING_MAX = 45;     // Maximum steering angle deviation
+const int STEERING_MAX = 55;     // Maximum steering angle deviation
 
 // Function declarations (prototypes)
 float calculateDistance(float lat1, float lon1, float lat2, float lon2);
@@ -189,6 +209,21 @@ const char webPage[] PROGMEM = R"rawliteral(
             <canvas id="joystick" width="300" height="300"></canvas>
         </div>
 
+        <!-- New manual mode GPS data section -->
+        <div id="manual-gps-data" style="margin-top: 20px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
+            <p>Fix Status: <span id="manual-fix">No Fix</span></p>
+            <p>Latitude: <span id="manual-lat">--</span></p>
+            <p>Longitude: <span id="manual-lng">--</span></p>
+            <button id="fusion-status-btn" class="submit-btn" style="background-color: #007bff;" onclick="getFusionStatus()">Get Fusion Status</button>
+            <p id="fusion-status-display" style="margin-top: 10px; display: none;">Fusion Status: <span id="fusion-status">--</span></p>
+            <p id="waypoint-count" style="margin-top: 10px;">Waypoints: 0/20</p>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button id="record-waypoint-btn" class="submit-btn" style="background-color: #28a745;" onclick="recordWaypoint()">Record WP</button>
+                <button id="clear-waypoint-btn" class="submit-btn" style="background-color: #dc3545;" onclick="clearWaypoints()">Clear WP</button>
+            </div>
+            <p id="recorded-waypoint-display" style="margin-top: 10px; display: none;">Latest WP: <span id="recorded-waypoint">--</span></p>
+        </div>
+
         <div id="autonomous-control">
             <h2>Set Destination</h2>
             <input type="text" id="coords-input" class="coordinate-input" placeholder="Coordinates (e.g. 42.637088, -72.729328)">
@@ -197,14 +232,16 @@ const char webPage[] PROGMEM = R"rawliteral(
             <div id="avoidance-alert" style="display: none; margin-top: 10px; padding: 10px; background-color: #ffc107; border-radius: 4px;"></div>
         </div>
 
-        <div id="gps-data">
+        <!-- Change existing gps-data div to be autonomous-specific -->
+        <div id="autonomous-gps-data" style="display: none;">
             <p>Distance to Target: <span id="distance">--</span> m</p>
-            <p>Current Bearing: <span id="bearing">--</span>&deg;</p>
-            <p>Fix Status: <span id="fix">No Fix</span></p>
-            <p style="margin-top: 20px;">Target Location:</p>
+            <p>Current Bearing: <span id="bearing">--</span>&deg</p>
+            <p>Fix Status: <span id="auto-fix">No Fix</span></p>
+            <p>Target Location:</p>
             <p>Latitude: <span id="dest-lat">--</span></p>
             <p>Longitude: <span id="dest-lng">--</span></p>
         </div>
+        
     </div>
 
 <script>
@@ -237,36 +274,55 @@ const char webPage[] PROGMEM = R"rawliteral(
                 document.getElementById('autonomous-control').style.display = 'none';
                 document.getElementById('manual-btn').className = 'active';
                 document.getElementById('auto-btn').className = 'inactive';
+                document.getElementById('manual-gps-data').style.display = 'block';
+                document.getElementById('autonomous-gps-data').style.display = 'none';
                 stopAutonomousMode();
             } else {
                 document.getElementById('manual-control').style.display = 'none';
                 document.getElementById('autonomous-control').style.display = 'block';
                 document.getElementById('manual-btn').className = 'inactive';
                 document.getElementById('auto-btn').className = 'active';
+                document.getElementById('manual-gps-data').style.display = 'none';
+                document.getElementById('autonomous-gps-data').style.display = 'block';
             }
         }
 
         function startAutonomousMode() {
-            const coordsStr = document.getElementById('coords-input').value.trim();
-            const coords = coordsStr.split(',').map(coord => coord.trim());
+            const coordsInput = document.getElementById('coords-input').value.trim();
             
-            if (coords.length !== 2 || isNaN(coords[0]) || isNaN(coords[1])) {
-                alert('Please enter valid coordinates');
-                return;
+            if (coordsInput) {
+                // If coordinates are manually entered, validate and use them
+                const coords = coordsInput.split(',').map(coord => coord.trim());
+                
+                if (coords.length !== 2 || isNaN(coords[0]) || isNaN(coords[1])) {
+                    alert('Please enter valid coordinates or clear input to use recorded waypoint');
+                    return;
+                }
+                
+                const lat = parseFloat(coords[0]);
+                const lng = parseFloat(coords[1]);
+                
+                fetch(`/setDestination?lat=${lat}&lng=${lng}`)
+                    .then(response => response.text())
+                    .then(result => {
+                        console.log('Navigation started:', result);
+                    })
+                    .catch(error => {
+                        console.error('Error starting navigation:', error);
+                        alert('Failed to start navigation');
+                    });
+            } else {
+                // If no coordinates entered, use recorded waypoint
+                fetch('/setDestination')
+                    .then(response => response.text())
+                    .then(result => {
+                        console.log('Navigation started with recorded waypoint:', result);
+                    })
+                    .catch(error => {
+                        console.error('Error starting navigation:', error);
+                        alert('Failed to start navigation');
+                    });
             }
-            
-            const lat = parseFloat(coords[0]);
-            const lng = parseFloat(coords[1]);
-
-            fetch(`/setDestination?lat=${lat}&lng=${lng}`)
-                .then(response => response.text())
-                .then(result => {
-                    console.log('Navigation started:', result);
-                })
-                .catch(error => {
-                    console.error('Error starting navigation:', error);
-                    alert('Failed to start navigation');
-                });
         }
 
         function stopAutonomousMode() {
@@ -378,11 +434,19 @@ const char webPage[] PROGMEM = R"rawliteral(
             fetch('/gps')
                 .then(response => response.json())
                 .then(data => {
-                    document.getElementById('fix').textContent = data.fix;
-                    document.getElementById('distance').textContent = data.distance;
-                    document.getElementById('bearing').textContent = data.bearing;
-                    document.getElementById('dest-lat').textContent = data.destLat || '--';
-                    document.getElementById('dest-lng').textContent = data.destLng || '--';
+                    // Update manual mode display
+                    document.getElementById('manual-fix').textContent = data.fix;
+                    document.getElementById('manual-lat').textContent = data.lat || '--';
+                    document.getElementById('manual-lng').textContent = data.lng || '--';
+
+                    // Update autonomous mode display
+                    if (document.getElementById('autonomous-control').style.display !== 'none') {
+                        document.getElementById('distance').textContent = data.distance;
+                        document.getElementById('bearing').textContent = data.bearing;
+                        document.getElementById('auto-fix').textContent = data.fix;
+                        document.getElementById('dest-lat').textContent = data.destLat;
+                        document.getElementById('dest-lng').textContent = data.destLng;
+                    }
                 })
                 .catch(console.error);
         }, 1000);
@@ -406,6 +470,90 @@ const char webPage[] PROGMEM = R"rawliteral(
                 })
                 .catch(console.error);
         }, 500);  // Update every 500ms
+
+        function getFusionStatus() {
+            const button = document.getElementById('fusion-status-btn');
+            const display = document.getElementById('fusion-status-display');
+            const statusSpan = document.getElementById('fusion-status');
+            
+            // Disable button while fetching
+            button.disabled = true;
+            button.textContent = 'Getting Status...';
+
+            // Show display immediately
+            display.style.display = 'block';
+            
+            fetch('/fusionStatus')
+                .then(response => response.json())
+                .then(data => {
+                    statusSpan.textContent = data.status;
+                    display.style.display = 'block';
+                })
+                .catch(error => {
+                    statusSpan.textContent = 'Error getting status';
+                    console.error('Error:', error);
+                })
+                .finally(() => {
+                    button.disabled = false;
+                    button.textContent = 'Get Fusion Status';
+                    // Ensure display stays visible
+                    display.style.display = 'block';
+                });
+        }
+        function recordWaypoint() {
+            const button = document.getElementById('record-waypoint-btn');
+            const display = document.getElementById('recorded-waypoint-display');
+            const waypointSpan = document.getElementById('recorded-waypoint');
+            const countDisplay = document.getElementById('waypoint-count');
+            
+            // Disable button while fetching
+            button.disabled = true;
+            button.textContent = 'Recording WP...';
+
+            // Show display immediately
+            display.style.display = 'block';
+            
+            fetch('/currentWP')
+                .then(response => response.json())
+                .then(data => {
+                    waypointSpan.textContent = data.lat + ", " + data.lng;
+                    countDisplay.textContent = `Waypoints: ${data.count}/20`;
+                    display.style.display = 'block';
+                })
+                .catch(error => {
+                    waypointSpan.textContent = 'Error getting WP';
+                    console.error('Error:', error);
+                })
+                .finally(() => {
+                    button.disabled = false;
+                    button.textContent = 'Record WP';
+                    // Ensure display stays visible
+                    display.style.display = 'block';
+                });
+        }
+
+        function clearWaypoints() {
+            const button = document.getElementById('clear-waypoint-btn');
+            const countDisplay = document.getElementById('waypoint-count');
+            
+            // Disable button while clearing
+            button.disabled = true;
+            button.textContent = 'Clearing...';
+            
+            fetch('/clearWaypoints')
+                .then(response => response.json())
+                .then(data => {
+                    countDisplay.textContent = `Waypoints: ${data.count}/20`;
+                    document.getElementById('recorded-waypoint-display').style.display = 'none';
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                })
+                .finally(() => {
+                    button.disabled = false;
+                    button.textContent = 'Clear WP';
+                });
+        }
     </script>
 </body>
 </html>
@@ -455,6 +603,7 @@ void updateSonarReadings() {
 }
 
 void setup() {
+    unsigned long setupTime = millis();
     Serial.begin(115200);
     //Serial.println("Starting RC Car Control with Sonar...");
     
@@ -490,29 +639,42 @@ void setup() {
     // Initialize GPS
     Wire.begin(32, 33);
     if (myGPS.begin() == false) {
-        //Serial.println("u-blox GNSS not detected. Check wiring.");
+        Serial.println("u-blox GNSS not detected. Check wiring.");
     }
+    //myGPS.setAutoESFALG(true); // Enable ESF alignment messages
 
     // Configure GPS
     myGPS.setI2COutput(COM_TYPE_UBX);
-    // Set dynamic model to "Automotive" for moving vehicle
-    myGPS.setDynamicModel(DYN_MODEL_AUTOMOTIVE);
-    // Enable sensor fusion
-    myGPS.enableIMUtoGNSSFusion(true);
-    //Serial.println("GNSS + IMU Fusion enabled");
+    // myGPS.setESFAutoAlignment(true); // Enable Automatic IMU-mount Alignment
+    // bool esfAutoAlignment = myGPS.getESFAutoAlignment();
+    // if (esfAutoAlignment) {
+    //     Serial.println("Auto alignment set");
+    // } else {
+    //     Serial.println("Failed to set auto alignment");
+    // }
+    // // Set dynamic model to "Automotive" for moving vehicle
+    // if (myGPS.setDynamicModel(DYN_MODEL_AUTOMOTIVE)) {
+    //     Serial.println("Dynamic model set to automotive");
+    // } else {
+    //     Serial.println("Failed to set dynamic model");
+    // }
+
     myGPS.setNavigationFrequency(10);
-    myGPS.saveConfigSelective(VAL_CFG_SUBSEC_IOPORT);
-    //Serial.println("GPS initialization complete");
+    //Serial.print("Navigation Frequency: ");
+    // Serial.println(myGPS.getNavigationFrequency());
+
+    // myGPS.saveConfigSelective(VAL_CFG_SUBSEC_IOPORT);
+    Serial.println("GPS initialization complete");
 
     // Setup WiFi Access Point
     WiFi.softAP(ssid, password);
-    Serial.println("Access Point Started");
-    Serial.print("IP Address: ");
-    Serial.println(WiFi.softAPIP());
+    //Serial.println("Access Point Started");
+    //Serial.print("IP Address: ");
+    //Serial.println(WiFi.softAPIP());
 
     // Web server routes
     server.on("/", HTTP_GET, []() {
-        Serial.println("Root page requested");
+        //Serial.println("Root page requested");
         server.send(200, "text/html", webPage);
     });
 
@@ -557,36 +719,55 @@ void setup() {
     });
 
     server.on("/gps", HTTP_GET, []() {
+        Serial.println("starting gps handler");
         float currentLat = myGPS.getLatitude() / 10000000.0;
         float currentLon = myGPS.getLongitude() / 10000000.0;
         
         float distance = 0;
         float bearing = 0;
-        bool isValid = (myGPS.getFixType() > 0);
+        unsigned char fixType = myGPS.getFixType();
         
-        if (isValid && (targetLat != 0 || targetLon != 0)) {
+        if (fixType && (targetLat != 0 || targetLon != 0)) {
             distance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
             bearing = calculateBearing(currentLat, currentLon, targetLat, targetLon);
         }
 
         String json = "{\"distance\":" + String(distance, 1) +
                       ",\"bearing\":" + String(bearing, 1) +
-                      ",\"valid\":" + String(isValid) +
-                      ",\"fix\":\"" + String(isValid ? "Active" : "No Fix") + "\"" +
+                      ",\"lat\":" + String(currentLat, 6) +
+                      ",\"lng\":" + String(currentLon, 6) +
+                      ",\"fix\":\"" + String(fixType) + "\"" +
                       ",\"destLat\":" + String(targetLat, 6) +
                       ",\"destLng\":" + String(targetLon, 6) +
                       "}";
+        Serial.println("about to send to server");
         server.send(200, "application/json", json);
+        Serial.println("done with gps handler");
+
     });
 
     server.on("/setDestination", HTTP_GET, []() {
         String lat = server.arg("lat");
         String lng = server.arg("lng");
         
-        targetLat = lat.toFloat();
-        targetLon = lng.toFloat();
+        if (lat != "" && lng != "") {
+            // Use manually entered coordinates
+            targetLat = lat.toFloat();
+            targetLon = lng.toFloat();
+        } else if (waypointCount > 0) {
+            // Start with first waypoint
+            currentWaypointIndex = 0;
+            targetLat = waypointLats[currentWaypointIndex];
+            targetLon = waypointLons[currentWaypointIndex];
+        } else {
+            server.send(400, "text/plain", "No destination coordinates provided or waypoints recorded");
+            return;
+        }
+        
+        destinationReached = false;
         autonomousMode = true;
-        lastAvoidanceMessage = "";  // Clear any previous messages
+        followingWaypoints = true;
+        lastAvoidanceMessage = "";
         
         server.send(200, "text/plain", "Navigation started");
     });
@@ -598,8 +779,147 @@ void setup() {
         server.send(200, "text/plain", "Navigation stopped");
     });
 
-    server.begin();
+    // server.on("/fusionStatus", HTTP_GET, []() {
+    //     Serial.println("Fusion status requested");
+    //     String fusionStatus = "Failed to get fusion data";
+        
+    //     // Check if module is connected/responding at all
+    //     bool isConnected = myGPS.isConnected();
+    //     Serial.print("GPS Module Connected: ");
+    //     Serial.println(isConnected);
+        
+    //     if (!isConnected) {
+    //         String json = "{\"status\":\"GPS Module Not Connected\"}";
+    //         server.send(200, "application/json", json);
+    //         return;
+    //     }
 
+    //     // Try for up to 3 seconds to get ESF info
+    //     unsigned long startTime = millis();
+    //     bool esfResult = false;
+    //     int attempts = 0;
+        
+    //     while (millis() - startTime < 3000) {
+    //         attempts++;
+    //         Serial.print("Attempt ");
+    //         Serial.print(attempts);
+    //         Serial.print(": ");
+            
+    //         esfResult = myGPS.getEsfInfo();
+            
+    //         if (esfResult) {
+    //             Serial.println("Success!");
+    //             break;
+    //         }
+    //         Serial.println("Failed");
+    //         delay(100); // Small delay between attempts
+    //     }
+
+    //     Serial.print("Made ");
+    //     Serial.print(attempts);
+    //     Serial.print(" attempts in ");
+    //     Serial.print(millis() - startTime);
+    //     Serial.println("ms");
+
+    //     if (esfResult) {
+    //         uint8_t fusionMode = myGPS.packetUBXESFSTATUS->data.fusionMode;
+    //         Serial.print("Fusion mode: ");
+    //         Serial.println(fusionMode);
+    //         switch(fusionMode) {
+    //             case 0: fusionStatus = "Initializing"; break;
+    //             case 1: fusionStatus = "Calibrated"; break;
+    //             case 2: fusionStatus = "Suspended"; break;
+    //             case 3: fusionStatus = "Disabled"; break;
+    //         }
+    //     } else {
+    //         Serial.println("Timed out waiting for ESF info");
+    //     }
+    //     // Try ESF INFO
+    //     Serial.println("Trying ESF INFO:");
+    //     bool esfInfoResult = myGPS.getEsfInfo();
+    //     Serial.print("ESF INFO result: ");
+    //     Serial.println(esfInfoResult);
+        
+    //     // Try ESF ALG
+    //     Serial.println("Trying ESF ALG:");
+    //     bool esfAlgResult = myGPS.getESFALG();
+    //     Serial.print("ESF ALG result: ");
+    //     Serial.println(esfAlgResult);
+        
+    //     if (esfInfoResult || esfAlgResult) {
+    //         fusionStatus = "Got some ESF data";
+    //     }
+    //     // Try ESF ALG since we know it works
+    //     Serial.println("Getting ESF ALG data:");
+    //     if (myGPS.getESFALG()) {
+    //         Serial.print("Roll: ");
+    //         Serial.println(myGPS.packetUBXESFALG->data.roll);
+    //         Serial.print("Pitch: ");
+    //         Serial.println(myGPS.packetUBXESFALG->data.pitch);
+    //         Serial.print("Yaw: ");
+    //         Serial.println(myGPS.packetUBXESFALG->data.yaw);
+            
+    //         fusionStatus = "Roll: " + String(myGPS.packetUBXESFALG->data.roll) + 
+    //                       " Pitch: " + String(myGPS.packetUBXESFALG->data.pitch) + 
+    //                       " Yaw: " + String(myGPS.packetUBXESFALG->data.yaw);
+    //     }
+
+    //     String json = "{\"status\":\"" + fusionStatus + "\"}";
+    //     server.send(200, "application/json", json);
+    // });
+
+    server.on("/fusionStatus", HTTP_GET, []() {
+        Serial.println("Fusion status requested");
+        myGPS.setNavigationFrequency(1); // Can't seem to get fusion status at a higher frequency, don't know why
+        String fusionStatus = "Failed to get fusion data";
+        
+        if (!myGPS.getEsfInfo()) {
+            while(1) { // CHANGE THIS TO TIME OUT IN CASE IT NEVER HAPPENS!!!!!!!!!!!!!!!!!!1
+                if (myGPS.getEsfInfo()) {
+                    uint8_t fusionMode = myGPS.packetUBXESFSTATUS->data.fusionMode;
+                    Serial.print("Fusion Mode: ");
+                    Serial.println(fusionMode);
+                
+                    switch(fusionMode) {
+                        case 0: fusionStatus = "Initializing"; break;
+                        case 1: fusionStatus = "Calibrated"; break;
+                        case 2: fusionStatus = "Suspended"; break;
+                        case 3: fusionStatus = "Disabled"; break;
+                  }
+                  break;
+                }
+            }   
+        }
+            
+        String json = "{\"status\":\"" + fusionStatus + "\"}";
+        server.send(200, "application/json", json);
+        myGPS.setNavigationFrequency(10);
+    });
+    server.on("/currentWP", HTTP_GET, []() {
+        float currentLat = myGPS.getLatitude() / 10000000.0;
+        float currentLon = myGPS.getLongitude() / 10000000.0;
+        
+        // Only store if we haven't hit the limit
+        if (waypointCount < MAX_WAYPOINTS) {
+            waypointLats[waypointCount] = currentLat;
+            waypointLons[waypointCount] = currentLon;
+            waypointCount++;
+        }        
+
+        String json = "{\"lat\":" + String(currentLat, 6) + 
+                      ",\"lng\":" + String(currentLon, 6) + 
+                      ",\"count\":" + String(waypointCount) + "}";
+                      
+        server.send(200, "application/json", json);
+    });
+    server.on("/clearWaypoints", HTTP_GET, []() {
+        waypointCount = 0;
+        String json = "{\"count\":" + String(waypointCount) + "}";
+        server.send(200, "application/json", json);
+    });
+    server.begin();
+    Serial.print("Setup time: ");
+    Serial.println(millis() - setupTime);
 }
 
 void loop() {
@@ -607,12 +927,8 @@ void loop() {
     updateSonarReadings();
     
     // Check GPS
-    myGPS.checkUblox();
-    myGPS.checkCallbacks();
-    //Serial.print("Fix Type: ");
-    //Serial.println(myGPS.getFixType());
-    //Serial.print("IMU Calibration Status: ");
-    //Serial.println(myGPS.getIMUAutoCalibrationStatus());
+    //myGPS.checkUblox();
+    //myGPS.checkCallbacks();
 
     // Autonomous navigation with obstacle avoidance
     if (autonomousMode && myGPS.getFixType() > 0) {
@@ -670,10 +986,21 @@ void loop() {
             }
             // Apply normal speed if no front obstacle
             int speed = 128;  // Base speed
-            if (distance < 1.0) {
-                speed = 0;
-                autonomousMode = false;
-                lastAvoidanceMessage = "Destination reached";
+            // Check if waypoint is reached
+            if (distance < WAYPOINT_REACHED_RADIUS) {
+                if (followingWaypoints && currentWaypointIndex < waypointCount - 1) {
+                    // Move to next waypoint
+                    currentWaypointIndex++;
+                    targetLat = waypointLats[currentWaypointIndex];
+                    targetLon = waypointLons[currentWaypointIndex];
+                } else {
+                    // Final destination reached
+                    speed = 0;
+                    autonomousMode = false;
+                    destinationReached = true;
+                    destinationReachedTime = millis();
+                    lastAvoidanceMessage = "Destination reached";
+                }
             }
             
             // Convert to ESC value and apply
@@ -688,15 +1015,24 @@ void loop() {
         steeringServo.write(steeringAngle);
         lastUpdateTime = millis();
     }
-    // Clear stale avoidance messages
-    if (lastAvoidanceMessage != "" &&
-        lastAvoidanceMessage != "Destination reached" &&
-        millis() - lastAvoidanceTime > AVOIDANCE_MESSAGE_TIMEOUT) {
-            lastAvoidanceMessage = "";
+    // Clear messages
+    if (lastAvoidanceMessage != "") {
+        if (lastAvoidanceMessage == "Destination reached") {
+            // Clear destination message after timeout
+            if (millis() - destinationReachedTime > DESTINATION_MESSAGE_TIMEOUT) {
+                lastAvoidanceMessage = "";
+                destinationReached = false;  // Reset for next navigation
+            }
+        } else {
+            // Handle other avoidance messages as before
+            if (millis() - lastAvoidanceTime > AVOIDANCE_MESSAGE_TIMEOUT) {
+                lastAvoidanceMessage = "";
+            }
+        }
     }
-
+    Serial.println("starting server");
     server.handleClient();
-    
+    Serial.println("done");
     // Safety timeout
     if (millis() - lastUpdateTime > TIMEOUT_MS) {
         escServo.write(ESC_NEUTRAL);
