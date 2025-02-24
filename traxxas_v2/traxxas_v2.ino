@@ -567,13 +567,11 @@ float readSonar(int trigPin, int echoPin, float* readings) {
     delayMicroseconds(10); // per HC-SR04 specs
     digitalWrite(trigPin, LOW);
     
-    long duration = pulseIn(echoPin, HIGH, 30000); // measure time to receieve response, wait up to 30ms (about 5m)
-    float distance = (duration == 0) ? -1 : duration * 0.034 / 2; //speed of sound
+    long duration = pulseIn(echoPin, HIGH, 12000); // measure time to receieve response, wait up to 12ms (about 2m)
+    float distance = (duration == 0) ? 200 : duration * 0.034 / 2; //speed of sound; return max distance if no echo
     
-    // Only update array if we got a valid reading
-    if (distance > 0) {
-        readings[readIndex] = distance;
-    }
+    // Update array if we got a valid reading
+    readings[readIndex] = distance;
     
     // Calculate median to filter out false positives
     float sortedReadings[FILTER_SAMPLES]; 
