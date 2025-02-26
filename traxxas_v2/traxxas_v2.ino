@@ -8,7 +8,10 @@ car itself is not meeting the calibration requirements. Need to try:
 
 2/22/25 trying to change the code so the user can pull waypoints directly from the car
 in manual mode. Start with one waypoint and prove out before moving on to multiple
-waypoints. */
+waypoints. 
+
+2/23 changes - front obstacle detected, reverse for 0.5 seconds, turn for 0.5 seconds (at slow speed for now),
+then continue navigation || AVOIDANCE_DURATION is set to 500ms */
 
 
 #include <Arduino.h>
@@ -20,7 +23,7 @@ waypoints. */
 
 // Pin Definitions
 const int STEERING_PIN = 5;   // GPIO5 for steering servo
-const int ESC_PIN = 23;      // GPIO23 for ESC control
+const int ESC_PIN = 23;       // GPIO23 for ESC control
 // Sonar pins
 const int TRIGGER_PIN_FRONT = 13;
 const int ECHO_PIN_FRONT = 14;
@@ -30,7 +33,7 @@ const int TRIGGER_PIN_RIGHT = 27;
 const int ECHO_PIN_RIGHT = 12;
 
 // Sonar thresholds (cm)
-const int FRONT_STOP_THRESHOLD = 50; // zero to suppress obst. avoidance
+const int FRONT_STOP_THRESHOLD = 170; // zero to suppress obst. avoidance
 const int SIDE_AVOID_THRESHOLD = 50;
 
 // GPS setup
@@ -72,10 +75,10 @@ const unsigned long AVOIDANCE_MESSAGE_TIMEOUT = 1000; // Clear message after 1 s
 bool inLeftAvoidance = false;
 bool inRightAvoidance = false;
 unsigned long avoidanceStartTime = 0;
-const unsigned long AVOIDANCE_DURATION = 1000; // Continue avoiding for 1 second
+const unsigned long AVOIDANCE_DURATION = 500; // Continue avoiding for 1 second
 
 unsigned long lastSonarUpdate = 0;
-const unsigned long SONAR_UPDATE_INTERVAL = 200; // 100ms between full sonar updates
+const unsigned long SONAR_UPDATE_INTERVAL = 100; // 100ms between full sonar updates
 
 // WiFi settings
 const char* ssid = "RC_Car_Control";
@@ -89,12 +92,25 @@ const unsigned long TIMEOUT_MS = 200;
 
 // Traxxas XL-2.5 ESC values
 const int ESC_NEUTRAL = 90;     // Neutral position (1.5ms pulse)
-const int ESC_MAX_FWD = 130;    // Max forward allowwed (~1.9ms pulse)
+const int ESC_MAX_FWD = 130;    // Max forward allowed (~1.9ms pulse)
 const int ESC_MAX_REV = 50;     // Max reverse allowed (~1.1ms pulse)
 const int ESC_MIN_FWD = 95;     // Minimum forward throttle
 const int ESC_MIN_REV = 85;     // Minimum reverse throttle
 const int STEERING_CENTER = 90;  // Center steering
 const int STEERING_MAX = 55;     // Maximum steering angle deviation
+
+// Obstacle avoidance state machine
+enum AvoidanceState {
+    NO_AVOIDANCE,
+    REVERSING,
+    TURNING
+};
+
+AvoidanceState avoidanceState = NO_AVOIDANCE;
+//unsigned long avoidanceStartTime = 0;
+
+// Sonar reading state
+int currentSonar = 0; // Tracks which sonar to read next
 
 // Function declarations (prototypes)
 float calculateDistance(float lat1, float lon1, float lat2, float lon2);
@@ -559,6 +575,7 @@ const char webPage[] PROGMEM = R"rawliteral(
 </html>
 )rawliteral";
 
+
 // Sonar functions
 float readSonar(int trigPin, int echoPin, float* readings) {
     digitalWrite(trigPin, LOW);
@@ -567,7 +584,7 @@ float readSonar(int trigPin, int echoPin, float* readings) {
     delayMicroseconds(10); // per HC-SR04 specs
     digitalWrite(trigPin, LOW);
     
-    long duration = pulseIn(echoPin, HIGH, 12000); // measure time to receieve response, wait up to 12ms (about 2m)
+    long duration = pulseIn(echoPin, HIGH, 12000); // measure time to receive response, wait up to 12ms (about 2m)
     float distance = (duration == 0) ? 200 : duration * 0.034 / 2; //speed of sound; return max distance if no echo
     
     // Update array if we got a valid reading
@@ -591,9 +608,22 @@ float readSonar(int trigPin, int echoPin, float* readings) {
 
 void updateSonarReadings() {
     if (millis() - lastSonarUpdate >= SONAR_UPDATE_INTERVAL) {
-        lastFrontDist = readSonar(TRIGGER_PIN_FRONT, ECHO_PIN_FRONT, frontReadings);
-        lastLeftDist = readSonar(TRIGGER_PIN_LEFT, ECHO_PIN_LEFT, leftReadings);
-        lastRightDist = readSonar(TRIGGER_PIN_RIGHT, ECHO_PIN_RIGHT, rightReadings);
+        switch(currentSonar) {
+            case 0: 
+                lastFrontDist = readSonar(TRIGGER_PIN_FRONT, ECHO_PIN_FRONT, frontReadings);
+                currentSonar = 1;
+                break;
+
+            case 1:
+                lastLeftDist = readSonar(TRIGGER_PIN_LEFT, ECHO_PIN_LEFT, leftReadings);
+                currentSonar = 2;
+                break;
+            
+            case 2:
+                lastRightDist = readSonar(TRIGGER_PIN_RIGHT, ECHO_PIN_RIGHT, rightReadings);
+                currentSonar = 0;
+                break;
+        }
         
         readIndex = (readIndex + 1) % FILTER_SAMPLES;
         lastSonarUpdate = millis();
@@ -603,7 +633,6 @@ void updateSonarReadings() {
 void setup() {
     unsigned long setupTime = millis();
     Serial.begin(115200);
-    //Serial.println("Starting RC Car Control with Sonar...");
     
     // Configure sonar pins
     pinMode(TRIGGER_PIN_FRONT, OUTPUT);
@@ -627,7 +656,6 @@ void setup() {
     escServo.attach(ESC_PIN, 1000, 2000);
     
     // Initialize ESC - start in neutral
-    //Serial.println("Setting ESC to neutral");
     escServo.write(ESC_NEUTRAL);
     delay(3000);  // Give ESC time to initialize
     
@@ -639,40 +667,15 @@ void setup() {
     if (myGPS.begin() == false) {
         Serial.println("u-blox GNSS not detected. Check wiring.");
     }
-    //myGPS.setAutoESFALG(true); // Enable ESF alignment messages
-
-    // Configure GPS
     myGPS.setI2COutput(COM_TYPE_UBX);
-    // myGPS.setESFAutoAlignment(true); // Enable Automatic IMU-mount Alignment
-    // bool esfAutoAlignment = myGPS.getESFAutoAlignment();
-    // if (esfAutoAlignment) {
-    //     Serial.println("Auto alignment set");
-    // } else {
-    //     Serial.println("Failed to set auto alignment");
-    // }
-    // // Set dynamic model to "Automotive" for moving vehicle
-    // if (myGPS.setDynamicModel(DYN_MODEL_AUTOMOTIVE)) {
-    //     Serial.println("Dynamic model set to automotive");
-    // } else {
-    //     Serial.println("Failed to set dynamic model");
-    // }
-
+    
     myGPS.setNavigationFrequency(10);
-    //Serial.print("Navigation Frequency: ");
-    // Serial.println(myGPS.getNavigationFrequency());
-
-    // myGPS.saveConfigSelective(VAL_CFG_SUBSEC_IOPORT);
-    Serial.println("GPS initialization complete");
 
     // Setup WiFi Access Point
     WiFi.softAP(ssid, password);
-    //Serial.println("Access Point Started");
-    //Serial.print("IP Address: ");
-    //Serial.println(WiFi.softAPIP());
 
-    // Web server routes
+    // Web server routes 
     server.on("/", HTTP_GET, []() {
-        //Serial.println("Root page requested");
         server.send(200, "text/html", webPage);
     });
 
@@ -704,7 +707,6 @@ void setup() {
         }
     });
 
-    // endpoint for sensor data
     server.on("/sensors", HTTP_GET, []() {
         String json = "{\"front\":" + String(lastFrontDist, 1) +
                      ",\"left\":" + String(lastLeftDist, 1) +
@@ -717,7 +719,6 @@ void setup() {
     });
 
     server.on("/gps", HTTP_GET, []() {
-        Serial.println("starting gps handler");
         float currentLat = myGPS.getLatitude() / 10000000.0;
         float currentLon = myGPS.getLongitude() / 10000000.0;
         
@@ -738,10 +739,7 @@ void setup() {
                       ",\"destLat\":" + String(targetLat, 6) +
                       ",\"destLng\":" + String(targetLon, 6) +
                       "}";
-        Serial.println("about to send to server");
         server.send(200, "application/json", json);
-        Serial.println("done with gps handler");
-
     });
 
     server.on("/setDestination", HTTP_GET, []() {
@@ -777,94 +775,6 @@ void setup() {
         server.send(200, "text/plain", "Navigation stopped");
     });
 
-    // server.on("/fusionStatus", HTTP_GET, []() {
-    //     Serial.println("Fusion status requested");
-    //     String fusionStatus = "Failed to get fusion data";
-        
-    //     // Check if module is connected/responding at all
-    //     bool isConnected = myGPS.isConnected();
-    //     Serial.print("GPS Module Connected: ");
-    //     Serial.println(isConnected);
-        
-    //     if (!isConnected) {
-    //         String json = "{\"status\":\"GPS Module Not Connected\"}";
-    //         server.send(200, "application/json", json);
-    //         return;
-    //     }
-
-    //     // Try for up to 3 seconds to get ESF info
-    //     unsigned long startTime = millis();
-    //     bool esfResult = false;
-    //     int attempts = 0;
-        
-    //     while (millis() - startTime < 3000) {
-    //         attempts++;
-    //         Serial.print("Attempt ");
-    //         Serial.print(attempts);
-    //         Serial.print(": ");
-            
-    //         esfResult = myGPS.getEsfInfo();
-            
-    //         if (esfResult) {
-    //             Serial.println("Success!");
-    //             break;
-    //         }
-    //         Serial.println("Failed");
-    //         delay(100); // Small delay between attempts
-    //     }
-
-    //     Serial.print("Made ");
-    //     Serial.print(attempts);
-    //     Serial.print(" attempts in ");
-    //     Serial.print(millis() - startTime);
-    //     Serial.println("ms");
-
-    //     if (esfResult) {
-    //         uint8_t fusionMode = myGPS.packetUBXESFSTATUS->data.fusionMode;
-    //         Serial.print("Fusion mode: ");
-    //         Serial.println(fusionMode);
-    //         switch(fusionMode) {
-    //             case 0: fusionStatus = "Initializing"; break;
-    //             case 1: fusionStatus = "Calibrated"; break;
-    //             case 2: fusionStatus = "Suspended"; break;
-    //             case 3: fusionStatus = "Disabled"; break;
-    //         }
-    //     } else {
-    //         Serial.println("Timed out waiting for ESF info");
-    //     }
-    //     // Try ESF INFO
-    //     Serial.println("Trying ESF INFO:");
-    //     bool esfInfoResult = myGPS.getEsfInfo();
-    //     Serial.print("ESF INFO result: ");
-    //     Serial.println(esfInfoResult);
-        
-    //     // Try ESF ALG
-    //     Serial.println("Trying ESF ALG:");
-    //     bool esfAlgResult = myGPS.getESFALG();
-    //     Serial.print("ESF ALG result: ");
-    //     Serial.println(esfAlgResult);
-        
-    //     if (esfInfoResult || esfAlgResult) {
-    //         fusionStatus = "Got some ESF data";
-    //     }
-    //     // Try ESF ALG since we know it works
-    //     Serial.println("Getting ESF ALG data:");
-    //     if (myGPS.getESFALG()) {
-    //         Serial.print("Roll: ");
-    //         Serial.println(myGPS.packetUBXESFALG->data.roll);
-    //         Serial.print("Pitch: ");
-    //         Serial.println(myGPS.packetUBXESFALG->data.pitch);
-    //         Serial.print("Yaw: ");
-    //         Serial.println(myGPS.packetUBXESFALG->data.yaw);
-            
-    //         fusionStatus = "Roll: " + String(myGPS.packetUBXESFALG->data.roll) + 
-    //                       " Pitch: " + String(myGPS.packetUBXESFALG->data.pitch) + 
-    //                       " Yaw: " + String(myGPS.packetUBXESFALG->data.yaw);
-    //     }
-
-    //     String json = "{\"status\":\"" + fusionStatus + "\"}";
-    //     server.send(200, "application/json", json);
-    // });
 
     server.on("/fusionStatus", HTTP_GET, []() {
         Serial.println("Fusion status requested");
@@ -893,6 +803,7 @@ void setup() {
         server.send(200, "application/json", json);
         myGPS.setNavigationFrequency(10);
     });
+
     server.on("/currentWP", HTTP_GET, []() {
         float currentLat = myGPS.getLatitude() / 10000000.0;
         float currentLon = myGPS.getLongitude() / 10000000.0;
@@ -910,11 +821,13 @@ void setup() {
                       
         server.send(200, "application/json", json);
     });
+
     server.on("/clearWaypoints", HTTP_GET, []() {
         waypointCount = 0;
         String json = "{\"count\":" + String(waypointCount) + "}";
         server.send(200, "application/json", json);
     });
+
     server.begin();
     Serial.print("Setup time: ");
     Serial.println(millis() - setupTime);
@@ -924,10 +837,6 @@ void loop() {
     // Update sonar readings
     updateSonarReadings();
     
-    // Check GPS
-    //myGPS.checkUblox();
-    //myGPS.checkCallbacks();
-
     // Autonomous navigation with obstacle avoidance
     if (autonomousMode && myGPS.getFixType() > 0) {
         float currentLat = myGPS.getLatitude() / 10000000.0;
@@ -946,73 +855,87 @@ void loop() {
         
         // Modify steering for obstacle avoidance
         if (lastFrontDist > 0 && lastFrontDist < FRONT_STOP_THRESHOLD) {
-            // Front obstacle detected - stop
-            escServo.write(ESC_NEUTRAL);
-            lastAvoidanceMessage = "Stopped - Front obstacle detected";
-            lastAvoidanceTime = millis();
-            //Serial.println("Front obstacle detected - stopping");
-        } else {
-            // Check side obstacles and modify steering if needed
-            if (lastLeftDist > 0 && lastLeftDist < SIDE_AVOID_THRESHOLD) {
-                inLeftAvoidance = true;
-                inRightAvoidance = false;  // Cancel any right avoidance
+            // Front obstacle detected - start avoidance behavior
+            if (avoidanceState == NO_AVOIDANCE) {
+                avoidanceState = REVERSING;
                 avoidanceStartTime = millis();
-                lastAvoidanceMessage = "Avoiding left obstacle";
+                lastAvoidanceMessage = "Front obstacle detected - reversing";
                 lastAvoidanceTime = millis();
-                //Serial.println("Left obstacle detected - steering right");
             }
-            if (lastRightDist > 0 && lastRightDist < SIDE_AVOID_THRESHOLD) {
-                // Obstacle on right - steer left
-                inRightAvoidance = true;
-                inLeftAvoidance = false;  // Cancel any left avoidance
-                avoidanceStartTime = millis();
-                lastAvoidanceMessage = "Avoiding right obstacle";
-                lastAvoidanceTime = millis();
-                //Serial.println("Right obstacle detected - steering left");
-            }
-            // Apply steering changes based on avoidance state
-            if (inLeftAvoidance && (millis() - avoidanceStartTime < AVOIDANCE_DURATION)) {
-                steeringAngle += 15;  // Steer away from left obstacle
-            } else {
-                inLeftAvoidance = false;
-            }
+        }
 
-            if (inRightAvoidance && (millis() - avoidanceStartTime < AVOIDANCE_DURATION)) {
-                steeringAngle -= 15;  // Steer away from right obstacle
-            } else {
-                inRightAvoidance = false;
-            }
-            // Apply normal speed if no front obstacle
-            int speed = 128;  // Base speed
-            // Check if waypoint is reached
-            if (distance < WAYPOINT_REACHED_RADIUS) {
-                if (followingWaypoints && currentWaypointIndex < waypointCount - 1) {
-                    // Move to next waypoint
-                    currentWaypointIndex++;
-                    targetLat = waypointLats[currentWaypointIndex];
-                    targetLon = waypointLons[currentWaypointIndex];
+        // Handle avoidance behavior
+        switch (avoidanceState) {
+            case REVERSING:
+                if (millis() - avoidanceStartTime < 500) {
+                    // Reverse for 0.5 second
+                    escServo.write(ESC_NEUTRAL);
+                    steeringServo.write(STEERING_CENTER);
                 } else {
-                    // Final destination reached
-                    speed = 0;
-                    autonomousMode = false;
-                    destinationReached = true;
-                    destinationReachedTime = millis();
-                    lastAvoidanceMessage = "Destination reached";
+                    // After reversing, start turning
+                    avoidanceState = TURNING;
+                    avoidanceStartTime = millis();
+                    lastAvoidanceMessage = "Turning to avoid obstacle";
+                    lastAvoidanceTime = millis();
                 }
-            }
-            
-            // Convert to ESC value and apply
-            int escValue = map(speed, 0, 255, ESC_MIN_FWD, ESC_MAX_FWD);
-            escServo.write(escValue);
+                break;
+
+            case TURNING:
+                if (millis() - avoidanceStartTime < 500) {
+                    // Turn for 0.5 second
+                    escServo.write(ESC_MIN_FWD); // move forward slowly
+                    if (lastLeftDist < lastRightDist) {
+                        // Turn right if left is closer
+                        steeringServo.write(STEERING_CENTER + STEERING_MAX);
+                    } else {
+                        // Turn left if right is closer
+                        steeringServo.write(STEERING_CENTER - STEERING_MAX);
+                    }
+                } else {
+                    // After turning, resume normal navigation
+                    avoidanceState = NO_AVOIDANCE;
+                    lastAvoidanceMessage = "Continue Navigation";
+                    lastAvoidanceTime = millis();
+                }
+                break;
+
+            case NO_AVOIDANCE:
+                // Normal navigation
+                if (distance < WAYPOINT_REACHED_RADIUS) {
+                    if (followingWaypoints && currentWaypointIndex < waypointCount - 1) {
+                        // Move to next waypoint
+                        currentWaypointIndex++;
+                        targetLat = waypointLats[currentWaypointIndex];
+                        targetLon = waypointLons[currentWaypointIndex];
+                    } else {
+                        // Final destination reached
+                        escServo.write(ESC_NEUTRAL);
+                        steeringServo.write(STEERING_CENTER);
+                        autonomousMode = false;
+                        destinationReached = true;
+                        destinationReachedTime = millis();
+                        lastAvoidanceMessage = "Destination reached";
+                    }
+                } else {
+                    // Apply normal speed if no front obstacle
+                    int speed = 128;  // Base speed
+                    int escValue = map(speed, 0, 255, ESC_MIN_FWD, ESC_MAX_FWD);
+                    escServo.write(escValue);
+                }
+                break;
         }
         
         // Apply final steering angle with constraints
-        steeringAngle = constrain(steeringAngle, 
-                                STEERING_CENTER - STEERING_MAX, 
-                                STEERING_CENTER + STEERING_MAX);
-        steeringServo.write(steeringAngle);
+        if (avoidanceState == NO_AVOIDANCE) {
+            steeringAngle = constrain(steeringAngle, 
+                                    STEERING_CENTER - STEERING_MAX, 
+                                    STEERING_CENTER + STEERING_MAX);
+            steeringServo.write(steeringAngle);
+        }
+        
         lastUpdateTime = millis();
     }
+
     // Clear messages
     if (lastAvoidanceMessage != "") {
         if (lastAvoidanceMessage == "Destination reached") {
@@ -1028,9 +951,9 @@ void loop() {
             }
         }
     }
-    Serial.println("starting server");
+
     server.handleClient();
-    Serial.println("done");
+
     // Safety timeout
     if (millis() - lastUpdateTime > TIMEOUT_MS) {
         escServo.write(ESC_NEUTRAL);
@@ -1070,4 +993,3 @@ float calculateBearing(float lat1, float lon1, float lat2, float lon2) {
     float bearing = atan2(y, x) * 180.0 / PI;
     return fmod((bearing + 360.0), 360.0);
 }
-
