@@ -33,7 +33,7 @@ const int TRIGGER_PIN_RIGHT = 27;
 const int ECHO_PIN_RIGHT = 12;
 
 // Sonar thresholds (cm)
-const int FRONT_STOP_THRESHOLD = 170; // zero to suppress obst. avoidance
+const int FRONT_STOP_THRESHOLD = 100; // zero to suppress obst. avoidance
 const int SIDE_AVOID_THRESHOLD = 50;
 
 // GPS setup
