@@ -11,7 +11,11 @@ in manual mode. Start with one waypoint and prove out before moving on to multip
 waypoints. 
 
 2/23 changes - front obstacle detected, reverse for 0.5 seconds, turn for 0.5 seconds (at slow speed for now),
-then continue navigation || AVOIDANCE_DURATION is set to 500ms */
+then continue navigation || AVOIDANCE_DURATION is set to 500ms 
+
+2/26 - assigned different sonar pins (apply to pcb), adjusted turn angle, and
+added state machine logic for avoidance*/
+
 
 #include <Arduino.h>
 #include <ESP32Servo.h>
@@ -24,15 +28,15 @@ then continue navigation || AVOIDANCE_DURATION is set to 500ms */
 const int STEERING_PIN = 5;   // GPIO5 for steering servo
 const int ESC_PIN = 23;       // GPIO23 for ESC control
 // Sonar pins
-const int TRIGGER_PIN_FRONT = 13;
-const int ECHO_PIN_FRONT = 14;
-const int TRIGGER_PIN_LEFT = 25;
-const int ECHO_PIN_LEFT = 26;
-const int TRIGGER_PIN_RIGHT = 27;
-const int ECHO_PIN_RIGHT = 12;
+const int TRIGGER_PIN_FRONT = 17;
+const int ECHO_PIN_FRONT = 16;
+const int TRIGGER_PIN_LEFT = 22;
+const int ECHO_PIN_LEFT = 18;
+const int TRIGGER_PIN_RIGHT = 19;
+const int ECHO_PIN_RIGHT = 21;
 
 // Sonar thresholds (cm)
-const int FRONT_STOP_THRESHOLD = 100; // zero to suppress obst. avoidance
+const int FRONT_STOP_THRESHOLD = 70; // zero to suppress obst. avoidance
 const int SIDE_AVOID_THRESHOLD = 50;
 
 // GPS setup
@@ -97,7 +101,7 @@ const int ESC_MIN_FWD = 95;     // Minimum forward throttle
 const int ESC_MIN_REV = 85;     // Minimum reverse throttle
 const int STEERING_CENTER = 90;  // Center steering
 const int STEERING_MAX = 55;     // Maximum steering angle deviation
-const int TURN_ANGLE = 30;       // Angle to turn after reversing
+const int TURN_ANGLE = 10;       // Angle to turn after reversing
 
 
 //AvoidanceState avoidanceState = NO_AVOIDANCE;
@@ -831,104 +835,154 @@ void setup() {
 void loop() {
     // Update sonar readings
     updateSonarReadings();
-        
+
     // Check GPS
     //myGPS.checkUblox();
     //myGPS.checkCallbacks();
-    
+
     // Autonomous navigation with obstacle avoidance
     if (autonomousMode && myGPS.getFixType() > 0) {
         float currentLat = myGPS.getLatitude() / 10000000.0;
         float currentLon = myGPS.getLongitude() / 10000000.0;
-        
+
         float distance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
         float bearing = calculateBearing(currentLat, currentLon, targetLat, targetLon);
         float currentHeading = myGPS.getHeading() / 100000.0;
-        
+
         float headingError = bearing - currentHeading;
         if (headingError > 180) headingError -= 360;
         if (headingError < -180) headingError += 360;
-        
+
         // Base steering calculation
         int steeringAngle = STEERING_CENTER + (headingError * 0.25);
 
-        // Modify steering for obstacle avoidance
+        // Obstacle avoidance state machine
+        static enum {
+            NO_OBSTACLE,
+            REVERSING,
+            TURNING,
+            RESUMING,
+            SIDE_AVOIDANCE
+        } avoidanceState = NO_OBSTACLE;
+
+        static unsigned long avoidanceStartTime = 0;
+        static bool avoidLeft = false; // True if avoiding left obstacle, false for right
+
+        // Check for obstacles and activate the state machine if necessary
         if (lastFrontDist > 0 && lastFrontDist < FRONT_STOP_THRESHOLD) {
-            // Front obstacle detected - reverse and then resume with a slight turn
-            escServo.write(ESC_MAX_REV);  // Reverse direction 
-            lastAvoidanceMessage = "Reversing - Front obstacle detected";
-            lastAvoidanceTime = millis();
-            // Reverse for 0.5 second
-            if (millis() - lastAvoidanceTime < 500) {
-                // Continue reversing
-                escServo.write(ESC_MAX_REV);
-            } else {
-                // After reversing, resume forward with slight turn for 0.5 seconds
-                escServo.write(ESC_NEUTRAL);  // Stop to prepare for the turn
-                if (millis() - lastAvoidanceTime < 1000) {
-                    steeringAngle += TURN_ANGLE;  // Apply slight turn to the right
-                    escServo.write(map(128, 0, 255, ESC_MIN_FWD, ESC_MAX_FWD));  // Resume forward motion
-                } else {
-                    // After 0.5 seconds, go back to normal forward motion
-                    steeringAngle = STEERING_CENTER;  // Center steering
-                    escServo.write(map(128, 0, 255, ESC_MIN_FWD, ESC_MAX_FWD));  // Move forward normally
-                }
+            // Front obstacle detected
+            if (avoidanceState == NO_OBSTACLE) {
+                avoidanceState = REVERSING;
+                avoidanceStartTime = millis();
+                lastAvoidanceMessage = "Front obstacle detected - reversing";
             }
-        } else {
-            // Check side obstacles and modify steering if needed
-            if (lastLeftDist > 0 && lastLeftDist < SIDE_AVOID_THRESHOLD) {
-                inLeftAvoidance = true;
-                inRightAvoidance = false;  // Cancel any right avoidance
+        } else if (lastLeftDist > 0 && lastLeftDist < SIDE_AVOID_THRESHOLD) {
+            // Left obstacle detected
+            if (avoidanceState == NO_OBSTACLE) {
+                avoidanceState = SIDE_AVOIDANCE;
+                avoidLeft = true;
                 avoidanceStartTime = millis();
                 lastAvoidanceMessage = "Avoiding left obstacle";
-                lastAvoidanceTime = millis();
-                //Serial.println("Left obstacle detected - steering right");
             }
-            if (lastRightDist > 0 && lastRightDist < SIDE_AVOID_THRESHOLD) {
-                // Obstacle on right - steer left
-                inRightAvoidance = true;
-                inLeftAvoidance = false;  // Cancel any left avoidance
+        } else if (lastRightDist > 0 && lastRightDist < SIDE_AVOID_THRESHOLD) {
+            // Right obstacle detected
+            if (avoidanceState == NO_OBSTACLE) {
+                avoidanceState = SIDE_AVOIDANCE;
+                avoidLeft = false;
                 avoidanceStartTime = millis();
                 lastAvoidanceMessage = "Avoiding right obstacle";
-                lastAvoidanceTime = millis();
-                //Serial.println("Right obstacle detected - steering left");
             }
-            // Apply steering changes based on avoidance state
-            if (inLeftAvoidance && (millis() - avoidanceStartTime < AVOIDANCE_DURATION)) {
-                steeringAngle += 15;  // Steer away from left obstacle
-            } else {
-                inLeftAvoidance = false;
+        } else {
+            // No obstacles detected
+            if (avoidanceState != NO_OBSTACLE) {
+                // Reset the state machine if no obstacles are detected
+                avoidanceState = NO_OBSTACLE;
+                lastAvoidanceMessage = "";
+            }
+        }
+
+        // Declare variables outside the switch statement
+        int speed = 128; // Base speed
+        int escValue = map(speed, 0, 255, ESC_MIN_FWD, ESC_MAX_FWD);
+
+        // State machine logic
+        switch (avoidanceState) {
+            case NO_OBSTACLE: {
+                // Normal navigation
+                if (distance < WAYPOINT_REACHED_RADIUS) {
+                    if (followingWaypoints && currentWaypointIndex < waypointCount - 1) {
+                        // Move to next waypoint
+                        currentWaypointIndex++;
+                        targetLat = waypointLats[currentWaypointIndex];
+                        targetLon = waypointLons[currentWaypointIndex];
+                    } else {
+                        // Final destination reached
+                        speed = 0;
+                        autonomousMode = false;
+                        destinationReached = true;
+                        destinationReachedTime = millis();
+                        lastAvoidanceMessage = "Destination reached";
+                    }
+                }
+                // Convert to ESC value and apply
+                escValue = map(speed, 0, 255, ESC_MIN_FWD, ESC_MAX_FWD);
+                escServo.write(escValue);
+                break;
             }
 
-            if (inRightAvoidance && (millis() - avoidanceStartTime < AVOIDANCE_DURATION)) {
-                steeringAngle -= 15;  // Steer away from right obstacle
-            } else {
-                inRightAvoidance = false;
-            }
-            // Apply normal speed if no front obstacle
-            int speed = 128;  // Base speed
-            // Check if waypoint is reached
-            if (distance < WAYPOINT_REACHED_RADIUS) {
-                if (followingWaypoints && currentWaypointIndex < waypointCount - 1) {
-                    // Move to next waypoint
-                    currentWaypointIndex++;
-                    targetLat = waypointLats[currentWaypointIndex];
-                    targetLon = waypointLons[currentWaypointIndex];
-                } else {
-                    // Final destination reached
-                    speed = 0;
-                    autonomousMode = false;
-                    destinationReached = true;
-                    destinationReachedTime = millis();
-                    lastAvoidanceMessage = "Destination reached";
+            case REVERSING: {
+                // Reverse for 500ms
+                escServo.write(ESC_MAX_REV);
+                if (millis() - avoidanceStartTime >= 500) {
+                    Serial.println("Reversing complete - entering TURNING state");
+                    avoidanceState = TURNING;
+                    avoidanceStartTime = millis();
+                    escServo.write(ESC_NEUTRAL); // Stop before turning
                 }
+                break;
             }
-            
-            // Convert to ESC value and apply
-            int escValue = map(speed, 0, 255, ESC_MIN_FWD, ESC_MAX_FWD);
-            escServo.write(escValue);
+
+            case TURNING: {
+                // Turn right for 1 second
+                steeringAngle = STEERING_CENTER + TURN_ANGLE; // Turn right
+                escServo.write(map(128, 0, 255, ESC_MIN_FWD, ESC_MAX_FWD)); // Move forward
+                if (millis() - avoidanceStartTime >= 1000) {
+                    Serial.println("Turning complete - entering RESUMING state");
+                    avoidanceState = RESUMING;
+                    avoidanceStartTime = millis();
+                }
+                break;
+            }
+
+            case RESUMING: {
+                // Resume normal navigation for 1 second
+                steeringAngle = STEERING_CENTER; // Center steering
+                escServo.write(map(128, 0, 255, ESC_MIN_FWD, ESC_MAX_FWD)); // Move forward
+                if (millis() - avoidanceStartTime >= 1000) {
+                    Serial.println("Resuming normal navigation");
+                    avoidanceState = NO_OBSTACLE;
+                    lastAvoidanceMessage = "";
+                }
+                break;
+            }
+
+            case SIDE_AVOIDANCE: {
+                // Steer away from the side obstacle
+                if (avoidLeft) {
+                    steeringAngle = STEERING_CENTER - TURN_ANGLE; // Steer left
+                } else {
+                    steeringAngle = STEERING_CENTER + TURN_ANGLE; // Steer right
+                }
+                escServo.write(map(128, 0, 255, ESC_MIN_FWD, ESC_MAX_FWD)); // Move forward
+                if (millis() - avoidanceStartTime >= 1000) {
+                    Serial.println("Side avoidance complete - resuming normal navigation");
+                    avoidanceState = NO_OBSTACLE;
+                    lastAvoidanceMessage = "";
+                }
+                break;
+            }
         }
-        
+
         // Apply final steering angle with constraints
         steeringAngle = constrain(steeringAngle, 
                                 STEERING_CENTER - STEERING_MAX, 
@@ -936,6 +990,7 @@ void loop() {
         steeringServo.write(steeringAngle);
         lastUpdateTime = millis();
     }
+
     // Clear messages
     if (lastAvoidanceMessage != "") {
         if (lastAvoidanceMessage == "Destination reached") {
@@ -951,9 +1006,10 @@ void loop() {
             }
         }
     }
-    Serial.println("starting server");
+
+    // Handle web server requests
     server.handleClient();
-    Serial.println("done");
+
     // Safety timeout
     if (millis() - lastUpdateTime > TIMEOUT_MS) {
         escServo.write(ESC_NEUTRAL);
@@ -962,7 +1018,6 @@ void loop() {
 
     delay(2);
 }
-
 
 // Haversine distance calculation
 float calculateDistance(float lat1, float lon1, float lat2, float lon2) {
