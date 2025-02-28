@@ -22,6 +22,13 @@ extern unsigned long destinationReachedTime;
 extern SFE_UBLOX_GNSS myGPS;
 extern Servo escServo, steeringServo;
 extern unsigned long lastUpdateTime;
+extern int waypointLoopCount;
+extern int targetLoopCount;
+extern float targetPace;
+extern float targetDistance;
+extern float totalDistance;
+extern unsigned long totalTimeMs;
+extern float currentPace;
 
 // Function to set up all web server routes
 void setupWebServerRoutes() {
@@ -95,7 +102,11 @@ void setupWebServerRoutes() {
     server.on("/setDestination", HTTP_GET, []() {
         String lat = server.arg("lat");
         String lng = server.arg("lng");
+        String loops = server.arg("loops");
+        String pace = server.arg("pace");
+        String distance = server.arg("distance");
         
+        // Set destination coordinates
         if (lat != "" && lng != "") {
             // Use manually entered coordinates
             targetLat = lat.toFloat();
@@ -110,13 +121,45 @@ void setupWebServerRoutes() {
             return;
         }
         
+        // Reset navigation tracking variables
+        waypointLoopCount = 0;
+        totalDistance = 0.0;
+        totalTimeMs = millis();
+        currentPace = 0.0;
+        lastPaceUpdate = millis();
+        
+        // Get current position for initial segment distance calculation
+        float currentLat = myGPS.getLatitude() / 10000000.0;
+        float currentLon = myGPS.getLongitude() / 10000000.0;
+        lastSegmentDistance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
+        
+        // Set target values from parameters
+        if (loops != "") {
+            targetLoopCount = loops.toInt();
+        } else {
+            targetLoopCount = DEFAULT_LOOP_COUNT;
+        }
+        
+        if (pace != "") {
+            targetPace = pace.toFloat();
+        } else {
+            targetPace = DEFAULT_TARGET_PACE;
+        }
+        
+        if (distance != "") {
+            targetDistance = distance.toFloat();
+        } else {
+            targetDistance = DEFAULT_TARGET_DISTANCE;
+        }
+        
         destinationReached = false;
         autonomousMode = true;
-        followingWaypoints = true;
+        followingWaypoints = (waypointCount > 0);
         lastAvoidanceMessage = "";
         
         server.send(200, "text/plain", "Navigation started");
     });
+
 
     server.on("/stopNavigation", HTTP_GET, []() {
         autonomousMode = false;
@@ -175,6 +218,18 @@ void setupWebServerRoutes() {
     server.on("/clearWaypoints", HTTP_GET, []() {
         waypointCount = 0;
         String json = "{\"count\":" + String(waypointCount) + "}";
+        server.send(200, "application/json", json);
+    });
+
+    server.on("/navstats", HTTP_GET, []() {
+        unsigned long elapsedTime = millis() - totalTimeMs;
+        
+        String json = "{\"totalDistance\":" + String(totalDistance, 1) +
+                      ",\"currentPace\":" + String(currentPace, 2) +
+                      ",\"totalTime\":" + String(elapsedTime) +
+                      ",\"currentLoop\":" + String(waypointLoopCount) +
+                      ",\"targetLoops\":" + String(targetLoopCount) + "}";
+                      
         server.send(200, "application/json", json);
     });
 

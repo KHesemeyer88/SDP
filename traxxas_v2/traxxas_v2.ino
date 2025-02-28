@@ -56,6 +56,19 @@ unsigned long lastSonarUpdate = 0;
 unsigned long lastAvoidanceTime = 0;
 unsigned long destinationReachedTime = 0;
 
+// Waypoint looping variables
+int waypointLoopCount = 0;        // Current count of completed loops
+int targetLoopCount = DEFAULT_LOOP_COUNT; // Target number of loops to complete
+
+// Pace and distance tracking
+float targetPace = DEFAULT_TARGET_PACE;        // Target pace in m/s
+float targetDistance = DEFAULT_TARGET_DISTANCE; // Target total distance in meters
+float totalDistance = 0.0;        // Total distance traveled so far
+unsigned long totalTimeMs = 0;    // Total time elapsed in milliseconds
+float currentPace = 0.0;          // Current pace in m/s
+unsigned long lastPaceUpdate = 0; // Last time pace was calculated
+float lastSegmentDistance = 0.0;  // Distance of last waypoint segment
+
 // The HTML content for the web interface is in webpage.h
 
 void setup() {
@@ -116,13 +129,57 @@ void loop() {
         if (!checkObstacles(steeringAngle)) {
             // No obstacles, check if destination reached
             if (distance < WAYPOINT_REACHED_RADIUS) {
-                if (followingWaypoints && currentWaypointIndex < waypointCount - 1) {
+                // Update total distance - add the segment that was just completed
+                if (followingWaypoints) {
+                    totalDistance += lastSegmentDistance;
+                }
+                
+                // Check if we've hit distance target (if set)
+                if (targetDistance > 0 && totalDistance >= targetDistance) {
+                    // Target distance reached
+                    autonomousMode = false;
+                    destinationReached = true;
+                    destinationReachedTime = millis();
+                    lastAvoidanceMessage = "Target distance reached";
+                    escServo.write(ESC_NEUTRAL); // Stop
+                }
+                // Following waypoints (not just going to a single destination)
+                else if (followingWaypoints) {
                     // Move to next waypoint
-                    currentWaypointIndex++;
+                    if (currentWaypointIndex < waypointCount - 1) {
+                        // Go to next waypoint in current loop
+                        currentWaypointIndex++;
+                    } 
+                    else {
+                        // End of waypoint list reached
+                        waypointLoopCount++;
+                        
+                        // Check if we've done all the requested loops
+                        if (targetLoopCount > 0 && waypointLoopCount >= targetLoopCount) {
+                            // All loops completed
+                            autonomousMode = false;
+                            destinationReached = true;
+                            destinationReachedTime = millis();
+                            lastAvoidanceMessage = "All waypoint loops completed";
+                            escServo.write(ESC_NEUTRAL); // Stop
+                        } else {
+                            // Start next loop from the beginning
+                            currentWaypointIndex = 0;
+                            lastAvoidanceMessage = "Starting loop " + String(waypointLoopCount + 1);
+                        }
+                    }
+                    
+                    // Set next target waypoint
                     targetLat = waypointLats[currentWaypointIndex];
                     targetLon = waypointLons[currentWaypointIndex];
-                } else {
-                    // Final destination reached
+                    
+                    // Calculate and store the distance to the next waypoint for distance tracking
+                    float currentLat, currentLon;
+                    getCurrentPosition(currentLat, currentLon);
+                    lastSegmentDistance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
+                } 
+                else {
+                    // Single destination reached
                     autonomousMode = false;
                     destinationReached = true;
                     destinationReachedTime = millis();
@@ -134,7 +191,41 @@ void loop() {
         
         // Get updated steering angle from avoidance system
         steeringAngle = handleAvoidance(steeringAngle);
-        
+
+        // Update time tracking and pace if we're in autonomous mode
+        if (autonomousMode && myGPS.getFixType() > 0) {
+            // Update total time
+            totalTimeMs = millis();
+            
+            // Update pace calculation every second
+            if (millis() - lastPaceUpdate > SPEED_CORRECTION_INTERVAL) {
+                // Calculate current speed from GPS (m/s)
+                float speedMps = myGPS.getGroundSpeed() / 1000.0; // Convert from mm/s to m/s
+                
+                // Update current pace
+                currentPace = speedMps;
+                
+                // Adjust speed if pace control is active
+                if (targetPace > 0) {
+                    // Get current throttle setting - assuming a global variable for this
+                    int currentSpeed = 128; // Base speed - might need to be tracked elsewhere
+                    
+                    // Adjust speed based on pace difference
+                    float paceDiff = targetPace - currentPace;
+                    int speedAdjustment = (int)(paceDiff * SPEED_CORRECTION_FACTOR * 255);
+                    
+                    // Apply new speed with constraints
+                    currentSpeed = constrain(currentSpeed + speedAdjustment, 0, 255);
+                    
+                    // Only apply this in NO_OBSTACLE state, otherwise obstacle avoidance handles speed
+                    if (getAvoidanceState() == NO_OBSTACLE) {
+                        escServo.write(map(currentSpeed, 0, 255, ESC_MIN_FWD, ESC_MAX_FWD));
+                    }
+                }
+                
+                lastPaceUpdate = millis();
+            }
+        }        
         // Apply final steering angle with constraints
         steeringAngle = constrain(steeringAngle, 
                               STEERING_CENTER - STEERING_MAX, 

@@ -74,4 +74,24 @@ extern unsigned long lastAvoidanceTime, destinationReachedTime;
 // HTML content for webpage
 extern const char webPage[] PROGMEM;
 
+// Waypoint loop settings
+const int DEFAULT_LOOP_COUNT = 1;     // Default number of times to loop through waypoints
+const float DEFAULT_TARGET_PACE = 0;  // Default target pace in m/s (0 = no pace control)
+const float DEFAULT_TARGET_DISTANCE = 0; // Default target distance in meters (0 = no distance limit)
+
+// Speed control values
+const int SPEED_CORRECTION_INTERVAL = 1000; // How often to adjust speed for pace (ms)
+const float SPEED_CORRECTION_FACTOR = 0.2;  // How aggressively to correct speed (0-1)
+
+// Extended extern declarations for new tracking variables
+extern int waypointLoopCount;         // Current count of completed loops
+extern int targetLoopCount;           // Target number of loops to complete
+extern float targetPace;              // Target pace in m/s
+extern float targetDistance;          // Target total distance in meters
+extern float totalDistance;           // Total distance traveled so far
+extern unsigned long totalTimeMs;     // Total time elapsed in ms
+extern float currentPace;             // Current pace in m/s
+extern unsigned long lastPaceUpdate;  // Last time pace was calculated
+extern float lastSegmentDistance;     // Distance of last segment for pace calculation
+
 #endif // CONFIG_H

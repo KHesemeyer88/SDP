@@ -126,13 +126,46 @@ const char webPage[] PROGMEM = R"rawliteral(
         </div>
 
         <div id="autonomous-control">
-            <h2>Set Destination</h2>
+            <h2>Set Destination or Waypoints</h2>
             <input type="text" id="coords-input" class="coordinate-input" placeholder="Coordinates (e.g. 42.637088, -72.729328)">
-            <button class="submit-btn" onclick="startAutonomousMode()">Start Navigation</button>
-            <button class="submit-btn" style="background-color: #dc3545;" onclick="stopAutonomousMode()">Stop Navigation</button>
+            
+            <div style="margin-top: 20px; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;">
+                <div style="flex: 1; min-width: 250px; max-width: 350px;">
+                    <h3>Advanced Settings</h3>
+                    <div style="margin-bottom: 10px;">
+                        <label for="loop-count">Waypoint Loop Count:</label>
+                        <input type="number" id="loop-count" class="coordinate-input" value="1" min="1" max="100" style="width: 80px;">
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label for="target-pace">Target Pace (m/s):</label>
+                        <input type="number" id="target-pace" class="coordinate-input" value="0" min="0" step="0.1" style="width: 80px;">
+                        <span style="font-size: 14px; color: #666;">0 = no pace control</span>
+                    </div>
+                    <div style="margin-bottom: 10px;">
+                        <label for="target-distance">Target Distance (m):</label>
+                        <input type="number" id="target-distance" class="coordinate-input" value="0" min="0" style="width: 80px;">
+                        <span style="font-size: 14px; color: #666;">0 = no distance limit</span>
+                    </div>
+                </div>
+                
+                <div style="flex: 1; min-width: 250px; max-width: 350px;">
+                    <h3>Navigation Status</h3>
+                    <div style="background: #f0f0f0; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
+                        <p>Total Distance: <span id="total-distance">0.0</span> m</p>
+                        <p>Current Pace: <span id="current-pace">0.0</span> m/s</p>
+                        <p>Elapsed Time: <span id="elapsed-time">00:00:00</span></p>
+                        <p>Loop: <span id="current-loop">0</span>/<span id="target-loops">1</span></p>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <button class="submit-btn" onclick="startAutonomousMode()">Start Navigation</button>
+                <button class="submit-btn" style="background-color: #dc3545;" onclick="stopAutonomousMode()">Stop Navigation</button>
+            </div>
+            
             <div id="avoidance-alert" style="display: none; margin-top: 10px; padding: 10px; background-color: #ffc107; border-radius: 4px;"></div>
         </div>
-
         <!-- Change existing gps-data div to be autonomous-specific -->
         <div id="autonomous-gps-data" style="display: none;">
             <p>Distance to Target: <span id="distance">--</span> m</p>
@@ -190,6 +223,16 @@ const char webPage[] PROGMEM = R"rawliteral(
 
         function startAutonomousMode() {
             const coordsInput = document.getElementById('coords-input').value.trim();
+            const loopCount = document.getElementById('loop-count').value;
+            const targetPace = document.getElementById('target-pace').value;
+            const targetDistance = document.getElementById('target-distance').value;
+            
+            // Update display of target loops
+            document.getElementById('target-loops').textContent = loopCount;
+            
+            // Construct the URL with the new parameters
+            let url = '/setDestination';
+            const params = [];
             
             if (coordsInput) {
                 // If coordinates are manually entered, validate and use them
@@ -200,30 +243,46 @@ const char webPage[] PROGMEM = R"rawliteral(
                     return;
                 }
                 
-                const lat = parseFloat(coords[0]);
-                const lng = parseFloat(coords[1]);
-                
-                fetch(`/setDestination?lat=${lat}&lng=${lng}`)
-                    .then(response => response.text())
-                    .then(result => {
-                        console.log('Navigation started:', result);
-                    })
-                    .catch(error => {
-                        console.error('Error starting navigation:', error);
-                        alert('Failed to start navigation');
-                    });
-            } else {
-                // If no coordinates entered, use recorded waypoint
-                fetch('/setDestination')
-                    .then(response => response.text())
-                    .then(result => {
-                        console.log('Navigation started with recorded waypoint:', result);
-                    })
-                    .catch(error => {
-                        console.error('Error starting navigation:', error);
-                        alert('Failed to start navigation');
-                    });
+                params.push(`lat=${coords[0]}`);
+                params.push(`lng=${coords[1]}`);
             }
+            
+            // Add the new parameters
+            params.push(`loops=${loopCount}`);
+            params.push(`pace=${targetPace}`);
+            params.push(`distance=${targetDistance}`);
+            
+            // Construct the full URL
+            if (params.length > 0) {
+                url += '?' + params.join('&');
+            }
+            
+            fetch(url)
+                .then(response => response.text())
+                .then(result => {
+                    console.log('Navigation started:', result);
+                    // Reset displays
+                    document.getElementById('total-distance').textContent = '0.0';
+                    document.getElementById('current-pace').textContent = '0.0';
+                    document.getElementById('elapsed-time').textContent = '00:00:00';
+                    document.getElementById('current-loop').textContent = '0';
+                })
+                .catch(error => {
+                    console.error('Error starting navigation:', error);
+                    alert('Failed to start navigation');
+                });
+        }
+
+        // function to format time as HH:MM:SS
+        function formatTime(ms) {
+            const totalSeconds = Math.floor(ms / 1000);
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+            
+            return String(hours).padStart(2, '0') + ':' +
+                  String(minutes).padStart(2, '0') + ':' +
+                  String(seconds).padStart(2, '0');
         }
 
         function stopAutonomousMode() {
@@ -371,6 +430,24 @@ const char webPage[] PROGMEM = R"rawliteral(
                 })
                 .catch(console.error);
         }, 500);  // Update every 500ms
+
+        // Endpoint to fetch navigation stats
+        setInterval(() => {
+            if (document.getElementById('autonomous-control').style.display !== 'none') {
+                fetch('/navstats')
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById('total-distance').textContent = data.totalDistance.toFixed(1);
+                        document.getElementById('current-pace').textContent = data.currentPace.toFixed(2);
+                        document.getElementById('elapsed-time').textContent = formatTime(data.totalTime);
+                        document.getElementById('current-loop').textContent = data.currentLoop;
+                        document.getElementById('target-loops').textContent = data.targetLoops;
+                    })
+                    .catch(console.error);
+            }
+        }, 1000);
+
+
 
         function getFusionStatus() {
             const button = document.getElementById('fusion-status-btn');
