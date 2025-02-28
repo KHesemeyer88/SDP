@@ -112,14 +112,6 @@ void setup() {
 }
 
 void loop() {
-    // Prevent movement if navigation is stopped
-    if (!autonomousMode) {
-        escServo.write(ESC_NEUTRAL);
-        steeringServo.write(STEERING_CENTER);
-        server.handleClient(); // Keep handling web requests
-        delay(2);  // Prevent CPU overload
-        return;  // Skip the rest of the movement logic
-    }
 
     // Update sonar readings
     updateSonarReadings();
