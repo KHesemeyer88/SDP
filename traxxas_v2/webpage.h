@@ -99,8 +99,8 @@ const char webPage[] PROGMEM = R"rawliteral(
 <body>
     <div class="control-container">
         <div class="mode-switch">
-            <button id="manual-btn" class="active" onclick="switchMode('manual')">Manual Control</button>
-            <button id="auto-btn" class="inactive" onclick="switchMode('autonomous')">Autonomous Mode</button>
+            <button id="manual-btn" class="active" onclick="switchMode('manual')">Manual</button>
+            <button id="auto-btn" class="inactive" onclick="switchMode('autonomous')">Autonomous</button>
         </div>
 
         <div id="manual-control">
@@ -110,72 +110,47 @@ const char webPage[] PROGMEM = R"rawliteral(
             <canvas id="joystick" width="300" height="300"></canvas>
         </div>
 
-        <!-- New manual mode GPS data section -->
         <div id="manual-gps-data" style="margin-top: 20px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
-            <p>Fix Status: <span id="manual-fix">No Fix</span></p>
-            <p>Latitude: <span id="manual-lat">--</span></p>
-            <p>Longitude: <span id="manual-lng">--</span></p>
-            <button id="fusion-status-btn" class="submit-btn" style="background-color: #007bff;" onclick="getFusionStatus()">Get Fusion Status</button>
-            <p id="fusion-status-display" style="margin-top: 10px; display: none;">Fusion Status: <span id="fusion-status">--</span></p>
-            <p id="waypoint-count" style="margin-top: 10px;">Waypoints: 0/20</p>
             <div style="display: flex; gap: 10px; justify-content: center;">
                 <button id="record-waypoint-btn" class="submit-btn" style="background-color: #28a745;" onclick="recordWaypoint()">Record WP</button>
                 <button id="clear-waypoint-btn" class="submit-btn" style="background-color: #dc3545;" onclick="clearWaypoints()">Clear WP</button>
             </div>
+            <p>Fix Status: <span id="manual-fix">No Fix</span></p>
+            <p>Latitude: <span id="manual-lat">--</span></p>
+            <p>Longitude: <span id="manual-lng">--</span></p>
+            <p id="waypoint-count" style="margin-top: 10px;">Waypoints: 0/20</p>
             <p id="recorded-waypoint-display" style="margin-top: 10px; display: none;">Latest WP: <span id="recorded-waypoint">--</span></p>
+            <button id="fusion-status-btn" class="submit-btn" style="background-color: #007bff;" onclick="getFusionStatus()">Get Fusion Status</button>
+            <p id="fusion-status-display" style="margin-top: 10px; display: none;">Fusion Status: <span id="fusion-status">--</span></p>
         </div>
 
-        <div id="autonomous-control">
-            <h2>Set Destination or Waypoints</h2>
-            <input type="text" id="coords-input" class="coordinate-input" placeholder="Coordinates (e.g. 42.637088, -72.729328)">
-            
-            <div style="margin-top: 20px; display: flex; flex-wrap: wrap; justify-content: center; gap: 10px;">
+        <div id="autonomous-control">          
+            <div style="margin-top: 5px; display: flex; flex-wrap: wrap; justify-content: center; gap: 5px;">
                 <div style="flex: 1; min-width: 250px; max-width: 350px;">
-                    <h3>Advanced Settings</h3>
-                    <div style="margin-bottom: 10px;">
-                        <label for="loop-count">Waypoint Loop Count:</label>
-                        <input type="number" id="loop-count" class="coordinate-input" value="1" min="1" max="100" style="width: 80px;">
-                    </div>
-                    <div style="margin-bottom: 10px;">
-                        <label for="target-pace">Target Pace (m/s):</label>
+                    <div style="margin-bottom: 5px;">
+                        <label for="target-pace">Pace (m/s):</label>
                         <input type="number" id="target-pace" class="coordinate-input" value="0" min="0" step="0.1" style="width: 80px;">
-                        <span style="font-size: 14px; color: #666;">0 = no pace control</span>
                     </div>
-                    <div style="margin-bottom: 10px;">
-                        <label for="target-distance">Target Distance (m):</label>
+                    <div style="margin-bottom: 5px;">
+                        <label for="target-distance">Distance (m):</label>
                         <input type="number" id="target-distance" class="coordinate-input" value="0" min="0" style="width: 80px;">
-                        <span style="font-size: 14px; color: #666;">0 = no distance limit</span>
                     </div>
+                    <button class="submit-btn" onclick="startAutonomousMode()">Start</button>
+                    <button class="submit-btn" style="background-color: #dc3545;" onclick="stopAutonomousMode()">Stop</button>
                 </div>
-                
                 <div style="flex: 1; min-width: 250px; max-width: 350px;">
-                    <h3>Navigation Status</h3>
                     <div style="background: #f0f0f0; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
-                        <p>Total Distance: <span id="total-distance">0.0</span> m</p>
-                        <p>Current Pace: <span id="current-pace">0.0</span> m/s</p>
-                        <p>Elapsed Time: <span id="elapsed-time">00:00:00</span></p>
-                        <p>Loop: <span id="current-loop">0</span>/<span id="target-loops">1</span></p>
+                        <p>Distance: <span id="total-distance">0.0</span> m</p>
+                        <p>Pace: <span id="current-pace">0.0</span> m/s</p>
+                        <p>Time: <span id="elapsed-time">00:00:00</span></p>
                     </div>
                 </div>
             </div>
-            
-            <div style="margin-top: 20px;">
-                <button class="submit-btn" onclick="startAutonomousMode()">Start Navigation</button>
-                <button class="submit-btn" style="background-color: #dc3545;" onclick="stopAutonomousMode()">Stop Navigation</button>
-            </div>
-            
+                        
             <div id="avoidance-alert" style="display: none; margin-top: 10px; padding: 10px; background-color: #ffc107; border-radius: 4px;"></div>
-        </div>
-        <!-- Change existing gps-data div to be autonomous-specific -->
-        <div id="autonomous-gps-data" style="display: none;">
-            <p>Distance to Target: <span id="distance">--</span> m</p>
-            <p>Current Bearing: <span id="bearing">--</span>&deg</p>
-            <p>Fix Status: <span id="auto-fix">No Fix</span></p>
-            <p>Target Location:</p>
-            <p>Latitude: <span id="dest-lat">--</span></p>
-            <p>Longitude: <span id="dest-lng">--</span></p>
-        </div>
-        
+            <h3>Input Coords</h3>
+            <input type="text" id="coords-input" class="coordinate-input" placeholder="Coordinates (e.g. 42.637088, -72.729328)">
+        </div>        
     </div>
 
 <script>
@@ -223,14 +198,10 @@ const char webPage[] PROGMEM = R"rawliteral(
 
         function startAutonomousMode() {
             const coordsInput = document.getElementById('coords-input').value.trim();
-            const loopCount = document.getElementById('loop-count').value;
             const targetPace = document.getElementById('target-pace').value;
             const targetDistance = document.getElementById('target-distance').value;
             
-            // Update display of target loops
-            document.getElementById('target-loops').textContent = loopCount;
-            
-            // Construct the URL with the new parameters
+            // Construct the URL with the parameters
             let url = '/setDestination';
             const params = [];
             
@@ -247,8 +218,6 @@ const char webPage[] PROGMEM = R"rawliteral(
                 params.push(`lng=${coords[1]}`);
             }
             
-            // Add the new parameters
-            params.push(`loops=${loopCount}`);
             params.push(`pace=${targetPace}`);
             params.push(`distance=${targetDistance}`);
             
@@ -265,7 +234,6 @@ const char webPage[] PROGMEM = R"rawliteral(
                     document.getElementById('total-distance').textContent = '0.0';
                     document.getElementById('current-pace').textContent = '0.0';
                     document.getElementById('elapsed-time').textContent = '00:00:00';
-                    document.getElementById('current-loop').textContent = '0';
                 })
                 .catch(error => {
                     console.error('Error starting navigation:', error);
@@ -440,9 +408,7 @@ const char webPage[] PROGMEM = R"rawliteral(
                         document.getElementById('total-distance').textContent = data.totalDistance.toFixed(1);
                         document.getElementById('current-pace').textContent = data.currentPace.toFixed(2);
                         document.getElementById('elapsed-time').textContent = formatTime(data.totalTime);
-                        document.getElementById('current-loop').textContent = data.currentLoop;
-                        document.getElementById('target-loops').textContent = data.targetLoops;
-                    })
+                   })
                     .catch(console.error);
             }
         }, 1000);

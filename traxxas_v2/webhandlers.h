@@ -102,7 +102,7 @@ void setupWebServerRoutes() {
     server.on("/setDestination", HTTP_GET, []() {
         String lat = server.arg("lat");
         String lng = server.arg("lng");
-        String loops = server.arg("loops");
+        // Remove loops = server.arg("loops");
         String pace = server.arg("pace");
         String distance = server.arg("distance");
         
@@ -122,9 +122,11 @@ void setupWebServerRoutes() {
         }
         
         // Reset navigation tracking variables
-        waypointLoopCount = 0;
+        waypointLoopCount = 0; 
         totalDistance = 0.0;
-        totalTimeMs = millis();
+        if (totalTimeMs == 0) {
+            totalTimeMs = millis(); // Start timing only if it's the first time
+        }
         currentPace = 0.0;
         lastPaceUpdate = millis();
         
@@ -133,12 +135,13 @@ void setupWebServerRoutes() {
         float currentLon = myGPS.getLongitude() / 10000000.0;
         lastSegmentDistance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
         
-        // Set target values from parameters
-        if (loops != "") {
-            targetLoopCount = loops.toInt();
-        } else {
-            targetLoopCount = DEFAULT_LOOP_COUNT;
-        }
+        // Remove the loops setting section and rely only on distance
+        // if (loops != "") {
+        //     targetLoopCount = loops.toInt();
+        // } else {
+        //     targetLoopCount = DEFAULT_LOOP_COUNT;
+        // }
+        targetLoopCount = 0; // No longer using loops
         
         if (pace != "") {
             targetPace = pace.toFloat();
@@ -165,6 +168,9 @@ void setupWebServerRoutes() {
         autonomousMode = false;
         escServo.write(ESC_NEUTRAL);
         steeringServo.write(STEERING_CENTER);
+        if (totalTimeMs > 0) {
+            totalTimeMs = millis() - totalTimeMs; // Convert to elapsed time
+        }        
         server.send(200, "text/plain", "Navigation stopped");
     });
 
@@ -222,13 +228,19 @@ void setupWebServerRoutes() {
     });
 
     server.on("/navstats", HTTP_GET, []() {
-        unsigned long elapsedTime = millis() - totalTimeMs;
+        unsigned long elapsedTime = 0;
+        if (autonomousMode) {
+            elapsedTime = millis() - totalTimeMs; // Ongoing timing
+        } else if (totalTimeMs > 0) {
+            elapsedTime = totalTimeMs; // Show frozen time when stopped
+        } else {
+            elapsedTime = 0; // Only if never started
+        }
         
         String json = "{\"totalDistance\":" + String(totalDistance, 1) +
                       ",\"currentPace\":" + String(currentPace, 2) +
-                      ",\"totalTime\":" + String(elapsedTime) +
-                      ",\"currentLoop\":" + String(waypointLoopCount) +
-                      ",\"targetLoops\":" + String(targetLoopCount) + "}";
+                      ",\"totalTime\":" + String(elapsedTime) + "}";
+                      // Removed loop info
                       
         server.send(200, "application/json", json);
     });

@@ -147,25 +147,21 @@ void loop() {
                 else if (followingWaypoints) {
                     // Move to next waypoint
                     if (currentWaypointIndex < waypointCount - 1) {
-                        // Go to next waypoint in current loop
+                        // Go to next waypoint in current sequence
                         currentWaypointIndex++;
                     } 
                     else {
-                        // End of waypoint list reached
-                        waypointLoopCount++;
+                        // End of waypoint list reached - wrap around instead of counting loops
+                        currentWaypointIndex = 0;
+                        lastAvoidanceMessage = "Starting waypoint sequence again";
                         
-                        // Check if we've done all the requested loops
-                        if (targetLoopCount > 0 && waypointLoopCount >= targetLoopCount) {
-                            // All loops completed
+                        // Only stop if we have a distance target, otherwise keep going
+                        if (targetDistance > 0 && totalDistance >= targetDistance) {
                             autonomousMode = false;
                             destinationReached = true;
                             destinationReachedTime = millis();
-                            lastAvoidanceMessage = "All waypoint loops completed";
+                            lastAvoidanceMessage = "Target distance reached";
                             escServo.write(ESC_NEUTRAL); // Stop
-                        } else {
-                            // Start next loop from the beginning
-                            currentWaypointIndex = 0;
-                            lastAvoidanceMessage = "Starting loop " + String(waypointLoopCount + 1);
                         }
                     }
                     
@@ -173,7 +169,7 @@ void loop() {
                     targetLat = waypointLats[currentWaypointIndex];
                     targetLon = waypointLons[currentWaypointIndex];
                     
-                    // Calculate and store the distance to the next waypoint for distance tracking
+                    // Calculate and store the distance to the next waypoint
                     float currentLat, currentLon;
                     getCurrentPosition(currentLat, currentLon);
                     lastSegmentDistance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
@@ -194,9 +190,7 @@ void loop() {
 
         // Update time tracking and pace if we're in autonomous mode
         if (autonomousMode && myGPS.getFixType() > 0) {
-            // Update total time
             totalTimeMs = millis();
-            
             // Update pace calculation every second
             if (millis() - lastPaceUpdate > SPEED_CORRECTION_INTERVAL) {
                 // Calculate current speed from GPS (m/s)

@@ -20,12 +20,12 @@ const int TRIGGER_PIN_RIGHT = 19;
 const int ECHO_PIN_RIGHT = 21;
 
 // Sonar thresholds (cm)
-const int FRONT_STOP_THRESHOLD = 70; // zero to suppress obst. avoidance
+const int FRONT_STOP_THRESHOLD = 0; // zero to suppress obst. avoidance
 const int SIDE_AVOID_THRESHOLD = 50;
 
 // Traxxas XL-2.5 ESC values
 const int ESC_NEUTRAL = 90;     // Neutral position (1.5ms pulse)
-const int ESC_MAX_FWD = 130;    // Max forward allowed (~1.9ms pulse)
+const int ESC_MAX_FWD = 180;    // Max forward allowed (~1.9ms pulse)
 const int ESC_MAX_REV = 50;     // Max reverse allowed (~1.1ms pulse)
 const int ESC_MIN_FWD = 95;     // Minimum forward throttle
 const int ESC_MIN_REV = 85;     // Minimum reverse throttle
@@ -81,7 +81,7 @@ const float DEFAULT_TARGET_DISTANCE = 0; // Default target distance in meters (0
 
 // Speed control values
 const int SPEED_CORRECTION_INTERVAL = 1000; // How often to adjust speed for pace (ms)
-const float SPEED_CORRECTION_FACTOR = 0.2;  // How aggressively to correct speed (0-1)
+const float SPEED_CORRECTION_FACTOR = 0.1;  // How aggressively to correct speed (0-1)
 
 // Extended extern declarations for new tracking variables
 extern int waypointLoopCount;         // Current count of completed loops
