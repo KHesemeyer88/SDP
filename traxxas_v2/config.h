@@ -76,12 +76,12 @@ extern const char webPage[] PROGMEM;
 
 // Waypoint loop settings
 const int DEFAULT_LOOP_COUNT = 1;     // Default number of times to loop through waypoints
-const float DEFAULT_TARGET_PACE = 0;  // Default target pace in m/s (0 = no pace control)
+const float DEFAULT_TARGET_PACE = 1;  // Default target pace in m/s (0 = no pace control)
 const float DEFAULT_TARGET_DISTANCE = 0; // Default target distance in meters (0 = no distance limit)
 
 // Speed control values
-const int SPEED_CORRECTION_INTERVAL = 1000; // How often to adjust speed for pace (ms)
-const float SPEED_CORRECTION_FACTOR = 0.1;  // How aggressively to correct speed (0-1)
+const int SPEED_CORRECTION_INTERVAL = 200; // How often to adjust speed for pace (ms)
+const float SPEED_CORRECTION_FACTOR = 0.2;  // How aggressively to correct speed (0-1)
 
 // Extended extern declarations for new tracking variables
 extern int waypointLoopCount;         // Current count of completed loops

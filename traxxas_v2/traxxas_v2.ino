@@ -112,6 +112,15 @@ void setup() {
 }
 
 void loop() {
+    // Prevent movement if navigation is stopped
+    if (!autonomousMode) {
+        escServo.write(ESC_NEUTRAL);
+        steeringServo.write(STEERING_CENTER);
+        server.handleClient(); // Keep handling web requests
+        delay(2);  // Prevent CPU overload
+        return;  // Skip the rest of the movement logic
+    }
+
     // Update sonar readings
     updateSonarReadings();
 
@@ -202,8 +211,8 @@ void loop() {
                 // Adjust speed if pace control is active
                 if (targetPace > 0) {
                     // Get current throttle setting - assuming a global variable for this
-                    int currentSpeed = 128; // Base speed - might need to be tracked elsewhere
-                    
+                    int currentSpeed = map(escServo.read(), ESC_MIN_FWD, ESC_MAX_FWD, 0, 255);
+        
                     // Adjust speed based on pace difference
                     float paceDiff = targetPace - currentPace;
                     int speedAdjustment = (int)(paceDiff * SPEED_CORRECTION_FACTOR * 255);
