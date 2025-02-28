@@ -69,13 +69,13 @@ bool checkObstacles(int steeringAngle) {
 // Handle avoidance state machine
 int handleAvoidance(int baseSteeringAngle) {
     int steeringAngle = baseSteeringAngle;
-    int speed = 128; // Base speed
+    int speed = 110; // Base speed in servo angle, not 0-255
     
     // State machine logic
     switch (avoidanceState) {
         case NO_OBSTACLE: {
             // Normal navigation
-            escServo.write(map(speed, 0, 255, ESC_MIN_FWD, ESC_MAX_FWD));
+            escServo.write(speed);
             break;
         }
 
@@ -93,7 +93,7 @@ int handleAvoidance(int baseSteeringAngle) {
         case TURNING: {
             // Turn right for 1 second
             steeringAngle = STEERING_CENTER + TURN_ANGLE; // Turn right
-            escServo.write(map(128, 0, 255, ESC_MIN_FWD, ESC_MAX_FWD)); // Move forward
+            escServo.write(speed); // Move forward
             if (millis() - avoidanceStartTime >= 1000) {
                 avoidanceState = RESUMING;
                 avoidanceStartTime = millis();
@@ -104,7 +104,7 @@ int handleAvoidance(int baseSteeringAngle) {
         case RESUMING: {
             // Resume normal navigation for 1 second
             steeringAngle = STEERING_CENTER; // Center steering
-            escServo.write(map(128, 0, 255, ESC_MIN_FWD, ESC_MAX_FWD)); // Move forward
+            escServo.write(speed); // Move forward
             if (millis() - avoidanceStartTime >= 1000) {
                 avoidanceState = NO_OBSTACLE;
                 lastAvoidanceMessage = "";
@@ -119,7 +119,7 @@ int handleAvoidance(int baseSteeringAngle) {
             } else {
                 steeringAngle = STEERING_CENTER + TURN_ANGLE; // Steer right
             }
-            escServo.write(map(128, 0, 255, ESC_MIN_FWD, ESC_MAX_FWD)); // Move forward
+            escServo.write(speed); // Move forward
             if (millis() - avoidanceStartTime >= 1000) {
                 avoidanceState = NO_OBSTACLE;
                 lastAvoidanceMessage = "";

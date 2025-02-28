@@ -13,6 +13,14 @@ extern float waypointLats[], waypointLons[];
 extern int waypointCount, currentWaypointIndex;
 extern bool followingWaypoints;
 extern unsigned long lastUpdateTime;
+// Additional extern declarations for pace control
+extern bool autonomousMode;
+extern unsigned long lastPaceUpdate;
+extern float targetPace;
+extern float currentPace;
+extern unsigned long totalTimeMs;
+extern AvoidanceState getAvoidanceState();
+extern Servo escServo;
 
 // Initialize GPS module
 bool initializeGPS() {
@@ -136,6 +144,92 @@ int calculateSteeringAngle(float currentLat, float currentLon) {
     lastUpdateTime = millis();
     
     return steeringAngle;
+}
+
+// // Update pace control based on current GPS speed
+// void updatePaceControl() {
+//     if (autonomousMode) {
+//         totalTimeMs = millis();
+//         // Update pace calculation every interval
+//         if (millis() - lastPaceUpdate > SPEED_CORRECTION_INTERVAL) {
+//             // Calculate current speed from GPS (m/s)
+//             float speedMps = myGPS.getGroundSpeed() / 1000.0; // Convert from mm/s to m/s
+            
+//             // Update current pace
+//             currentPace = speedMps;
+            
+//             // Adjust speed if pace control is active
+//             if (targetPace > 0 && getAvoidanceState() == NO_OBSTACLE) {
+//                 // Calculate how far off we are from target pace
+//                 float paceDiff = targetPace - currentPace;
+                
+//                 // Get current ESC value
+//                 int currentEscValue = escServo.read();
+                
+//                 // Adjust more aggressively when we're going too fast
+//                 int escAdjustment;
+//                 if (paceDiff < 0) { // Going too fast
+//                     escAdjustment = paceDiff * 10; // More aggressive slowdown
+//                 } else {
+//                     escAdjustment = paceDiff * 5; // Gentler speedup
+//                 }
+                
+//                 // Calculate new ESC value and constrain it
+//                 int newEscValue = constrain(currentEscValue + escAdjustment, ESC_MIN_FWD, ESC_MAX_FWD);
+                
+//                 // Set the ESC directly using servo angle
+//                 escServo.write(newEscValue);
+//             }
+            
+//             lastPaceUpdate = millis();
+//         }
+//     }
+// }
+void updatePaceControl() {
+    if (autonomousMode) {
+        totalTimeMs = millis();
+        
+        // Update pace calculation every interval
+        if (millis() - lastPaceUpdate > SPEED_CORRECTION_INTERVAL) {
+            // Calculate current speed from GPS (m/s)
+            float speedMps = myGPS.getGroundSpeed() / 1000.0; // Convert from mm/s to m/s
+            
+            // Update current pace
+            currentPace = speedMps;
+            
+            // Adjust speed if pace control is active
+            if (targetPace > 0 && getAvoidanceState() == NO_OBSTACLE) {
+                // Get current ESC value
+                int currentEscValue = escServo.read();
+                
+                // Calculate pace difference as a percentage of target
+                float paceRatio = targetPace > 0 ? currentPace / targetPace : 1.0;
+                
+                // More aggressive adjustment factor
+                int adjustmentValue;
+                
+                if (paceRatio < 0.95) {
+                    // Too slow - speed up more aggressively
+                    adjustmentValue = (int)((1.0 - paceRatio) * 15.0);
+                } else if (paceRatio > 1.05) {
+                    // Too fast - slow down more aggressively
+                    adjustmentValue = (int)((1.0 - paceRatio) * 15.0);
+                } else {
+                    // Close enough - minor adjustment
+                    adjustmentValue = (int)((1.0 - paceRatio) * 5.0);
+                }
+                
+                // Calculate new ESC value
+                int newEscValue = currentEscValue + adjustmentValue;
+                newEscValue = constrain(newEscValue, 105, 155); // Use safe range
+                
+                // Set the ESC directly
+                escServo.write(newEscValue);
+            }
+            
+            lastPaceUpdate = millis();
+        }
+    }
 }
 
 #endif // NAVIGATION_H

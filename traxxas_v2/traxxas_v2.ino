@@ -68,6 +68,9 @@ unsigned long totalTimeMs = 0;    // Total time elapsed in milliseconds
 float currentPace = 0.0;          // Current pace in m/s
 unsigned long lastPaceUpdate = 0; // Last time pace was calculated
 float lastSegmentDistance = 0.0;  // Distance of last waypoint segment
+float lastTrackedLat = 0;
+float lastTrackedLon = 0;
+unsigned long lastDistanceUpdate = 0;
 
 // The HTML content for the web interface is in webpage.h
 
@@ -112,125 +115,93 @@ void setup() {
 }
 
 void loop() {
-
-    // Update sonar readings
+    // Always handle web server requests and update sensors
+    server.handleClient();
     updateSonarReadings();
-
-    // Autonomous navigation with obstacle avoidance
+    
+    // Check if we need to clear avoidance or destination messages
+    updateStatusMessages();
+    
+    // Safety timeout check - applies to both manual and autonomous modes
+    if (millis() - lastUpdateTime > TIMEOUT_MS) {
+        escServo.write(ESC_NEUTRAL);
+        steeringServo.write(STEERING_CENTER);
+    }
+    
+    // Autonomous mode with valid GPS fix
     if (autonomousMode && myGPS.getFixType() > 0) {
         float currentLat, currentLon;
         getCurrentPosition(currentLat, currentLon);
         
-        // Calculate steering angle based on current position and target
+        // Track continuous distance
+        updateContinuousDistance(currentLat, currentLon);
+        
+        // Calculate distance to target and steering angle
+        float distance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
         int steeringAngle = calculateSteeringAngle(currentLat, currentLon);
         
-        float distance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
-            
-        // Check for obstacles
+        // Check for obstacles first
         if (!checkObstacles(steeringAngle)) {
-            // No obstacles, check if destination reached
+            // No obstacles, check if waypoint reached
             if (distance < WAYPOINT_REACHED_RADIUS) {
-                // Update total distance - add the segment that was just completed
-                if (followingWaypoints) {
-                    totalDistance += lastSegmentDistance;
-                }
-                
-                // Check if we've hit distance target (if set)
-                if (targetDistance > 0 && totalDistance >= targetDistance) {
-                    // Target distance reached
-                    autonomousMode = false;
-                    destinationReached = true;
-                    destinationReachedTime = millis();
-                    lastAvoidanceMessage = "Target distance reached";
-                    escServo.write(ESC_NEUTRAL); // Stop
-                }
-                // Following waypoints (not just going to a single destination)
-                else if (followingWaypoints) {
-                    // Move to next waypoint
-                    if (currentWaypointIndex < waypointCount - 1) {
-                        // Go to next waypoint in current sequence
-                        currentWaypointIndex++;
-                    } 
-                    else {
-                        // End of waypoint list reached - wrap around instead of counting loops
-                        currentWaypointIndex = 0;
-                        lastAvoidanceMessage = "Starting waypoint sequence again";
-                        
-                        // Only stop if we have a distance target, otherwise keep going
-                        if (targetDistance > 0 && totalDistance >= targetDistance) {
-                            autonomousMode = false;
-                            destinationReached = true;
-                            destinationReachedTime = millis();
-                            lastAvoidanceMessage = "Target distance reached";
-                            escServo.write(ESC_NEUTRAL); // Stop
-                        }
-                    }
-                    
-                    // Set next target waypoint
-                    targetLat = waypointLats[currentWaypointIndex];
-                    targetLon = waypointLons[currentWaypointIndex];
-                    
-                    // Calculate and store the distance to the next waypoint
-                    float currentLat, currentLon;
-                    getCurrentPosition(currentLat, currentLon);
-                    lastSegmentDistance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
-                } 
-                else {
-                    // Single destination reached
-                    autonomousMode = false;
-                    destinationReached = true;
-                    destinationReachedTime = millis();
-                    lastAvoidanceMessage = "Destination reached";
-                    escServo.write(ESC_NEUTRAL); // Stop
-                }
+                handleWaypointReached();
             }
         }
         
         // Get updated steering angle from avoidance system
         steeringAngle = handleAvoidance(steeringAngle);
-
-        // Update time tracking and pace if we're in autonomous mode
-        if (autonomousMode && myGPS.getFixType() > 0) {
-            totalTimeMs = millis();
-            // Update pace calculation every second
-            if (millis() - lastPaceUpdate > SPEED_CORRECTION_INTERVAL) {
-                // Calculate current speed from GPS (m/s)
-                float speedMps = myGPS.getGroundSpeed() / 1000.0; // Convert from mm/s to m/s
-                
-                // Update current pace
-                currentPace = speedMps;
-                
-                // Adjust speed if pace control is active
-                if (targetPace > 0) {
-                    // Get current throttle setting - assuming a global variable for this
-                    int currentSpeed = map(escServo.read(), ESC_MIN_FWD, ESC_MAX_FWD, 0, 255);
         
-                    // Adjust speed based on pace difference
-                    float paceDiff = targetPace - currentPace;
-                    int speedAdjustment = (int)(paceDiff * SPEED_CORRECTION_FACTOR * 255);
-                    
-                    // Apply new speed with constraints
-                    currentSpeed = constrain(currentSpeed + speedAdjustment, 0, 255);
-                    
-                    // Only apply this in NO_OBSTACLE state, otherwise obstacle avoidance handles speed
-                    if (getAvoidanceState() == NO_OBSTACLE) {
-                        escServo.write(map(currentSpeed, 0, 255, ESC_MIN_FWD, ESC_MAX_FWD));
-                    }
-                }
-                
-                lastPaceUpdate = millis();
-            }
-        }        
+        // Update pace and speed settings
+        updatePaceControl();
+        
         // Apply final steering angle with constraints
         steeringAngle = constrain(steeringAngle, 
                               STEERING_CENTER - STEERING_MAX, 
                               STEERING_CENTER + STEERING_MAX);
         steeringServo.write(steeringAngle);
     }
+    
+    delay(2);  // Small delay for stability
+}
 
-    // Clear messages
+// Track continuous distance traveled
+void updateContinuousDistance(float currentLat, float currentLon) {
+    if (millis() - lastDistanceUpdate >= 1000) { // Update once per second
+        if (lastTrackedLat != 0 && lastTrackedLon != 0) {
+            float movementDistance = calculateDistance(lastTrackedLat, lastTrackedLon, currentLat, currentLon);
+            
+            // Only add reasonable distances to prevent GPS jitter
+            if (movementDistance > 0.1 && movementDistance < 5.0) {
+                totalDistance += movementDistance;
+                //Serial.print("Added distance: ");
+                //Serial.print(movementDistance);
+                //Serial.print(" Total: ");
+                //Serial.println(totalDistance);
+                
+                // Check distance target if set
+                if (targetDistance > 0 && totalDistance >= targetDistance) {
+                    autonomousMode = false;
+                    destinationReached = true;
+                    destinationReachedTime = millis();
+                    lastAvoidanceMessage = "Target distance reached";
+                    escServo.write(ESC_NEUTRAL); // Stop
+                    return; // Exit early as we're no longer in autonomous mode
+                }
+            }
+        }
+        
+        // Update last tracked position
+        lastTrackedLat = currentLat;
+        lastTrackedLon = currentLon;
+        lastDistanceUpdate = millis();
+    }
+}
+
+// Update message timeouts
+void updateStatusMessages() {
     if (lastAvoidanceMessage != "") {
-        if (lastAvoidanceMessage == "Destination reached") {
+        if (lastAvoidanceMessage == "Destination reached" || 
+            lastAvoidanceMessage == "Target distance reached") {
             // Clear destination message after timeout
             if (millis() - destinationReachedTime > DESTINATION_MESSAGE_TIMEOUT) {
                 lastAvoidanceMessage = "";
@@ -243,15 +214,44 @@ void loop() {
             }
         }
     }
-
-    // Handle web server requests
-    server.handleClient();
-
-    // Safety timeout - stop if no updates received
-    if (millis() - lastUpdateTime > TIMEOUT_MS) {
-        escServo.write(ESC_NEUTRAL);
-        steeringServo.write(STEERING_CENTER);
-    }
-
-    delay(2);  // Small delay for stability
 }
+
+// Handle reaching a waypoint
+void handleWaypointReached() {
+    // Update total distance - add the segment that was just completed
+    if (followingWaypoints) {
+        totalDistance += lastSegmentDistance;
+    }
+    
+    // Following waypoints (not just going to a single destination)
+    if (followingWaypoints) {
+        // Move to next waypoint
+        if (currentWaypointIndex < waypointCount - 1) {
+            // Go to next waypoint in current sequence
+            currentWaypointIndex++;
+        } 
+        else {
+            // End of waypoint list reached - wrap around
+            currentWaypointIndex = 0;
+            lastAvoidanceMessage = "Starting waypoint sequence again";
+        }
+        
+        // Set next target waypoint
+        targetLat = waypointLats[currentWaypointIndex];
+        targetLon = waypointLons[currentWaypointIndex];
+        
+        // Calculate and store the distance to the next waypoint
+        float currentLat, currentLon;
+        getCurrentPosition(currentLat, currentLon);
+        lastSegmentDistance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
+    } 
+    else {
+        // Single destination reached
+        autonomousMode = false;
+        destinationReached = true;
+        destinationReachedTime = millis();
+        lastAvoidanceMessage = "Destination reached";
+        escServo.write(ESC_NEUTRAL); // Stop
+    }
+}
+
