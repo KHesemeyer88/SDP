@@ -22,8 +22,8 @@ extern unsigned long destinationReachedTime;
 extern SFE_UBLOX_GNSS myGPS;
 extern Servo escServo, steeringServo;
 extern unsigned long lastUpdateTime;
-extern int waypointLoopCount;
-extern int targetLoopCount;
+//extern int waypointLoopCount;
+//extern int targetLoopCount;
 extern float targetPace;
 extern float targetDistance;
 extern float totalDistance;
@@ -122,7 +122,7 @@ void setupWebServerRoutes() {
         }
         
         // Reset navigation tracking variables
-        waypointLoopCount = 0; 
+        //waypointLoopCount = 0; 
         totalDistance = 0.0;
         if (totalTimeMs == 0) {
             totalTimeMs = millis(); // Start timing only if it's the first time
@@ -141,7 +141,7 @@ void setupWebServerRoutes() {
         // } else {
         //     targetLoopCount = DEFAULT_LOOP_COUNT;
         // }
-        targetLoopCount = 0; // No longer using loops
+        //targetLoopCount = 0; 
         
         if (pace != "") {
             targetPace = pace.toFloat();

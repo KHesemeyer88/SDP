@@ -1,6 +1,20 @@
 /*
- * RC Car Control with GPS Navigation and Obstacle Avoidance
- * Main file using modular structure with separate header files
+ * Autonomous car control with GNSS navigation and obstacle avoidance.
+
+ * Broke out main file using modular structure with separate header files.
+ * Eliminated all mapping to 0-255 for speed. Speed is set only by servo style angles.
+  ** where 0=max reverse, 90=neutral, 180=max forward.
+ * Obstacle detection and avoidance is not currently working well, I may have broken it.
+ * Pace tracking and control implemented but very poorly. Improvements needed:
+  ** Fix distance tracking so it does NOT increment while no power is applied to motor
+    ** (currently distance increments from GNSS noise alone even while car is still).
+  ** Fix time tracking so it increments once start navigation is selected
+    ** and pauses when stop navigation is selected.
+  ** Add functionality to reset distance and time tracking (button probably).
+  ** Investigate general improvements for pace tracking and correction. It is 
+    ** VERY rough and inaccurate right now.
+  ** Add functionality to show average pace using reported distance and time.
+  ** Average pace is more important than instantaneous pace, though both need improvement.
  * Last updated: 2/28/2025
  */
 
@@ -57,8 +71,8 @@ unsigned long lastAvoidanceTime = 0;
 unsigned long destinationReachedTime = 0;
 
 // Waypoint looping variables
-int waypointLoopCount = 0;        // Current count of completed loops
-int targetLoopCount = DEFAULT_LOOP_COUNT; // Target number of loops to complete
+//int waypointLoopCount = 0;        // Current count of completed loops
+//int targetLoopCount = DEFAULT_LOOP_COUNT; // Target number of loops to complete
 
 // Pace and distance tracking
 float targetPace = DEFAULT_TARGET_PACE;        // Target pace in m/s
@@ -91,8 +105,8 @@ void setup() {
     steeringServo.setPeriodHertz(50);
     escServo.setPeriodHertz(50);
     
-    steeringServo.attach(STEERING_PIN, 1000, 2000);
-    escServo.attach(ESC_PIN, 1000, 2000);
+    steeringServo.attach(STEERING_PIN, 1000, 2000); //1000ms pulse is 0 degrees, 2000ms pulse is 180 degrees
+    escServo.attach(ESC_PIN, 1000, 2000); //100ms pulse is 0 degrees=max reverse, 2000ms pulse is 180 degrees=max forward
     
     // Initialize ESC - start in neutral
     escServo.write(ESC_NEUTRAL);

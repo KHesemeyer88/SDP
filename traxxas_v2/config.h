@@ -23,9 +23,9 @@ const int ECHO_PIN_RIGHT = 21;
 const int FRONT_STOP_THRESHOLD = 50; // zero to suppress obst. avoidance
 const int SIDE_AVOID_THRESHOLD = 50;
 
-// Traxxas XL-2.5 ESC values
+// Traxxas XL-2.5 ESC & servo values. Note ESC takes angles like a servo, but converts them to speed
 const int ESC_NEUTRAL = 90;     // Neutral position (1.5ms pulse)
-const int ESC_MAX_FWD = 180;    // Max forward allowed (~1.9ms pulse)
+const int ESC_MAX_FWD = 150;    // Max forward allowed (180 removes speed governor)
 const int ESC_MAX_REV = 50;     // Max reverse allowed (~1.1ms pulse)
 const int ESC_MIN_FWD = 95;     // Minimum forward throttle
 const int ESC_MIN_REV = 85;     // Minimum reverse throttle
@@ -75,7 +75,7 @@ extern unsigned long lastAvoidanceTime, destinationReachedTime;
 extern const char webPage[] PROGMEM;
 
 // Waypoint loop settings
-const int DEFAULT_LOOP_COUNT = 1;     // Default number of times to loop through waypoints
+//const int DEFAULT_LOOP_COUNT = 1;     // Default number of times to loop through waypoints
 const float DEFAULT_TARGET_PACE = 1;  // Default target pace in m/s (0 = no pace control)
 const float DEFAULT_TARGET_DISTANCE = 0; // Default target distance in meters (0 = no distance limit)
 
@@ -84,8 +84,8 @@ const int SPEED_CORRECTION_INTERVAL = 200; // How often to adjust speed for pace
 const float SPEED_CORRECTION_FACTOR = 0.05;  // How aggressively to correct speed (0-1)
 
 // Extended extern declarations for new tracking variables
-extern int waypointLoopCount;         // Current count of completed loops
-extern int targetLoopCount;           // Target number of loops to complete
+//extern int waypointLoopCount;         // Current count of completed loops
+//extern int targetLoopCount;           // Target number of loops to complete
 extern float targetPace;              // Target pace in m/s
 extern float targetDistance;          // Target total distance in meters
 extern float totalDistance;           // Total distance traveled so far
