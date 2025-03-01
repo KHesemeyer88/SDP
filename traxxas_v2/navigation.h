@@ -146,45 +146,6 @@ int calculateSteeringAngle(float currentLat, float currentLon) {
     return steeringAngle;
 }
 
-// // Update pace control based on current GPS speed
-// void updatePaceControl() {
-//     if (autonomousMode) {
-//         totalTimeMs = millis();
-//         // Update pace calculation every interval
-//         if (millis() - lastPaceUpdate > SPEED_CORRECTION_INTERVAL) {
-//             // Calculate current speed from GPS (m/s)
-//             float speedMps = myGPS.getGroundSpeed() / 1000.0; // Convert from mm/s to m/s
-            
-//             // Update current pace
-//             currentPace = speedMps;
-            
-//             // Adjust speed if pace control is active
-//             if (targetPace > 0 && getAvoidanceState() == NO_OBSTACLE) {
-//                 // Calculate how far off we are from target pace
-//                 float paceDiff = targetPace - currentPace;
-                
-//                 // Get current ESC value
-//                 int currentEscValue = escServo.read();
-                
-//                 // Adjust more aggressively when we're going too fast
-//                 int escAdjustment;
-//                 if (paceDiff < 0) { // Going too fast
-//                     escAdjustment = paceDiff * 10; // More aggressive slowdown
-//                 } else {
-//                     escAdjustment = paceDiff * 5; // Gentler speedup
-//                 }
-                
-//                 // Calculate new ESC value and constrain it
-//                 int newEscValue = constrain(currentEscValue + escAdjustment, ESC_MIN_FWD, ESC_MAX_FWD);
-                
-//                 // Set the ESC directly using servo angle
-//                 escServo.write(newEscValue);
-//             }
-            
-//             lastPaceUpdate = millis();
-//         }
-//     }
-// }
 void updatePaceControl() {
     if (autonomousMode) {
         totalTimeMs = millis();
@@ -221,7 +182,7 @@ void updatePaceControl() {
                 
                 // Calculate new ESC value
                 int newEscValue = currentEscValue + adjustmentValue;
-                newEscValue = constrain(newEscValue, 105, 155); // Use safe range
+                newEscValue = constrain(newEscValue, 105, 135); // Use safe range
                 
                 // Set the ESC directly
                 escServo.write(newEscValue);
@@ -231,5 +192,4 @@ void updatePaceControl() {
         }
     }
 }
-
 #endif // NAVIGATION_H
