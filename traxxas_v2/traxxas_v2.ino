@@ -15,7 +15,14 @@
     ** VERY rough and inaccurate right now.
   ** Add functionality to show average pace using reported distance and time.
   ** Average pace is more important than instantaneous pace, though both need improvement.
- * Last updated: 2/28/2025
+
+  **** MOST IMPORTANT ****
+  * NEED TO IMPLEMENT HEARTBEAT/SAFETY TIMEOUT IN AUTONOMOUS MODE
+  * CURRENTLY CAR CAN LOSE CONNECTION WITH PHONE BUT CONTINUE NAVIGATING
+  * RESULT IS THAT STOP NAVIGATION BUTTON HAS NO EFFECT
+  ************************
+
+ * Last updated: 3/1/2025
  */
 
 // Include all headers
