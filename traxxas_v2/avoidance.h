@@ -1,154 +1,85 @@
-// avoidance.h
 #ifndef AVOIDANCE_H
 #define AVOIDANCE_H
 
 #include <Arduino.h>
-#include "config.h" // For constants like FRONT_STOP_THRESHOLD
+#include "config.h"  
 
-// Avoidance states
-enum AvoidanceState {
-    NO_OBSTACLE,
-    REVERSING,
-    TURNING,
-    RESUMING,
-    SIDE_AVOIDANCE
-};
-
-// Variables needed for avoidance logic
 extern float lastFrontDist, lastLeftDist, lastRightDist;
 extern String lastAvoidanceMessage;
-extern unsigned long lastAvoidanceTime;
-extern Servo steeringServo, escServo;
-extern unsigned long lastUpdateTime;
+extern Servo escServo;
 
-// Current state information
-static AvoidanceState avoidanceState = NO_OBSTACLE;
+enum AvoidanceState { NO_AVOID, FRONT_AVOID, LEFT_AVOID, RIGHT_AVOID };
+static AvoidanceState avoidanceState = NO_AVOID;
 static unsigned long avoidanceStartTime = 0;
-static bool avoidLeft = false; // True if avoiding left obstacle, false for right
+const unsigned long AVOIDANCE_DURATION_MS = 1000; // Duration of avoidance action in milliseconds
 
-// Functions
-bool checkObstacles(int steeringAngle) {
-    // Check for obstacles and activate the state machine if necessary
-    if (lastFrontDist > 0 && lastFrontDist < FRONT_STOP_THRESHOLD) {
-        // Front obstacle detected
-        if (avoidanceState == NO_OBSTACLE) {
-            avoidanceState = REVERSING;
-            avoidanceStartTime = millis();
-            lastAvoidanceMessage = "Front obstacle detected - reversing";
-            return true;
-        }
-    } else if (lastLeftDist > 0 && lastLeftDist < SIDE_AVOID_THRESHOLD) {
-        // Left obstacle detected
-        if (avoidanceState == NO_OBSTACLE) {
-            avoidanceState = SIDE_AVOIDANCE;
-            avoidLeft = true;
-            avoidanceStartTime = millis();
-            lastAvoidanceMessage = "Avoiding left obstacle";
-            return true;
-        }
-    } else if (lastRightDist > 0 && lastRightDist < SIDE_AVOID_THRESHOLD) {
-        // Right obstacle detected
-        if (avoidanceState == NO_OBSTACLE) {
-            avoidanceState = SIDE_AVOIDANCE;
-            avoidLeft = false;
-            avoidanceStartTime = millis();
-            lastAvoidanceMessage = "Avoiding right obstacle";
-            return true;
-        }
-    } else {
-        // No obstacles detected
-        if (avoidanceState != NO_OBSTACLE) {
-            // Reset the state machine if no obstacles are detected
-            avoidanceState = NO_OBSTACLE;
+inline int applyObstacleAvoidance(int baseSteeringAngle) {
+    unsigned long now = millis();
+    
+    // If already in avoidance state, continue it until the duration elapses.
+    if (avoidanceState != NO_AVOID) {
+        if (now - avoidanceStartTime < AVOIDANCE_DURATION_MS) {
+            switch (avoidanceState) {
+                case FRONT_AVOID:
+                    // Continue reverse command and steer away
+                    escServo.write(ESC_MAX_REV);
+                    if (lastLeftDist > lastRightDist) {
+                        lastAvoidanceMessage = "Avoiding front obstacle: turning left";
+                        return STEERING_CENTER - TURN_ANGLE;
+                    } else {
+                        lastAvoidanceMessage = "Avoiding front obstacle: turning right";
+                        return STEERING_CENTER + TURN_ANGLE;
+                    }
+                
+                case LEFT_AVOID:
+                    lastAvoidanceMessage = "Avoiding left obstacle: steering right";
+                    return STEERING_CENTER + TURN_ANGLE;
+                
+                case RIGHT_AVOID:
+                    lastAvoidanceMessage = "Avoiding right obstacle: steering left";
+                    return STEERING_CENTER - TURN_ANGLE;
+                
+                default:
+                    break;
+            }
+        } else {
+            // Timeout reached: exit avoidance mode
+            avoidanceState = NO_AVOID;
             lastAvoidanceMessage = "";
         }
     }
-    return false;
-}
-
-// Handle avoidance state machine
-int handleAvoidance(int baseSteeringAngle) {
-    int steeringAngle = baseSteeringAngle;
-    int speed = 110; // Base speed in servo angle, not 0-255
     
-    // State machine logic
-    switch (avoidanceState) {
-        case NO_OBSTACLE: {
-            // Normal navigation
-            escServo.write(speed);
-            break;
-        }
-
-        case REVERSING: {
-            // Reverse for 500ms
-            escServo.write(ESC_MAX_REV);
-            if (millis() - avoidanceStartTime >= 500) {
-                avoidanceState = TURNING;
-                avoidanceStartTime = millis();
-                escServo.write(ESC_NEUTRAL); // Stop before turning
-            }
-            break;
-        }
-
-        case TURNING: {
-            // Turn right for 1 second
-            steeringAngle = STEERING_CENTER + TURN_ANGLE; // Turn right
-            escServo.write(speed); // Move forward
-            if (millis() - avoidanceStartTime >= 1000) {
-                avoidanceState = RESUMING;
-                avoidanceStartTime = millis();
-            }
-            break;
-        }
-
-        case RESUMING: {
-            // Resume normal navigation for 1 second
-            steeringAngle = STEERING_CENTER; // Center steering
-            escServo.write(speed); // Move forward
-            if (millis() - avoidanceStartTime >= 1000) {
-                avoidanceState = NO_OBSTACLE;
-                lastAvoidanceMessage = "";
-            }
-            break;
-        }
-
-        case SIDE_AVOIDANCE: {
-            // Steer away from the side obstacle
-            if (avoidLeft) {
-                steeringAngle = STEERING_CENTER - TURN_ANGLE; // Steer left
-            } else {
-                steeringAngle = STEERING_CENTER + TURN_ANGLE; // Steer right
-            }
-            escServo.write(speed); // Move forward
-            if (millis() - avoidanceStartTime >= 1000) {
-                avoidanceState = NO_OBSTACLE;
-                lastAvoidanceMessage = "";
-            }
-            break;
+    // Not in avoidance state; check sensors for new obstacles:
+    if (lastFrontDist > 0 && lastFrontDist < FRONT_STOP_THRESHOLD) {
+        avoidanceState = FRONT_AVOID;
+        avoidanceStartTime = now;
+        escServo.write(ESC_MAX_REV);
+        if (lastLeftDist > lastRightDist) {
+            lastAvoidanceMessage = "Front obstacle: turning left";
+            return STEERING_CENTER - TURN_ANGLE;
+        } else {
+            lastAvoidanceMessage = "Front obstacle: turning right";
+            return STEERING_CENTER + TURN_ANGLE;
         }
     }
-
-    // Global safety timeout for any avoidance state
-    if (avoidanceState != NO_OBSTACLE && 
-        (millis() - avoidanceStartTime > MAX_AVOIDANCE_TIME)) {
-        avoidanceState = NO_OBSTACLE;
-        lastAvoidanceMessage = "Avoidance timeout - resuming";
-        escServo.write(ESC_NEUTRAL); // Briefly stop to ensure safety
-        delay(100); 
+    else if (lastLeftDist > 0 && lastLeftDist < SIDE_AVOID_THRESHOLD) {
+        avoidanceState = LEFT_AVOID;
+        avoidanceStartTime = now;
+        lastAvoidanceMessage = "Left obstacle: steering right";
+        return STEERING_CENTER + TURN_ANGLE;
     }
-
-    lastUpdateTime = millis();
-    return steeringAngle;
+    else if (lastRightDist > 0 && lastRightDist < SIDE_AVOID_THRESHOLD) {
+        avoidanceState = RIGHT_AVOID;
+        avoidanceStartTime = now;
+        lastAvoidanceMessage = "Right obstacle: steering left";
+        return STEERING_CENTER - TURN_ANGLE;
+    }
+    
+    return baseSteeringAngle;
 }
 
-// Get current avoidance state
-AvoidanceState getAvoidanceState() {
-    return avoidanceState;
-}
-
-// Reset avoidance state
-void resetAvoidance() {
-    avoidanceState = NO_OBSTACLE;
+inline void resetAvoidance() {
+    avoidanceState = NO_AVOID;
     lastAvoidanceMessage = "";
 }
 
