@@ -38,7 +38,7 @@ const char* ssid = "RC_Car_Control";
 const char* password = "12345678";
 
 // Timing constants
-const unsigned long TIMEOUT_MS = 200;
+const unsigned long COMMAND_TIMEOUT_MS = 500;
 const unsigned long SONAR_UPDATE_INTERVAL = 100; // 100ms between full sonar updates
 const unsigned long AVOIDANCE_MESSAGE_TIMEOUT = 1000; // Clear message after 1 second
 const unsigned long DESTINATION_MESSAGE_TIMEOUT = 5000;  // 5 seconds
@@ -68,7 +68,7 @@ extern float lastFrontDist, lastLeftDist, lastRightDist;
 extern String lastAvoidanceMessage;
 
 // Timing variables
-extern unsigned long lastUpdateTime, lastSonarUpdate;
+extern unsigned long lastSonarUpdate;
 extern unsigned long lastAvoidanceTime, destinationReachedTime;
 
 // HTML content for webpage

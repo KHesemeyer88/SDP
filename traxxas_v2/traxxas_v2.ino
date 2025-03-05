@@ -73,7 +73,7 @@ int currentSonar = 0;
 String lastAvoidanceMessage = "";
 
 // Timing variables
-unsigned long lastUpdateTime = 0;
+unsigned long lastCommandTime = 0;
 unsigned long lastSonarUpdate = 0;
 unsigned long lastAvoidanceTime = 0;
 unsigned long destinationReachedTime = 0;
@@ -133,82 +133,47 @@ void setup() {
 }
 
 void loop() {
-  server.handleClient();
-  updateSonarReadings();
-  updateStatusMessages();
-  
-  // Safety timeout: if no update in TIMEOUT_MS, reset to neutral
-  if (millis() - lastUpdateTime > TIMEOUT_MS) {
+  // Safety checks run regardless of MODE
+  unsigned long currentTime = millis();
+  // Safety check: if no clients connected to the AP, stop the vehicle
+  if (WiFi.softAPgetStationNum() == 0) {
+      autonomousMode = false;
+      escServo.write(ESC_NEUTRAL);
+      steeringServo.write(STEERING_CENTER);
+  }
+  // Check for command staleness in manual mode
+  if (!autonomousMode && (currentTime - lastCommandTime > COMMAND_TIMEOUT_MS)) {
     escServo.write(ESC_NEUTRAL);
     steeringServo.write(STEERING_CENTER);
   }
-  
-  if (autonomousMode && myGPS.getFixType() > 0) {
-    float currentLat, currentLon;
-    getCurrentPosition(currentLat, currentLon);
-    
-    // Update distance tracking (only when the motor is active)
-    updateDistanceTracking();
-    
-    // Calculate distance to target and base steering angle
-    float distance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
-    int steeringAngle = calculateSteeringAngle(currentLat, currentLon);
-    
-    // If the target is reached, handle waypoint or end session
-    if (distance < WAYPOINT_REACHED_RADIUS) {
-      handleWaypointReached();
-    }
-    
-    steeringAngle = applyObstacleAvoidance(steeringAngle);
-    
-    // Update pace control
-    updatePaceControl();
-    
-    // Constrain and apply the steering angle
-    steeringAngle = constrain(steeringAngle, STEERING_CENTER - STEERING_MAX, STEERING_CENTER + STEERING_MAX);
-    steeringServo.write(steeringAngle);
-    
-    lastUpdateTime = millis();
+  // handle web requests
+  server.handleClient();
+  // only update sonar readings if in manual mode
+  if (!autonomousMode){
+      updateSonarReadings();
+  } else{ //only update status messages in auto mode
+      updateStatusMessages();
+      // only do navigation in auto mode with good GNSS fix
+      if (myGPS.getFixType() > 0) {
+          float currentLat, currentLon;
+          getCurrentPosition(currentLat, currentLon);
+          // Update distance tracking (only when the motor is active)
+          updateDistanceTracking();
+          // Calculate distance to target and base steering angle
+          float distance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
+          int steeringAngle = calculateSteeringAngle(currentLat, currentLon);
+          // If the target is reached, handle waypoint or end session
+          if (distance < WAYPOINT_REACHED_RADIUS) {
+              handleWaypointReached();
+          }
+          steeringAngle = applyObstacleAvoidance(steeringAngle);
+          // Update pace control
+          updatePaceControl();
+          // Constrain and apply the steering angle
+          steeringAngle = constrain(steeringAngle, STEERING_CENTER - STEERING_MAX, STEERING_CENTER + STEERING_MAX);
+          steeringServo.write(steeringAngle);
+      }
   }
-  
   delay(2);
 }
 
-void updateStatusMessages() {
-  if (lastAvoidanceMessage != "") {
-    if (lastAvoidanceMessage == "Destination reached" ||
-        lastAvoidanceMessage == "Target distance reached") {
-      if (millis() - destinationReachedTime > DESTINATION_MESSAGE_TIMEOUT) {
-        lastAvoidanceMessage = "";
-        destinationReached = false;
-      }
-    } else {
-      if (millis() - lastAvoidanceTime > AVOIDANCE_MESSAGE_TIMEOUT) {
-        lastAvoidanceMessage = "";
-      }
-    }
-  }
-}
-
-void handleWaypointReached() {
-  if (followingWaypoints) {
-    if (currentWaypointIndex < waypointCount - 1) {
-      currentWaypointIndex++;
-    } else {
-      currentWaypointIndex = 0;
-      lastAvoidanceMessage = "Starting waypoint sequence again";
-    }
-    targetLat = waypointLats[currentWaypointIndex];
-    targetLon = waypointLons[currentWaypointIndex];
-    float currentLat, currentLon;
-    getCurrentPosition(currentLat, currentLon);
-    lastSegmentDistance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
-  } else {
-    autonomousMode = false;
-    destinationReached = true;
-    destinationReachedTime = millis();
-    finalElapsedTime = millis() - startTime;  // Capture the final elapsed time
-    lastAvoidanceMessage = "Destination reached";
-    escServo.write(ESC_NEUTRAL);
-  }
-}

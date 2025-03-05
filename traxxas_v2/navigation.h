@@ -5,15 +5,14 @@
 #include <SparkFun_u-blox_GNSS_v3.h>
 #include "config.h" // For constants like WAYPOINT_REACHED_RADIUS
 
-// External variables
+// External GNSS variables
 extern SFE_UBLOX_GNSS myGPS;
 extern float targetLat, targetLon;
 extern float waypointLats[], waypointLons[];
 extern int waypointCount, currentWaypointIndex;
 extern bool followingWaypoints;
-extern unsigned long lastUpdateTime;
 
-// Pace control variables and tracking variables
+// External pace control and tracking variables
 extern bool autonomousMode;
 extern unsigned long lastPaceUpdate;
 extern float targetPace;
@@ -26,8 +25,6 @@ extern unsigned long lastDistanceUpdate;
 
 extern unsigned long startTime;         // Set when autonomous mode starts
 extern unsigned long finalElapsedTime;    // Set when autonomous mode stops
-
-extern String lastAvoidanceMessage;
 
 extern Servo escServo;
 
@@ -149,8 +146,6 @@ int calculateSteeringAngle(float currentLat, float currentLon) {
         headingError += 360;
     
     int steeringAngle = STEERING_CENTER + (headingError * 0.25);
-    // Update timestamp
-    lastUpdateTime = millis();
 
     return steeringAngle;
 }
@@ -214,6 +209,47 @@ void resetTracking() {
     getCurrentPosition(currentLat, currentLon);
     lastTrackedLat = currentLat;
     lastTrackedLon = currentLon;
+}
+
+// update obstacle avoidance and destination reached flash messages
+void updateStatusMessages() {
+  if (lastAvoidanceMessage != "") {
+    if (lastAvoidanceMessage == "Destination reached" ||
+        lastAvoidanceMessage == "Target distance reached") {
+      if (millis() - destinationReachedTime > DESTINATION_MESSAGE_TIMEOUT) {
+        lastAvoidanceMessage = "";
+        destinationReached = false;
+      }
+    } else {
+      if (millis() - lastAvoidanceTime > AVOIDANCE_MESSAGE_TIMEOUT) {
+        lastAvoidanceMessage = "";
+      }
+    }
+  }
+}
+
+// increment waypoint index, calculate segment distance, stop auto nav if distanced reached
+void handleWaypointReached() {
+  if (followingWaypoints) {
+    if (currentWaypointIndex < waypointCount - 1) {
+      currentWaypointIndex++;
+    } else {
+      currentWaypointIndex = 0;
+      lastAvoidanceMessage = "Starting waypoint sequence again";
+    }
+    targetLat = waypointLats[currentWaypointIndex];
+    targetLon = waypointLons[currentWaypointIndex];
+    float currentLat, currentLon;
+    getCurrentPosition(currentLat, currentLon);
+    lastSegmentDistance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
+  } else {
+    autonomousMode = false;
+    destinationReached = true;
+    destinationReachedTime = millis();
+    finalElapsedTime = millis() - startTime;  // Capture the final elapsed time
+    lastAvoidanceMessage = "Destination reached";
+    escServo.write(ESC_NEUTRAL);
+  }
 }
 
 #endif // NAVIGATION_H

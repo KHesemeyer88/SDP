@@ -1,5 +1,6 @@
 #ifndef WEBPAGE_H
 #define WEBPAGE_H
+#include "config.h"
 
 // HTML/js for webpage
 const char webPage[] PROGMEM = R"rawliteral(
@@ -342,16 +343,17 @@ const char webPage[] PROGMEM = R"rawliteral(
             const dx = handleX - centerX;
             const dy = handleY - centerY;
             const maxDistance = joystickSize;
-
-            const speed = Math.round((-dy / maxDistance) * 255);
-            const angle = Math.round((dx / maxDistance) * 45 + 90);
-
-            return { speed, angle };
+            
+            // Normalize to -1 to 1
+            const normalizedX = dx / maxDistance;
+            const normalizedY = -dy / maxDistance;
+            
+            return { normalizedY, normalizedX };
         }
 
         function sendUpdate() {
-            const { speed, angle } = calculateValues();
-            fetch(`/control?speed=${speed}&angle=${angle}`)
+            const { normalizedY, normalizedX } = calculateValues();
+            fetch(`/control?vertical=${normalizedY}&horizontal=${normalizedX}`)
                 .catch((e) => console.error('Error:', e));
         }
 
@@ -412,8 +414,6 @@ const char webPage[] PROGMEM = R"rawliteral(
                     .catch(console.error);
             }
         }, 1000);
-
-
 
         function getFusionStatus() {
             const button = document.getElementById('fusion-status-btn');
