@@ -138,10 +138,10 @@ void setup() {
 void loop() {
     // Always handle web server requests and update sensors
     server.handleClient();
-    updateSonarReadings();
+    updateSonarReadings(); //SHOULD PROBABLY PUT THIS IN A MANUAL MODE ONLY CONDITIONAL. IT'S WASTING TIME IN AUTO MODE.
     
     // Check if we need to clear avoidance or destination messages
-    updateStatusMessages();
+    updateStatusMessages(); //SHOULD PUT THIS IN AUTO MODE ONLY CONDITIONAL. WASTING TIME IN MANUAL MODE.
     
     // Safety timeout check - applies to both manual and autonomous modes
     if (millis() - lastUpdateTime > TIMEOUT_MS) {
@@ -193,7 +193,7 @@ void updateContinuousDistance(float currentLat, float currentLon) {
             
             // Only add reasonable distances to prevent GPS jitter
             if (movementDistance > 0.1 && movementDistance < 5.0) {
-                totalDistance += movementDistance;
+                totalDistance += movementDistance; //PROBABLY NEED TO ELIMINATE ALL MOVEMENT DISTANCE CALCULATIONS. WE'RE DOUBLE COUNTING, AND COUNTING GNSS JITTER
                 //Serial.print("Added distance: ");
                 //Serial.print(movementDistance);
                 //Serial.print(" Total: ");
