@@ -5,14 +5,15 @@
 #include <SparkFun_u-blox_GNSS_v3.h>
 #include "config.h" // For constants like WAYPOINT_REACHED_RADIUS
 
-// External GNSS variables
+// External variables
 extern SFE_UBLOX_GNSS myGPS;
 extern float targetLat, targetLon;
 extern float waypointLats[], waypointLons[];
 extern int waypointCount, currentWaypointIndex;
 extern bool followingWaypoints;
+extern unsigned long lastUpdateTime;
 
-// External pace control and tracking variables
+// Pace control variables and tracking variables
 extern bool autonomousMode;
 extern unsigned long lastPaceUpdate;
 extern float targetPace;
@@ -25,6 +26,8 @@ extern unsigned long lastDistanceUpdate;
 
 extern unsigned long startTime;         // Set when autonomous mode starts
 extern unsigned long finalElapsedTime;    // Set when autonomous mode stops
+
+extern String lastAvoidanceMessage;
 
 extern Servo escServo;
 
@@ -146,6 +149,8 @@ int calculateSteeringAngle(float currentLat, float currentLon) {
         headingError += 360;
     
     int steeringAngle = STEERING_CENTER + (headingError * 0.25);
+    // Update timestamp
+    lastUpdateTime = millis();
 
     return steeringAngle;
 }

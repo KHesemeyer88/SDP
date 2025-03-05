@@ -1,8 +1,7 @@
 #ifndef WEBPAGE_H
 #define WEBPAGE_H
-#include "config.h"
 
-// HTML/js for webpage
+// HTML/JS for webpage
 const char webPage[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html>
@@ -138,11 +137,13 @@ const char webPage[] PROGMEM = R"rawliteral(
                     </div>
                     <button class="submit-btn" onclick="startAutonomousMode()">Start</button>
                     <button class="submit-btn" style="background-color: #dc3545;" onclick="stopAutonomousMode()">Stop</button>
+                    <button class="submit-btn" style="background-color: #ffc107;" onclick="resetTracking()">Reset Tracking</button>
                 </div>
                 <div style="flex: 1; min-width: 250px; max-width: 350px;">
                     <div style="background: #f0f0f0; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
                         <p>Distance: <span id="total-distance">0.0</span> m</p>
-                        <p>Pace: <span id="current-pace">0.0</span> m/s</p>
+                        <p>Instantaneous Pace: <span id="current-pace">0.0</span> m/s</p>
+                        <p>Average Pace: <span id="average-pace">0.0</span> m/s</p>
                         <p>Time: <span id="elapsed-time">00:00:00</span></p>
                     </div>
                 </div>
@@ -185,7 +186,6 @@ const char webPage[] PROGMEM = R"rawliteral(
                 document.getElementById('manual-btn').className = 'active';
                 document.getElementById('auto-btn').className = 'inactive';
                 document.getElementById('manual-gps-data').style.display = 'block';
-                document.getElementById('autonomous-gps-data').style.display = 'none';
                 stopAutonomousMode();
             } else {
                 document.getElementById('manual-control').style.display = 'none';
@@ -193,7 +193,6 @@ const char webPage[] PROGMEM = R"rawliteral(
                 document.getElementById('manual-btn').className = 'inactive';
                 document.getElementById('auto-btn').className = 'active';
                 document.getElementById('manual-gps-data').style.display = 'none';
-                document.getElementById('autonomous-gps-data').style.display = 'block';
             }
         }
 
@@ -202,19 +201,15 @@ const char webPage[] PROGMEM = R"rawliteral(
             const targetPace = document.getElementById('target-pace').value;
             const targetDistance = document.getElementById('target-distance').value;
             
-            // Construct the URL with the parameters
             let url = '/setDestination';
             const params = [];
             
             if (coordsInput) {
-                // If coordinates are manually entered, validate and use them
                 const coords = coordsInput.split(',').map(coord => coord.trim());
-                
                 if (coords.length !== 2 || isNaN(coords[0]) || isNaN(coords[1])) {
                     alert('Please enter valid coordinates or clear input to use recorded waypoint');
                     return;
                 }
-                
                 params.push(`lat=${coords[0]}`);
                 params.push(`lng=${coords[1]}`);
             }
@@ -222,7 +217,6 @@ const char webPage[] PROGMEM = R"rawliteral(
             params.push(`pace=${targetPace}`);
             params.push(`distance=${targetDistance}`);
             
-            // Construct the full URL
             if (params.length > 0) {
                 url += '?' + params.join('&');
             }
@@ -231,27 +225,15 @@ const char webPage[] PROGMEM = R"rawliteral(
                 .then(response => response.text())
                 .then(result => {
                     console.log('Navigation started:', result);
-                    // Reset displays
                     document.getElementById('total-distance').textContent = '0.0';
                     document.getElementById('current-pace').textContent = '0.0';
+                    document.getElementById('average-pace').textContent = '0.0';
                     document.getElementById('elapsed-time').textContent = '00:00:00';
                 })
                 .catch(error => {
                     console.error('Error starting navigation:', error);
                     alert('Failed to start navigation');
                 });
-        }
-
-        // function to format time as HH:MM:SS
-        function formatTime(ms) {
-            const totalSeconds = Math.floor(ms / 1000);
-            const hours = Math.floor(totalSeconds / 3600);
-            const minutes = Math.floor((totalSeconds % 3600) / 60);
-            const seconds = totalSeconds % 60;
-            
-            return String(hours).padStart(2, '0') + ':' +
-                  String(minutes).padStart(2, '0') + ':' +
-                  String(seconds).padStart(2, '0');
         }
 
         function stopAutonomousMode() {
@@ -265,7 +247,27 @@ const char webPage[] PROGMEM = R"rawliteral(
                 });
         }
 
-        // Add both mouse and touch events
+        function resetTracking() {
+            fetch('/resetTracking')
+                .then(response => response.text())
+                .then(result => {
+                    console.log('Tracking reset:', result);
+                })
+                .catch(error => {
+                    console.error('Error resetting tracking:', error);
+                });
+        }
+
+        function formatTime(ms) {
+            const totalSeconds = Math.floor(ms / 1000);
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+            return String(hours).padStart(2, '0') + ':' +
+                  String(minutes).padStart(2, '0') + ':' +
+                  String(seconds).padStart(2, '0');
+        }
+
         canvas.addEventListener('mousedown', (e) => {
             isDragging = true;
             if (updateInterval === null) {
@@ -343,45 +345,30 @@ const char webPage[] PROGMEM = R"rawliteral(
             const dx = handleX - centerX;
             const dy = handleY - centerY;
             const maxDistance = joystickSize;
-            
-            // Normalize to -1 to 1
-            const normalizedX = dx / maxDistance;
-            const normalizedY = -dy / maxDistance;
-            
-            return { normalizedY, normalizedX };
+            const speed = Math.round((-dy / maxDistance) * 255);
+            const angle = Math.round((dx / maxDistance) * 45 + 90);
+            return { speed, angle };
         }
 
         function sendUpdate() {
-            const { normalizedY, normalizedX } = calculateValues();
-            fetch(`/control?vertical=${normalizedY}&horizontal=${normalizedX}`)
+            const { speed, angle } = calculateValues();
+            fetch(`/control?speed=${speed}&angle=${angle}`)
                 .catch((e) => console.error('Error:', e));
         }
 
         drawJoystick();
 
-        // GPS status updates
         setInterval(() => {
             fetch('/gps')
                 .then(response => response.json())
                 .then(data => {
-                    // Update manual mode display
                     document.getElementById('manual-fix').textContent = data.fix;
                     document.getElementById('manual-lat').textContent = data.lat || '--';
                     document.getElementById('manual-lng').textContent = data.lng || '--';
-
-                    // Update autonomous mode display
-                    if (document.getElementById('autonomous-control').style.display !== 'none') {
-                        document.getElementById('distance').textContent = data.distance;
-                        document.getElementById('bearing').textContent = data.bearing;
-                        document.getElementById('auto-fix').textContent = data.fix;
-                        document.getElementById('dest-lat').textContent = data.destLat;
-                        document.getElementById('dest-lng').textContent = data.destLng;
-                    }
                 })
                 .catch(console.error);
         }, 1000);
 
-        // Update sensor readings
         setInterval(() => {
             fetch('/sensors')
                 .then(response => response.json())
@@ -395,13 +382,12 @@ const char webPage[] PROGMEM = R"rawliteral(
                         alert.style.display = 'block';
                         setTimeout(() => {
                             alert.style.display = 'none';
-                        }, 3000);  // Hide after 3 seconds
+                        }, 3000);
                     }
                 })
                 .catch(console.error);
-        }, 500);  // Update every 500ms
+        }, 500);
 
-        // Endpoint to fetch navigation stats
         setInterval(() => {
             if (document.getElementById('autonomous-control').style.display !== 'none') {
                 fetch('/navstats')
@@ -409,8 +395,9 @@ const char webPage[] PROGMEM = R"rawliteral(
                     .then(data => {
                         document.getElementById('total-distance').textContent = data.totalDistance.toFixed(1);
                         document.getElementById('current-pace').textContent = data.currentPace.toFixed(2);
+                        document.getElementById('average-pace').textContent = data.averagePace.toFixed(2);
                         document.getElementById('elapsed-time').textContent = formatTime(data.totalTime);
-                   })
+                    })
                     .catch(console.error);
             }
         }, 1000);
@@ -419,12 +406,8 @@ const char webPage[] PROGMEM = R"rawliteral(
             const button = document.getElementById('fusion-status-btn');
             const display = document.getElementById('fusion-status-display');
             const statusSpan = document.getElementById('fusion-status');
-            
-            // Disable button while fetching
             button.disabled = true;
             button.textContent = 'Getting Status...';
-
-            // Show display immediately
             display.style.display = 'block';
             
             fetch('/fusionStatus')
@@ -440,21 +423,17 @@ const char webPage[] PROGMEM = R"rawliteral(
                 .finally(() => {
                     button.disabled = false;
                     button.textContent = 'Get Fusion Status';
-                    // Ensure display stays visible
                     display.style.display = 'block';
                 });
         }
+
         function recordWaypoint() {
             const button = document.getElementById('record-waypoint-btn');
             const display = document.getElementById('recorded-waypoint-display');
             const waypointSpan = document.getElementById('recorded-waypoint');
             const countDisplay = document.getElementById('waypoint-count');
-            
-            // Disable button while fetching
             button.disabled = true;
             button.textContent = 'Recording WP...';
-
-            // Show display immediately
             display.style.display = 'block';
             
             fetch('/currentWP')
@@ -471,7 +450,6 @@ const char webPage[] PROGMEM = R"rawliteral(
                 .finally(() => {
                     button.disabled = false;
                     button.textContent = 'Record WP';
-                    // Ensure display stays visible
                     display.style.display = 'block';
                 });
         }
@@ -479,8 +457,6 @@ const char webPage[] PROGMEM = R"rawliteral(
         function clearWaypoints() {
             const button = document.getElementById('clear-waypoint-btn');
             const countDisplay = document.getElementById('waypoint-count');
-            
-            // Disable button while clearing
             button.disabled = true;
             button.textContent = 'Clearing...';
             

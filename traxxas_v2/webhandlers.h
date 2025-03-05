@@ -20,6 +20,7 @@ extern bool autonomousMode, followingWaypoints, destinationReached;
 extern unsigned long destinationReachedTime;
 extern SFE_UBLOX_GNSS myGPS;
 extern Servo escServo, steeringServo;
+extern unsigned long lastUpdateTime;
 //extern int waypointLoopCount;
 //extern int targetLoopCount;
 extern float targetPace;
@@ -30,7 +31,6 @@ extern unsigned long startTime;
 extern unsigned long totalTimeMs;
 extern float currentPace;
 extern float averagePace;
-extern unsigned long lastCommandTime;
 
 // Function to set up all web server routes
 void setupWebServerRoutes() {
@@ -39,42 +39,36 @@ void setupWebServerRoutes() {
     });
 
     server.on("/control", HTTP_GET, []() {
-        String verticalStr = server.arg("vertical");
-        String horizontalStr = server.arg("horizontal");
+        String speedStr = server.arg("speed");
+        String angleStr = server.arg("angle");
 
-        if (verticalStr != "" && horizontalStr != "") {
-            float normalizedY = verticalStr.toFloat();
-            float normalizedX = horizontalStr.toFloat();
-            
-            // Map to ESC values
+        if (speedStr != "" && angleStr != "") {
+            int speed = speedStr.toInt();
+            int angle = angleStr.toInt();
+
+            // Convert -255 to 255 speed range to ESC range
             int escValue;
-            if (abs(normalizedY) < 0.05) { // Small deadzone for joystick itself
+            if (abs(speed) < 20) { // Small deadzone for neutral
                 escValue = ESC_NEUTRAL;
             }
-            else if (normalizedY > 0) {
-                escValue = ESC_NEUTRAL + normalizedY * (ESC_MAX_FWD - ESC_NEUTRAL);
+            else if (speed > 0) {
+                escValue = map(speed, 20, 255, ESC_MIN_FWD, ESC_MAX_FWD);
             }
             else {
-                escValue = ESC_NEUTRAL + normalizedY * (ESC_NEUTRAL - ESC_MAX_REV);
+                escValue = map(speed, -255, -20, ESC_MAX_REV, ESC_MIN_REV);
             }
-            
-            // Apply ESC deadzone check (separate from joystick deadzone)
-            if (escValue < ESC_MIN_FWD && escValue > ESC_MIN_REV) {
-                escValue = ESC_NEUTRAL;
-            }
-            
-            // Map to steering values
-            int steeringValue = STEERING_CENTER + normalizedX * STEERING_MAX;
-            
-            // Apply the values
+
             escServo.write(escValue);
-            steeringServo.write(steeringValue);
-            lastCommandTime = millis();
+            steeringServo.write(angle);
+
+            lastUpdateTime = millis();
             server.send(200, "text/plain", "OK");
+
         } else {
             server.send(400, "text/plain", "Missing parameters");
         }
     });
+
 
     server.on("/sensors", HTTP_GET, []() {
         String json = "{\"front\":" + String(lastFrontDist, 1) +
@@ -86,6 +80,7 @@ void setupWebServerRoutes() {
         }
         server.send(200, "application/json", json);
     });
+
 
     server.on("/gps", HTTP_GET, []() {
         float currentLat = myGPS.getLatitude() / 10000000.0;

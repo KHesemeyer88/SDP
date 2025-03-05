@@ -1,4 +1,3 @@
-// config.h
 #ifndef CONFIG_H
 #define CONFIG_H
 
@@ -20,7 +19,7 @@ const int TRIGGER_PIN_RIGHT = 19;
 const int ECHO_PIN_RIGHT = 21;
 
 // Sonar thresholds (cm)
-const int FRONT_STOP_THRESHOLD = 50; // zero to suppress obst. avoidance
+const int FRONT_STOP_THRESHOLD = 50; // threshold for obstacle detection in front
 const int SIDE_AVOID_THRESHOLD = 50;
 
 // Traxxas XL-2.5 ESC & servo values. Note ESC takes angles like a servo, but converts them to speed
@@ -31,14 +30,14 @@ const int ESC_MIN_FWD = 95;     // Minimum forward throttle
 const int ESC_MIN_REV = 85;     // Minimum reverse throttle
 const int STEERING_CENTER = 90;  // Center steering
 const int STEERING_MAX = 55;     // Maximum steering angle deviation
-const int TURN_ANGLE = 10;       // Angle to turn after reversing
+const int TURN_ANGLE = 10;       // Angle to turn during avoidance maneuvers
 
 // WiFi settings
 const char* ssid = "RC_Car_Control";
 const char* password = "12345678";
 
 // Timing constants
-const unsigned long COMMAND_TIMEOUT_MS = 500;
+const unsigned long TIMEOUT_MS = 200;
 const unsigned long SONAR_UPDATE_INTERVAL = 100; // 100ms between full sonar updates
 const unsigned long AVOIDANCE_MESSAGE_TIMEOUT = 1000; // Clear message after 1 second
 const unsigned long DESTINATION_MESSAGE_TIMEOUT = 5000;  // 5 seconds
@@ -68,24 +67,13 @@ extern float lastFrontDist, lastLeftDist, lastRightDist;
 extern String lastAvoidanceMessage;
 
 // Timing variables
-extern unsigned long lastSonarUpdate;
+extern unsigned long lastUpdateTime, lastSonarUpdate;
 extern unsigned long lastAvoidanceTime, destinationReachedTime;
 
 // HTML content for webpage
 extern const char webPage[] PROGMEM;
 
-// Waypoint loop settings
-//const int DEFAULT_LOOP_COUNT = 1;     // Default number of times to loop through waypoints
-const float DEFAULT_TARGET_PACE = 1;  // Default target pace in m/s (0 = no pace control)
-const float DEFAULT_TARGET_DISTANCE = 0; // Default target distance in meters (0 = no distance limit)
-
-// Speed control values
-const int SPEED_CORRECTION_INTERVAL = 200; // How often to adjust speed for pace (ms)
-const float SPEED_CORRECTION_FACTOR = 0.05;  // How aggressively to correct speed (0-1)
-
-// Extended extern declarations for new tracking variables
-//extern int waypointLoopCount;         // Current count of completed loops
-//extern int targetLoopCount;           // Target number of loops to complete
+// Navigation tracking and pace control variables
 extern float targetPace;              // Target pace in m/s
 extern float targetDistance;          // Target total distance in meters
 extern float totalDistance;           // Total distance traveled so far
@@ -96,5 +84,12 @@ extern float lastSegmentDistance;     // Distance of last segment for pace calcu
 extern float lastTrackedLat;
 extern float lastTrackedLon; 
 extern unsigned long lastDistanceUpdate;
+extern float averagePace;             // Average pace calculated from distance and time
+
+// Default settings
+const float DEFAULT_TARGET_PACE = 1;  // Default target pace in m/s
+const float DEFAULT_TARGET_DISTANCE = 0; // Default target distance in meters (0 = no distance limit)
+const int SPEED_CORRECTION_INTERVAL = 200; // How often to adjust speed for pace (ms)
+const float SPEED_CORRECTION_FACTOR = 0.05;  // How aggressively to correct speed (0-1)
 
 #endif // CONFIG_H

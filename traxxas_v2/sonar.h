@@ -1,4 +1,3 @@
-// sonar.h
 #ifndef SONAR_H
 #define SONAR_H
 
@@ -36,18 +35,17 @@ void initializeSonar() {
 // Read distance from a single sonar sensor
 float readSonar(int trigPin, int echoPin, float* readings) {
     digitalWrite(trigPin, LOW);
-    delayMicroseconds(2); // per HC-SR04 specs
+    delayMicroseconds(2); 
     digitalWrite(trigPin, HIGH);
-    delayMicroseconds(10); // per HC-SR04 specs
+    delayMicroseconds(10); 
     digitalWrite(trigPin, LOW);
     
-    long duration = pulseIn(echoPin, HIGH, 12000); // measure time to receive response, wait up to 12ms (about 2m)
-    float distance = (duration == 0) ? 200 : duration * 0.034 / 2; //speed of sound; return max distance if no echo
+    long duration = pulseIn(echoPin, HIGH, 12000);
+    float distance = (duration == 0) ? 200 : duration * 0.034 / 2;
     
-    // Update array if we got a valid reading
     readings[readIndex] = distance;
     
-    // Calculate median to filter out false positives
+    // Calculate median to filter out noise
     float sortedReadings[FILTER_SAMPLES]; 
     memcpy(sortedReadings, readings, sizeof(sortedReadings));
     for(int i = 0; i < FILTER_SAMPLES-1; i++) {
@@ -60,7 +58,7 @@ float readSonar(int trigPin, int echoPin, float* readings) {
         }
     }
     
-    return sortedReadings[FILTER_SAMPLES/2];  // Return median value
+    return sortedReadings[FILTER_SAMPLES/2];
 }
 
 // Update readings from all sonar sensors (called from loop)
@@ -71,12 +69,10 @@ void updateSonarReadings() {
                 lastFrontDist = readSonar(TRIGGER_PIN_FRONT, ECHO_PIN_FRONT, frontReadings);
                 currentSonar = 1;
                 break;
-
             case 1:
                 lastLeftDist = readSonar(TRIGGER_PIN_LEFT, ECHO_PIN_LEFT, leftReadings);
                 currentSonar = 2;
                 break;
-            
             case 2:
                 lastRightDist = readSonar(TRIGGER_PIN_RIGHT, ECHO_PIN_RIGHT, rightReadings);
                 currentSonar = 0;
