@@ -1,4 +1,3 @@
-// navigation.h
 #ifndef NAVIGATION_H
 #define NAVIGATION_H
 
@@ -13,19 +12,29 @@ extern float waypointLats[], waypointLons[];
 extern int waypointCount, currentWaypointIndex;
 extern bool followingWaypoints;
 extern unsigned long lastUpdateTime;
-// Additional extern declarations for pace control
+
+// Pace control variables and tracking variables
 extern bool autonomousMode;
 extern unsigned long lastPaceUpdate;
 extern float targetPace;
 extern float currentPace;
-extern unsigned long totalTimeMs;
-extern AvoidanceState getAvoidanceState();
+extern float totalDistance;
+extern float averagePace;
+extern float lastTrackedLat;
+extern float lastTrackedLon;
+extern unsigned long lastDistanceUpdate;
+
+extern unsigned long startTime;         // Set when autonomous mode starts
+extern unsigned long finalElapsedTime;    // Set when autonomous mode stops
+
+extern String lastAvoidanceMessage;
+
 extern Servo escServo;
 
 // Initialize GPS module
 bool initializeGPS() {
     Wire.begin(32, 33);
-    if (myGPS.begin() == false) {
+    if (!myGPS.begin()) {
         Serial.println("u-blox GNSS not detected. Check wiring.");
         return false;
     }
@@ -34,18 +43,18 @@ bool initializeGPS() {
     return true;
 }
 
-// Get fusion status from IMU
+// Get fusion status from IMU 
 String getFusionStatus() {
     // Temporarily set nav frequency to 1Hz for status check
     myGPS.setNavigationFrequency(1);
     String fusionStatus = "Failed to get fusion data";
-    
+
     // Try to get ESF info with timeout
-    unsigned long startTime = millis();
+    unsigned long startTimeLocal = millis();
     const unsigned long ESF_TIMEOUT = 1000; // 1 second timeout
-    
+
     if (!myGPS.getEsfInfo()) {
-        while(millis() - startTime < ESF_TIMEOUT) {
+        while (millis() - startTimeLocal < ESF_TIMEOUT) {
             if (myGPS.getEsfInfo()) {
                 uint8_t fusionMode = myGPS.packetUBXESFSTATUS->data.fusionMode;
                 switch(fusionMode) {
@@ -56,15 +65,15 @@ String getFusionStatus() {
                 }
                 break;
             }
-        }   
+        }
     }
-    
+
     // Restore original navigation frequency
     myGPS.setNavigationFrequency(10);
     return fusionStatus;
 }
 
-// Calculate distance between two coordinates using Haversine formula
+// Calculate distance between two coordinates using the Haversine formula
 float calculateDistance(float lat1, float lon1, float lat2, float lon2) {
     float lat1Rad = lat1 * PI / 180.0;
     float lon1Rad = lon1 * PI / 180.0;
@@ -89,9 +98,9 @@ float calculateBearing(float lat1, float lon1, float lat2, float lon2) {
 
     float dLon = lon2Rad - lon1Rad;
     float y = sin(dLon) * cos(lat2Rad);
-    float x = cos(lat1Rad) * sin(lat2Rad) -
-              sin(lat1Rad) * cos(lat2Rad) * cos(dLon);
-    
+    float x = cos(lat1Rad) * sin(lat2Rad) - sin(lat1Rad) * cos(lat2Rad) * cos(dLon);
+
+
     float bearing = atan2(y, x) * 180.0 / PI;
     return fmod((bearing + 360.0), 360.0);
 }
@@ -102,19 +111,19 @@ void getCurrentPosition(float &lat, float &lon) {
     lon = myGPS.getLongitude() / 10000000.0;
 }
 
-// Record a waypoint at current position
+// Record a waypoint at the current position
 bool recordWaypoint() {
-    if (waypointCount >= MAX_WAYPOINTS) {
+    if (waypointCount >= MAX_WAYPOINTS)
         return false; // Waypoint limit reached
-    }
-    
+
+
     float lat, lon;
     getCurrentPosition(lat, lon);
-    
+
     waypointLats[waypointCount] = lat;
     waypointLons[waypointCount] = lon;
     waypointCount++;
-    
+
     return true;
 }
 
@@ -123,73 +132,88 @@ void clearWaypoints() {
     waypointCount = 0;
 }
 
-// Calculate steering angle based on heading error
+// Calculate steering angle based on heading error (simple proportional control)
 int calculateSteeringAngle(float currentLat, float currentLon) {
-    if (myGPS.getFixType() == 0) {
-        return STEERING_CENTER; // No GPS fix, return center
-    }
-    
+    if (myGPS.getFixType() == 0)
+        return STEERING_CENTER;
+
     float distance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
     float bearing = calculateBearing(currentLat, currentLon, targetLat, targetLon);
     float currentHeading = myGPS.getHeading() / 100000.0;
-
-    float headingError = bearing - currentHeading;
-    if (headingError > 180) headingError -= 360;
-    if (headingError < -180) headingError += 360;
-
-    // Base steering calculation with PID-like proportional control
-    int steeringAngle = STEERING_CENTER + (headingError * 0.25);
     
+    float headingError = bearing - currentHeading;
+    if (headingError > 180)
+        headingError -= 360;
+    
+    if (headingError < -180)
+        headingError += 360;
+    
+    int steeringAngle = STEERING_CENTER + (headingError * 0.25);
     // Update timestamp
     lastUpdateTime = millis();
-    
+
     return steeringAngle;
 }
 
+// pace control and compute average pace
 void updatePaceControl() {
     if (autonomousMode) {
-        totalTimeMs = millis();
-        
-        // Update pace calculation every interval
-        if (millis() - lastPaceUpdate > SPEED_CORRECTION_INTERVAL) {
-            // Calculate current speed from GPS (m/s)
-            float speedMps = myGPS.getGroundSpeed() / 1000.0; // Convert from mm/s to m/s
-            
-            // Update current pace
+        unsigned long currentTime = millis();
+        if (currentTime - lastPaceUpdate > SPEED_CORRECTION_INTERVAL) {
+            float speedMps = myGPS.getGroundSpeed() / 1000.0;
             currentPace = speedMps;
             
-            // Adjust speed if pace control is active
-            if (targetPace > 0 && getAvoidanceState() == NO_OBSTACLE) {
-                // Get current ESC value
-                int currentEscValue = escServo.read();
-                
-                // Calculate pace difference as a percentage of target
-                float paceRatio = targetPace > 0 ? currentPace / targetPace : 1.0;
-                
-                // More aggressive adjustment factor
-                int adjustmentValue;
-                
-                if (paceRatio < 0.95) {
-                    // Too slow - speed up more aggressively
-                    adjustmentValue = (int)((1.0 - paceRatio) * 15.0);
-                } else if (paceRatio > 1.05) {
-                    // Too fast - slow down more aggressively
-                    adjustmentValue = (int)((1.0 - paceRatio) * 15.0);
-                } else {
-                    // Close enough - minor adjustment
-                    adjustmentValue = (int)((1.0 - paceRatio) * 5.0);
-                }
-                
-                // Calculate new ESC value
-                int newEscValue = currentEscValue + adjustmentValue;
-                newEscValue = constrain(newEscValue, 105, 135); // Use safe range
-                
-                // Set the ESC directly
-                escServo.write(newEscValue);
+            unsigned long elapsedTime = currentTime - startTime;
+            if (elapsedTime > 0) {
+                averagePace = totalDistance / (elapsedTime / 1000.0);
             }
             
-            lastPaceUpdate = millis();
+            if (targetPace > 0 && lastAvoidanceMessage == "") {
+                int currentEscValue = escServo.read();
+                float paceRatio = targetPace > 0 ? currentPace / targetPace : 1.0;
+                int adjustmentValue = (abs(1.0 - paceRatio) < 0.05) ? (int)((1.0 - paceRatio) * 5.0)
+                                                                   : (int)((1.0 - paceRatio) * 15.0);
+                int newEscValue = currentEscValue + adjustmentValue;
+                newEscValue = constrain(newEscValue, 105, 135);
+                escServo.write(newEscValue);
+            }
+            lastPaceUpdate = currentTime;
         }
     }
 }
+
+// Update distance tracking: add incremental distance only when motor power is applied
+void updateDistanceTracking() {
+    float currentLat, currentLon;
+    getCurrentPosition(currentLat, currentLon);
+    if (millis() - lastDistanceUpdate >= 1000 && escServo.read() != ESC_NEUTRAL) {
+        if (lastTrackedLat != 0 && lastTrackedLon != 0) {
+            float delta = calculateDistance(lastTrackedLat, lastTrackedLon, currentLat, currentLon);
+            if (delta < 5.0)
+                totalDistance += delta;
+            if (targetDistance > 0 && totalDistance >= targetDistance) {
+                autonomousMode = false;
+                destinationReached = true;
+                finalElapsedTime = millis() - startTime;  // Capture final elapsed time
+                lastAvoidanceMessage = "Target distance reached";
+                escServo.write(ESC_NEUTRAL);
+                return;
+            }
+        }
+        lastTrackedLat = currentLat;
+        lastTrackedLon = currentLon;
+        lastDistanceUpdate = millis();
+    }
+}
+
+// Reset distance and time tracking for a new session
+void resetTracking() {
+    totalDistance = 0.0;
+    startTime = (autonomousMode) ? millis() : 0;
+    float currentLat, currentLon;
+    getCurrentPosition(currentLat, currentLon);
+    lastTrackedLat = currentLat;
+    lastTrackedLon = currentLon;
+}
+
 #endif // NAVIGATION_H
