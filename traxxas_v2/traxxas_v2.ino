@@ -1,32 +1,15 @@
 /*
  * Autonomous car control with GNSS navigation and obstacle avoidance.
 
- fuuuuuuuuuuuuuuuuuckn this shit for real bruh
  * Broke out main file using modular structure with separate header files.
- * Eliminated all mapping to 0-255 for speed. Speed is set only by servo style angles.
-  ** where 0=max reverse, 90=neutral, 180=max forward.
- * Obstacle detection and avoidance is not currently working well, I may have broken it.
- * Pace tracking and control implemented but very poorly. 
- 
- **Improvements:
-  **  distance tracking doesn't increment while no power is applied to motor
-    ** (currently distance increments from GNSS noise alone even while car is still).
-  ** Fixed time tracking so it increments once start navigation is selected and pauses 
-     when stop navigation is selected.
-  ** Added functionality to reset distance and time tracking (button probably).
-  ** Added functionality to show average pace using reported distance and time.
+
+ * Obstacle detection and avoidance is not currently working well.
 
   ** needs further testing on - 
   ** average pace and instantaneous pace, both need improvement.
   ** general improvements for pace tracking and correction. 
 
-  **** MOST IMPORTANT ****
-  * NEED TO IMPLEMENT HEARTBEAT/SAFETY TIMEOUT IN AUTONOMOUS MODE
-  * CURRENTLY CAR CAN LOSE CONNECTION WITH PHONE BUT CONTINUE NAVIGATING
-  * RESULT IS THAT STOP NAVIGATION BUTTON HAS NO EFFECT
-  ************************
-
- * Last updated: 3/3/2025
+ * Last updated: 3/5/2025
  */
 
 #include <Arduino.h>
@@ -149,10 +132,10 @@ void loop() {
   }
   // handle web requests
   server.handleClient();
-  // only update sonar readings if in manual mode
-  if (!autonomousMode){
-      updateSonarReadings();
-  } else{ //only update status messages in auto mode
+  // ALWAYS update sonar readings
+  updateSonarReadings();
+  // do autonomous navigation if in auto mode:
+  if (autonomousMode) { //only update status messages in auto mode
       updateStatusMessages();
       // only do navigation in auto mode with good GNSS fix
       if (myGPS.getFixType() > 0) {

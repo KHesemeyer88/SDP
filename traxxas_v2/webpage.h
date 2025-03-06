@@ -164,6 +164,8 @@ const char webPage[] PROGMEM = R"rawliteral(
         const centerX = canvas.width / 2;
         const centerY = canvas.height / 2;
 
+        let sensorPollingInterval = null;
+
         let handleX = centerX;
         let handleY = centerY;
         let isDragging = false;
@@ -188,12 +190,21 @@ const char webPage[] PROGMEM = R"rawliteral(
                 document.getElementById('auto-btn').className = 'inactive';
                 document.getElementById('manual-gps-data').style.display = 'block';
                 stopAutonomousMode();
+                // Start sensor polling in manual mode
+                if (sensorPollingInterval === null) {
+                    sensorPollingInterval = setInterval(updateSensorReadings, 500);
+                }
             } else {
                 document.getElementById('manual-control').style.display = 'none';
                 document.getElementById('autonomous-control').style.display = 'block';
                 document.getElementById('manual-btn').className = 'inactive';
                 document.getElementById('auto-btn').className = 'active';
                 document.getElementById('manual-gps-data').style.display = 'none';
+                // Stop sensor polling in autonomous mode
+                if (sensorPollingInterval !== null) {
+                    clearInterval(sensorPollingInterval);
+                    sensorPollingInterval = null;
+                }
             }
         }
 
@@ -360,20 +371,7 @@ const char webPage[] PROGMEM = R"rawliteral(
                 .catch((e) => console.error('Error:', e));
         }
 
-        drawJoystick();
-
-        setInterval(() => {
-            fetch('/gps')
-                .then(response => response.json())
-                .then(data => {
-                    document.getElementById('manual-fix').textContent = data.fix;
-                    document.getElementById('manual-lat').textContent = data.lat || '--';
-                    document.getElementById('manual-lng').textContent = data.lng || '--';
-                })
-                .catch(console.error);
-        }, 1000);
-
-        setInterval(() => {
+        function updateSensorReadings() {
             fetch('/sensors')
                 .then(response => response.json())
                 .then(data => {
@@ -390,6 +388,41 @@ const char webPage[] PROGMEM = R"rawliteral(
                     }
                 })
                 .catch(console.error);
+        }
+
+        // Start sensor polling only in manual mode (initial state)
+        sensorPollingInterval = setInterval(updateSensorReadings, 500);
+
+        drawJoystick();
+
+        setInterval(() => {
+            fetch('/gps')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('manual-fix').textContent = data.fix;
+                    document.getElementById('manual-lat').textContent = data.lat || '--';
+                    document.getElementById('manual-lng').textContent = data.lng || '--';
+                })
+                .catch(console.error);
+        }, 1000);
+
+        // Keep polling for messages in autonomous mode
+        setInterval(() => {
+            if (document.getElementById('autonomous-control').style.display !== 'none') {
+                fetch('/messages')  // New endpoint just for messages
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.message && data.message !== "") {
+                            const alert = document.getElementById('avoidance-alert');
+                            alert.textContent = data.message;
+                            alert.style.display = 'block';
+                            setTimeout(() => {
+                                alert.style.display = 'none';
+                            }, 3000);
+                        }
+                    })
+                    .catch(console.error);
+            }
         }, 500);
 
         setInterval(() => {

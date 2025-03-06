@@ -250,6 +250,14 @@ void setupWebServerRoutes() {
         resetTracking();
         server.send(200, "text/plain", "Tracking reset");
     });
+
+    server.on("/messages", HTTP_GET, []() {
+        String json = "{\"message\":\"" + lastAvoidanceMessage + "\"}";
+        if (lastAvoidanceMessage != "Destination reached") {
+            lastAvoidanceMessage = "";
+        }
+        server.send(200, "application/json", json);
+    });
 }
 
 #endif // WEBHANDLERS_H
