@@ -12,3 +12,12 @@ To get yourself up to date with main:
   -git pull
   -git checkout origin/YourBranch
   -git merge main
+
+
+
+To merge person A to person B
+-person A has updates / new code
+
+In old/out_of_date branch
+
+git merge the_branch_with_updates
