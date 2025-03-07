@@ -77,6 +77,17 @@ float lastTrackedLon = 0;
 unsigned long lastDistanceUpdate = 0;
 float averagePace = 0.0;
 
+// GPS data from PVT callback
+volatile float currentLat, currentLon;
+volatile float currentSpeed;
+volatile uint8_t currentFixType;
+volatile bool newPVTDataAvailable;
+
+// Initial straight-line phase variables
+bool initialStraightPhase = false;
+unsigned long straightPhaseStartTime = 0;
+const unsigned long STRAIGHT_PHASE_DURATION = 500; // initial straight phase
+
 void setup() {
   Serial.begin(115200);
   
@@ -105,7 +116,13 @@ void setup() {
   
   // Initialize GPS
   if (!initializeGPS()) {
-    Serial.println("GPS initialization failed!");
+    while(1){
+        Serial.println("GPS initialization failed!");
+        delay(1000);
+        if(initializeGPS()){
+          break;
+        }
+    }
   }
   
   // Setup WiFi as an access point
@@ -117,6 +134,10 @@ void setup() {
 }
 
 void loop() {
+  // Process incoming GNSS messages
+  myGPS.checkUblox();  // Check for the arrival of new data and process it
+  myGPS.checkCallbacks(); // Check if any callbacks are waiting to be processed
+  
   // Safety checks run regardless of MODE
   unsigned long currentTime = millis();
   // Safety check: if no clients connected to the AP, stop the vehicle
@@ -138,26 +159,45 @@ void loop() {
   if (autonomousMode) { //only update status messages in auto mode
       updateStatusMessages();
       // only do navigation in auto mode with good GNSS fix
-      if (myGPS.getFixType() > 0) {
-          float currentLat, currentLon;
-          getCurrentPosition(currentLat, currentLon);
-          // Update distance tracking (only when the motor is active)
-          updateDistanceTracking();
+      if (currentFixType > 0) {
           // Calculate distance to target and base steering angle
           float distance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
-          int steeringAngle = calculateSteeringAngle(currentLat, currentLon);
-          // If the target is reached, handle waypoint or end session
-          if (distance < WAYPOINT_REACHED_RADIUS) {
-              handleWaypointReached();
+          
+          // Check if we're in initial straight-line phase
+          if (initialStraightPhase) {
+              // During straight phase, keep steering centered
+              steeringServo.write(STEERING_CENTER);
+              
+              // If straight phase duration has elapsed, exit straight phase
+              if (currentTime - straightPhaseStartTime >= STRAIGHT_PHASE_DURATION) {
+                  initialStraightPhase = false;
+              }
+          } else {
+              // Normal navigation with steering correction
+              int steeringAngle = calculateSteeringAngle(currentLat, currentLon);
+              
+              // If the target is reached, handle waypoint or end session
+              if (distance < WAYPOINT_REACHED_RADIUS) {
+                  handleWaypointReached();
+                  // No longer reset the straight-line phase for each waypoint
+              }
+              
+              steeringAngle = applyObstacleAvoidance(steeringAngle);
+              
+              // Constrain and apply the steering angle
+              steeringAngle = constrain(steeringAngle, STEERING_CENTER - STEERING_MAX, STEERING_CENTER + STEERING_MAX);
+              steeringServo.write(steeringAngle);
           }
-          steeringAngle = applyObstacleAvoidance(steeringAngle);
-          // Update pace control
+          
+          // Update pace control (do this regardless of straight phase)
           updatePaceControl();
-          // Constrain and apply the steering angle
-          steeringAngle = constrain(steeringAngle, STEERING_CENTER - STEERING_MAX, STEERING_CENTER + STEERING_MAX);
-          steeringServo.write(steeringAngle);
+          
+          // Update distance tracking
+          updateDistanceTracking();
+          
+          // Reset the new data flag after processing
+          newPVTDataAvailable = false;
       }
   }
   delay(2);
 }
-

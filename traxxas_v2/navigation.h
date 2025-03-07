@@ -28,6 +28,30 @@ extern unsigned long finalElapsedTime;    // Set when autonomous mode stops
 
 extern Servo escServo;
 
+// store the latest GPS data
+extern volatile float currentLat, currentLon;
+extern volatile float currentSpeed;
+extern volatile uint8_t currentFixType;
+extern volatile bool newPVTDataAvailable;
+
+// Add this to the top of navigation.h
+void pvtCallback(UBX_NAV_PVT_data_t *pvtData);
+
+// Update the callback function implementation
+void pvtCallback(UBX_NAV_PVT_data_t *pvtData)
+{
+    //Serial.println("PVT Callback called!");
+    
+    // Update global position variables with new data
+    currentLat = pvtData->lat / 10000000.0;
+    currentLon = pvtData->lon / 10000000.0;
+    currentSpeed = pvtData->gSpeed / 1000.0;  // Convert from mm/s to m/s
+    currentFixType = pvtData->fixType;
+    
+    // Set flag to indicate new data is available
+    newPVTDataAvailable = true;
+}
+
 // Initialize GPS module
 bool initializeGPS() {
     Wire.begin(32, 33);
@@ -35,8 +59,29 @@ bool initializeGPS() {
         Serial.println("u-blox GNSS not detected. Check wiring.");
         return false;
     }
+    
+    Serial.println("GNSS module found!");
+    
     myGPS.setI2COutput(COM_TYPE_UBX);
-    myGPS.setNavigationFrequency(10);
+    myGPS.setNavigationFrequency(NAV_FREQ);
+    
+    // Enable the callback for PVT messages
+    myGPS.setAutoPVTcallbackPtr(&pvtCallback);
+    
+    // Set Dynamic Model to Robotic Lawn Mower (11) 
+    // Also need to try: portable (0), pedestrian (3), automotive (4), wrist (9), bike(10), escooter (12)
+    // if (!myGPS.setVal8(0x20110021, 11)) {
+    //     Serial.println("Failed to set dynamic model to RLM.");
+    // } else {
+    //     Serial.println("Dynamic model set to Robotic Lawn Mower (RLM).");
+    // }
+    // Disable all sensor fusion: (does not seem to improve performance)
+    if (!myGPS.setVal8(UBLOX_CFG_SFCORE_USE_SF, 0)) {
+        Serial.println("Failed to disable sensor fusion.");
+    } else {
+        Serial.println("IMU sensor fusion disabled.");
+    }
+    
     return true;
 }
 
@@ -66,7 +111,7 @@ String getFusionStatus() {
     }
 
     // Restore original navigation frequency
-    myGPS.setNavigationFrequency(10);
+    myGPS.setNavigationFrequency(NAV_FREQ);
     return fusionStatus;
 }
 
@@ -104,8 +149,8 @@ float calculateBearing(float lat1, float lon1, float lat2, float lon2) {
 
 // Get current GPS coordinates
 void getCurrentPosition(float &lat, float &lon) {
-    lat = myGPS.getLatitude() / 10000000.0;
-    lon = myGPS.getLongitude() / 10000000.0;
+    lat = currentLat;
+    lon = currentLon;
 }
 
 // Record a waypoint at the current position
@@ -113,12 +158,8 @@ bool recordWaypoint() {
     if (waypointCount >= MAX_WAYPOINTS)
         return false; // Waypoint limit reached
 
-
-    float lat, lon;
-    getCurrentPosition(lat, lon);
-
-    waypointLats[waypointCount] = lat;
-    waypointLons[waypointCount] = lon;
+    waypointLats[waypointCount] = currentLat;
+    waypointLons[waypointCount] = currentLon;
     waypointCount++;
 
     return true;
@@ -131,12 +172,12 @@ void clearWaypoints() {
 
 // Calculate steering angle based on heading error (simple proportional control)
 int calculateSteeringAngle(float currentLat, float currentLon) {
-    if (myGPS.getFixType() == 0)
+    if (currentFixType == 0)
         return STEERING_CENTER;
 
     float distance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
     float bearing = calculateBearing(currentLat, currentLon, targetLat, targetLon);
-    float currentHeading = myGPS.getHeading() / 100000.0;
+    float currentHeading = myGPS.getHeading() / 100000.0;  // Still need to poll for heading
     
     float headingError = bearing - currentHeading;
     if (headingError > 180)
@@ -151,50 +192,107 @@ int calculateSteeringAngle(float currentLat, float currentLon) {
 }
 
 // pace control and compute average pace
+// Global variable for speed smoothing
+const int SPEED_SAMPLES = 3;
+volatile float speedSamples[SPEED_SAMPLES] = {0};
+volatile int speedSampleIndex = 0;
+
+// pace control and compute average pace
 void updatePaceControl() {
     if (autonomousMode) {
         unsigned long currentTime = millis();
         if (currentTime - lastPaceUpdate > SPEED_CORRECTION_INTERVAL) {
-            float speedMps = myGPS.getGroundSpeed() / 1000.0;
-            currentPace = speedMps;
+            // Update speed sample buffer for smoothing
+            speedSamples[speedSampleIndex] = currentSpeed;
+            speedSampleIndex = (speedSampleIndex + 1) % SPEED_SAMPLES;
+            
+            // Calculate smoothed speed (simple moving average)
+            float smoothedSpeed = 0;
+            for (int i = 0; i < SPEED_SAMPLES; i++) {
+                smoothedSpeed += speedSamples[i];
+            }
+            smoothedSpeed /= SPEED_SAMPLES;
+            
+            // Use smoothed speed for pace control
+            currentPace = smoothedSpeed;
             
             unsigned long elapsedTime = currentTime - startTime;
             if (elapsedTime > 0) {
                 averagePace = totalDistance / (elapsedTime / 1000.0);
             }
             
+            // Only apply throttle control when we have a target pace and not avoiding obstacles
             if (targetPace > 0 && lastAvoidanceMessage == "") {
-                int currentEscValue = escServo.read();
-                float paceRatio = targetPace > 0 ? currentPace / targetPace : 1.0;
-                int adjustmentValue = (abs(1.0 - paceRatio) < 0.05) ? (int)((1.0 - paceRatio) * 5.0)
-                                                                   : (int)((1.0 - paceRatio) * 15.0);
-                int newEscValue = currentEscValue + adjustmentValue;
-                newEscValue = constrain(newEscValue, 105, 135);
-                escServo.write(newEscValue);
+                // Calculate speed error (difference between target and current)
+                float speedError = targetPace - currentPace;
+                
+                // PI control variables
+                static float integralError = 0;
+                float dt = SPEED_CORRECTION_INTERVAL / 1000.0; // Time step in seconds
+                
+                // If we're at a standstill, provide an initial push
+                if (currentPace < 0.2 && targetPace > 0) {
+                    // Initial push to get moving
+                    escServo.write(ESC_MIN_FWD + 12);
+                    // Reset integral to prevent windup during startup
+                    integralError = 0;
+                } else {
+                    // Update integral term (accumulate error over time)
+                    integralError += speedError * dt;
+                    
+                    // Anti-windup: Limit the integral term to prevent excessive accumulation
+                    integralError = constrain(integralError, -8.0, 8.0);
+                    
+                    // PI control equation: Output = Kp*error + Ki*integral
+                    float Kp = 20.0;  // Proportional gain
+                    float Ki = 10.0;   // Integral gain
+                    
+                    int pidOutput = (int)(Kp * speedError + Ki * integralError);
+                    
+                    // Calculate ESC value: base value + PI controller output
+                    int escValue = ESC_MIN_FWD + pidOutput;
+                    
+                    // Constrain to valid range
+                    escValue = constrain(escValue, ESC_MIN_FWD, ESC_MAX_FWD);
+                    
+                    // Apply the throttle setting
+                    escServo.write(escValue);
+                }
+            } else if (targetPace <= 0 || lastAvoidanceMessage != "") {
+                // Reset integral term when we don't want to move
+                static float integralError = 0;
+                integralError = 0;
             }
+            
             lastPaceUpdate = currentTime;
         }
     }
 }
 
 // Update distance tracking: add incremental distance only when motor power is applied
+// Update distance tracking: add incremental distance only when GPS reports movement
 void updateDistanceTracking() {
-    float currentLat, currentLon;
-    getCurrentPosition(currentLat, currentLon);
-    if (millis() - lastDistanceUpdate >= 1000 && escServo.read() != ESC_NEUTRAL) {
-        if (lastTrackedLat != 0 && lastTrackedLon != 0) {
+    if (millis() - lastDistanceUpdate >= 1000) {
+        // Only update if we have valid previous coordinates
+        if (lastTrackedLat != 0 && lastTrackedLon != 0 && currentLat != 0 && currentLon != 0) {
             float delta = calculateDistance(lastTrackedLat, lastTrackedLon, currentLat, currentLon);
-            if (delta < 5.0)
+            
+            // Use a looser filter since we're checking speed as well
+            if (delta < 10.0 && currentSpeed > 0.5) {
                 totalDistance += delta;
+            }
+            
             if (targetDistance > 0 && totalDistance >= targetDistance) {
                 autonomousMode = false;
                 destinationReached = true;
-                finalElapsedTime = millis() - startTime;  // Capture final elapsed time
+                finalElapsedTime = millis() - startTime;
                 lastAvoidanceMessage = "Target distance reached";
                 escServo.write(ESC_NEUTRAL);
                 return;
             }
         }
+        
+        // Update tracked position regardless of whether we calculated distance
         lastTrackedLat = currentLat;
         lastTrackedLon = currentLon;
         lastDistanceUpdate = millis();

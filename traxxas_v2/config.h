@@ -48,6 +48,7 @@ const unsigned long MAX_AVOIDANCE_TIME = 5000; // Maximum 5 seconds in any avoid
 // Navigation constants
 const float WAYPOINT_REACHED_RADIUS = 2.0;  // 2 meters radius
 const int MAX_WAYPOINTS = 20;
+const int NAV_FREQ = 30;
 
 // Sonar filtering
 const int FILTER_SAMPLES = 5;  // Number of samples to average
@@ -62,6 +63,10 @@ extern float targetLat, targetLon;
 extern float waypointLats[], waypointLons[];
 extern int waypointCount, currentWaypointIndex;
 extern bool followingWaypoints, autonomousMode, destinationReached;
+extern volatile float currentLat, currentLon;
+extern volatile float currentSpeed;
+extern volatile uint8_t currentFixType;
+extern volatile bool newPVTDataAvailable;
 
 // Sensor readings
 extern float lastFrontDist, lastLeftDist, lastRightDist;
@@ -80,8 +85,8 @@ const float DEFAULT_TARGET_PACE = 1;  // Default target pace in m/s (0 = no pace
 const float DEFAULT_TARGET_DISTANCE = 0; // Default target distance in meters (0 = no distance limit)
 
 // Speed control values
-const int SPEED_CORRECTION_INTERVAL = 200; // How often to adjust speed for pace (ms)
-const float SPEED_CORRECTION_FACTOR = 0.05;  // How aggressively to correct speed (0-1)
+const int SPEED_CORRECTION_INTERVAL = 50; // How often to adjust speed for pace (ms)
+const float SPEED_CORRECTION_THRESHOLD = 0.05;  // How aggressively to correct speed (0-1)
 
 // Extended extern declarations for new tracking variables
 //extern int waypointLoopCount;         // Current count of completed loops
@@ -96,5 +101,10 @@ extern float lastSegmentDistance;     // Distance of last segment for pace calcu
 extern float lastTrackedLat;
 extern float lastTrackedLon; 
 extern unsigned long lastDistanceUpdate;
+
+// Straight phase variables
+extern bool initialStraightPhase;
+extern unsigned long straightPhaseStartTime;
+extern const unsigned long STRAIGHT_PHASE_DURATION;
 
 #endif // CONFIG_H
