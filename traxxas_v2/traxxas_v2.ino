@@ -160,7 +160,7 @@ void loop() {
   // ALWAYS update sonar readings
   updateSonarReadings();
   // emergency check for avoidance
-     int emergencyAovidance = applyObstacleAvoidance(STEERING_CENTER);
+  // int emergencyAovidance = applyObstacleAvoidance(STEERING_CENTER);
   
   // do autonomous navigation if in auto mode:
   if (autonomousMode) { //only update status messages in auto mode
