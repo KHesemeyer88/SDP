@@ -17,7 +17,7 @@ inline int applyObstacleAvoidance(int SteeringAngle) {
     static unsigned long frontAvoidStartTime = 0;
     
     // Define throttle values.
-    const int FULL_REVERSE_THROTTLE = ESC_MAX_REV;         // Use maximum reverse throttle.
+    const int FULL_REVERSE_THROTTLE = ESC_MAX_REV - 20;         // Use maximum reverse throttle.
     const int SLOW_FORWARD_THROTTLE = ESC_MIN_FWD + 10;      // A slow forward throttle above minimum.
 
     // --- FRONT OBSTACLE LOGIC ---
@@ -32,7 +32,7 @@ inline int applyObstacleAvoidance(int SteeringAngle) {
         } else {
             // Already in avoidance mode.
             if (now - frontAvoidStartTime < 500) {  // 100 ms reverse period.
-                escServo.write(ESC_MAX_REV);
+                escServo.write(ESC_MAX_REV - 20);
                 lastAvoidanceMessage = "Front obstacle";
                 return STEERING_CENTER;
             } else {

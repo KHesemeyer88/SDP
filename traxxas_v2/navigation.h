@@ -328,21 +328,26 @@ void updateStatusMessages() {
 
 // increment waypoint index, calculate segment distance, stop auto nav if distanced reached
 void handleWaypointReached() {
-  if (followingWaypoints) {
-    if (currentWaypointIndex < waypointCount - 1) {
-      currentWaypointIndex++;
+    if (followingWaypoints) {
+      if (currentWaypointIndex < waypointCount - 1) {
+        currentWaypointIndex++;
+      } else {
+        currentWaypointIndex = 0;
+        lastAvoidanceMessage = "Starting waypoint sequence again";
+      }
+      targetLat = waypointLats[currentWaypointIndex];
+      targetLon = waypointLons[currentWaypointIndex];
+      float currentLat, currentLon;
+      getCurrentPosition(currentLat, currentLon);
+      lastSegmentDistance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
     } else {
-      currentWaypointIndex = 0;
-      lastAvoidanceMessage = "Starting waypoint sequence again";
+      autonomousMode = false;
+      destinationReached = true;
+      destinationReachedTime = millis();
+      finalElapsedTime = millis() - startTime;  // Capture the final elapsed time
+      lastAvoidanceMessage = "Destination reached";
+      escServo.write(ESC_NEUTRAL);
     }
-  } else {
-    autonomousMode = false;
-    destinationReached = true;
-    destinationReachedTime = millis();
-    finalElapsedTime = millis() - startTime;  // Capture the final elapsed time
-    lastAvoidanceMessage = "Destination reached";
-    escServo.write(ESC_NEUTRAL);
   }
-}
 
 #endif // NAVIGATION_H
