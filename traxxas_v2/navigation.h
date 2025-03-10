@@ -172,104 +172,103 @@ void clearWaypoints() {
 
 // Calculate steering angle based on heading error (simple proportional control)
 int calculateSteeringAngle(float currentLat, float currentLon) {
-    if (currentFixType == 0)
-        return STEERING_CENTER;
+    if(!initialStraightPhase){
+        float distance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
+        float bearing = calculateBearing(currentLat, currentLon, targetLat, targetLon);
+        float currentHeading = myGPS.getHeading() / 100000.0;  // Still need to poll for heading
+        
+        float headingError = bearing - currentHeading;
+        if (headingError > 180)
+            headingError -= 360;
+        
+        if (headingError < -180)
+            headingError += 360;
+        
+        int steeringAngle = STEERING_CENTER + (headingError * 0.35);
 
-    float distance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
-    float bearing = calculateBearing(currentLat, currentLon, targetLat, targetLon);
-    float currentHeading = myGPS.getHeading() / 100000.0;  // Still need to poll for heading
-    
-    float headingError = bearing - currentHeading;
-    if (headingError > 180)
-        headingError -= 360;
-    
-    if (headingError < -180)
-        headingError += 360;
-    
-    int steeringAngle = STEERING_CENTER + (headingError * 0.25);
-
-    return steeringAngle;
-}
-
-// pace control and compute average pace
-// Global variable for speed smoothing
-const int SPEED_SAMPLES = 3;
-volatile float speedSamples[SPEED_SAMPLES] = {0};
-volatile int speedSampleIndex = 0;
-
-// pace control and compute average pace
-void updatePaceControl() {
-    if (autonomousMode) {
-        unsigned long currentTime = millis();
-        if (currentTime - lastPaceUpdate > SPEED_CORRECTION_INTERVAL) {
-            // Update speed sample buffer for smoothing
-            speedSamples[speedSampleIndex] = currentSpeed;
-            speedSampleIndex = (speedSampleIndex + 1) % SPEED_SAMPLES;
-            
-            // Calculate smoothed speed (simple moving average)
-            float smoothedSpeed = 0;
-            for (int i = 0; i < SPEED_SAMPLES; i++) {
-                smoothedSpeed += speedSamples[i];
-            }
-            smoothedSpeed /= SPEED_SAMPLES;
-            
-            // Use smoothed speed for pace control
-            currentPace = smoothedSpeed;
-            
-            unsigned long elapsedTime = currentTime - startTime;
-            if (elapsedTime > 0) {
-                averagePace = totalDistance / (elapsedTime / 1000.0);
-            }
-            
-            // Only apply throttle control when we have a target pace and not avoiding obstacles
-            if (targetPace > 0 && lastAvoidanceMessage == "") {
-                // Calculate speed error (difference between target and current)
-                float speedError = targetPace - currentPace;
-                
-                // PI control variables
-                static float integralError = 0;
-                float dt = SPEED_CORRECTION_INTERVAL / 1000.0; // Time step in seconds
-                
-                // If we're at a standstill, provide an initial push
-                if (currentPace < 0.2 && targetPace > 0) {
-                    // Initial push to get moving
-                    escServo.write(ESC_MIN_FWD + 12);
-                    // Reset integral to prevent windup during startup
-                    integralError = 0;
-                } else {
-                    // Update integral term (accumulate error over time)
-                    integralError += speedError * dt;
-                    
-                    // Anti-windup: Limit the integral term to prevent excessive accumulation
-                    integralError = constrain(integralError, -8.0, 8.0);
-                    
-                    // PI control equation: Output = Kp*error + Ki*integral
-                    float Kp = 20.0;  // Proportional gain
-                    float Ki = 10.0;   // Integral gain
-                    
-                    int pidOutput = (int)(Kp * speedError + Ki * integralError);
-                    
-                    // Calculate ESC value: base value + PI controller output
-                    int escValue = ESC_MIN_FWD + pidOutput;
-                    
-                    // Constrain to valid range
-                    escValue = constrain(escValue, ESC_MIN_FWD, ESC_MAX_FWD);
-                    
-                    // Apply the throttle setting
-                    escServo.write(escValue);
-                }
-            } else if (targetPace <= 0 || lastAvoidanceMessage != "") {
-                // Reset integral term when we don't want to move
-                static float integralError = 0;
-                integralError = 0;
-            }
-            
-            lastPaceUpdate = currentTime;
-        }
+        return steeringAngle;
+    } else {
+        return STEERING_CENTER + TRIM_ANGLE;
     }
 }
 
-// Update distance tracking: add incremental distance only when motor power is applied
+// Only adjust speed if we have a target pace and no obstacle avoidance active
+void updatePaceControl() {
+    // Only process if in autonomous mode
+    if (!autonomousMode) {
+        return;
+    }
+    
+    unsigned long currentTime = millis();
+    
+    // Only update at the specified interval
+    if (currentTime - lastPaceUpdate <= SPEED_CORRECTION_INTERVAL) {
+        return;
+    }
+    
+    // Static variables for PI control
+    static float cumulativeError = 0;
+    static int lastEscCommand = ESC_MIN_FWD; // Track our last command instead of reading
+    
+    // Get current speed and update pace
+    float speedMps = currentSpeed;
+    currentPace = speedMps;
+    
+    // Calculate average pace
+    unsigned long elapsedTime = currentTime - startTime;
+    if (elapsedTime > 0) {
+        averagePace = totalDistance / (elapsedTime / 1000.0);
+    }
+    
+    // Only adjust speed if we have a target pace and no obstacle avoidance active
+    if (targetPace > 0 && lastAvoidanceMessage == "") {
+        float paceError = targetPace - currentPace;
+        int adjustmentValue = 0;
+        
+        // Vehicle is stopped or moving very slowly (GPS noise)
+        if (currentPace < 0.5) {
+            // Initial push to overcome inertia - use a fixed starting value
+            lastEscCommand = ESC_MIN_FWD + 15;
+            cumulativeError = 0; // Reset integral term on fresh start
+        }
+        // Normal PI control operation when vehicle is moving
+        else {
+            // Proportional component
+            float pComponent = paceError * 1.5;
+            
+            // Integral component with slower accumulation
+            cumulativeError = constrain(cumulativeError + paceError * 0.03, -3.0, 5.0);
+            
+            // integral gain
+            float iComponent = cumulativeError * 1.0;
+            
+            // Combined adjustment from PI components
+            adjustmentValue = (int)(pComponent + iComponent);
+            
+            // Constrain adjustment to prevent lurching
+            adjustmentValue = constrain(adjustmentValue, -1, 1);
+            
+            // Calculate new ESC value based on our previous command
+            lastEscCommand = lastEscCommand + adjustmentValue;
+        }
+        
+        // Minimum throttle floor based on target pace
+        float minPowerLevel = ESC_MIN_FWD + (targetPace * 10.0);
+        //minPowerLevel = constrain(minPowerLevel, ESC_MIN_FWD + 10, ESC_MIN_FWD + 25);
+        
+        if (currentPace > 0.5 && lastEscCommand < minPowerLevel) {
+            lastEscCommand = (int)minPowerLevel;
+        }
+        
+        // Apply and constrain final value
+        lastEscCommand = constrain(lastEscCommand, ESC_MIN_FWD, ESC_MAX_FWD);
+        escServo.write(lastEscCommand);
+    }
+    
+    // Update the timestamp for next interval
+    lastPaceUpdate = currentTime;
+}
+
 // Update distance tracking: add incremental distance only when GPS reports movement
 void updateDistanceTracking() {
     if (millis() - lastDistanceUpdate >= 1000) {
@@ -328,26 +327,26 @@ void updateStatusMessages() {
 
 // increment waypoint index, calculate segment distance, stop auto nav if distanced reached
 void handleWaypointReached() {
-  if (followingWaypoints) {
-    if (currentWaypointIndex < waypointCount - 1) {
-      currentWaypointIndex++;
+    if (followingWaypoints) {
+      if (currentWaypointIndex < waypointCount - 1) {
+        currentWaypointIndex++;
+      } else {
+        currentWaypointIndex = 0;
+        lastAvoidanceMessage = "Starting waypoint sequence again";
+      }
+      targetLat = waypointLats[currentWaypointIndex];
+      targetLon = waypointLons[currentWaypointIndex];
+      float currentLat, currentLon;
+      getCurrentPosition(currentLat, currentLon);
+      lastSegmentDistance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
     } else {
-      currentWaypointIndex = 0;
-      lastAvoidanceMessage = "Starting waypoint sequence again";
+      autonomousMode = false;
+      destinationReached = true;
+      destinationReachedTime = millis();
+      finalElapsedTime = millis() - startTime;  // Capture the final elapsed time
+      lastAvoidanceMessage = "Destination reached";
+      escServo.write(ESC_NEUTRAL);
     }
-    targetLat = waypointLats[currentWaypointIndex];
-    targetLon = waypointLons[currentWaypointIndex];
-    float currentLat, currentLon;
-    getCurrentPosition(currentLat, currentLon);
-    lastSegmentDistance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
-  } else {
-    autonomousMode = false;
-    destinationReached = true;
-    destinationReachedTime = millis();
-    finalElapsedTime = millis() - startTime;  // Capture the final elapsed time
-    lastAvoidanceMessage = "Destination reached";
-    escServo.write(ESC_NEUTRAL);
   }
-}
 
 #endif // NAVIGATION_H

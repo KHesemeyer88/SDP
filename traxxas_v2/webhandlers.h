@@ -31,6 +31,9 @@ extern unsigned long totalTimeMs;
 extern float currentPace;
 extern float averagePace;
 extern unsigned long lastCommandTime;
+// Straight phase variables
+extern bool initialStraightPhase;
+extern unsigned long straightPhaseStartTime;
 
 // Function to set up all web server routes
 void setupWebServerRoutes() {
@@ -135,10 +138,6 @@ void setupWebServerRoutes() {
         currentPace = 0.0;
         lastPaceUpdate = millis();
         
-        // Initialize straight-line phase
-        initialStraightPhase = true;
-        straightPhaseStartTime = millis();
-        
         // Set pace and distance targets
         if (pace != "") {
             targetPace = pace.toFloat();
@@ -157,7 +156,9 @@ void setupWebServerRoutes() {
         autonomousMode = true;
         followingWaypoints = (waypointCount > 0);
         lastAvoidanceMessage = "";
-        
+        // Initialize straight-line phase
+        initialStraightPhase = true;
+        straightPhaseStartTime = millis();
         server.send(200, "text/plain", "Navigation started");
     });
     

@@ -20,8 +20,8 @@ const int TRIGGER_PIN_RIGHT = 19;
 const int ECHO_PIN_RIGHT = 21;
 
 // Sonar thresholds (cm)
-const int FRONT_STOP_THRESHOLD = 50; // zero to suppress obst. avoidance
-const int SIDE_AVOID_THRESHOLD = 50;
+const int FRONT_STOP_THRESHOLD = 0; // zero to suppress obst. avoidance
+const int SIDE_AVOID_THRESHOLD = 0;
 
 // Traxxas XL-2.5 ESC & servo values. Note ESC takes angles like a servo, but converts them to speed
 const int ESC_NEUTRAL = 90;     // Neutral position (1.5ms pulse)
@@ -31,7 +31,8 @@ const int ESC_MIN_FWD = 95;     // Minimum forward throttle
 const int ESC_MIN_REV = 85;     // Minimum reverse throttle
 const int STEERING_CENTER = 90;  // Center steering
 const int STEERING_MAX = 55;     // Maximum steering angle deviation
-const int TURN_ANGLE = 10;       // Angle to turn after reversing
+const int TURN_ANGLE = 20;       // Angle to turn 
+const int TRIM_ANGLE = 2; //car lists left
 
 // WiFi settings
 const char* ssid = "RC_Car_Control";
@@ -42,11 +43,9 @@ const unsigned long COMMAND_TIMEOUT_MS = 500;
 const unsigned long SONAR_UPDATE_INTERVAL = 100; // 100ms between full sonar updates
 const unsigned long AVOIDANCE_MESSAGE_TIMEOUT = 1000; // Clear message after 1 second
 const unsigned long DESTINATION_MESSAGE_TIMEOUT = 5000;  // 5 seconds
-const unsigned long AVOIDANCE_DURATION = 500; // Continue avoiding for 500ms
-const unsigned long MAX_AVOIDANCE_TIME = 5000; // Maximum 5 seconds in any avoidance state
 
 // Navigation constants
-const float WAYPOINT_REACHED_RADIUS = 2.0;  // 2 meters radius
+const float WAYPOINT_REACHED_RADIUS = 2.0; //meters
 const int MAX_WAYPOINTS = 20;
 const int NAV_FREQ = 30;
 
@@ -85,7 +84,7 @@ const float DEFAULT_TARGET_PACE = 1;  // Default target pace in m/s (0 = no pace
 const float DEFAULT_TARGET_DISTANCE = 0; // Default target distance in meters (0 = no distance limit)
 
 // Speed control values
-const int SPEED_CORRECTION_INTERVAL = 50; // How often to adjust speed for pace (ms)
+const int SPEED_CORRECTION_INTERVAL = 200; // How often to adjust speed for pace (ms)
 const float SPEED_CORRECTION_THRESHOLD = 0.05;  // How aggressively to correct speed (0-1)
 
 // Extended extern declarations for new tracking variables

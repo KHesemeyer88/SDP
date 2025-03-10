@@ -9,7 +9,7 @@
   ** average pace and instantaneous pace, both need improvement.
   ** general improvements for pace tracking and correction. 
 
- * Last updated: 3/5/2025
+ * Last updated: 3/9/2025
  */
 
 #include <Arduino.h>
@@ -86,7 +86,8 @@ volatile bool newPVTDataAvailable;
 // Initial straight-line phase variables
 bool initialStraightPhase = false;
 unsigned long straightPhaseStartTime = 0;
-const unsigned long STRAIGHT_PHASE_DURATION = 500; // initial straight phase
+const unsigned long STRAIGHT_PHASE_DURATION = 1000; // initial straight phase
+
 
 void setup() {
   Serial.begin(115200);
@@ -140,37 +141,45 @@ void loop() {
   
   // Safety checks run regardless of MODE
   unsigned long currentTime = millis();
+  
   // Safety check: if no clients connected to the AP, stop the vehicle
   if (WiFi.softAPgetStationNum() == 0) {
       autonomousMode = false;
       escServo.write(ESC_NEUTRAL);
       steeringServo.write(STEERING_CENTER);
   }
+
   // Check for command staleness in manual mode
   if (!autonomousMode && (currentTime - lastCommandTime > COMMAND_TIMEOUT_MS)) {
     escServo.write(ESC_NEUTRAL);
     steeringServo.write(STEERING_CENTER);
   }
+
   // handle web requests
   server.handleClient();
+
   // ALWAYS update sonar readings
   updateSonarReadings();
+  // emergency check for avoidance
+  // int emergencyAovidance = applyObstacleAvoidance(STEERING_CENTER);
+  
   // do autonomous navigation if in auto mode:
   if (autonomousMode) { //only update status messages in auto mode
       updateStatusMessages();
       // only do navigation in auto mode with good GNSS fix
-      if (currentFixType > 0) {
+      if (currentFixType > 0 ) {
           // Calculate distance to target and base steering angle
           float distance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
-          
           // Check if we're in initial straight-line phase
           if (initialStraightPhase) {
               // During straight phase, keep steering centered
-              steeringServo.write(STEERING_CENTER);
+              steeringServo.write(STEERING_CENTER + TRIM_ANGLE);
               
               // If straight phase duration has elapsed, exit straight phase
-              if (currentTime - straightPhaseStartTime >= STRAIGHT_PHASE_DURATION) {
-                  initialStraightPhase = false;
+              if ((currentTime >= straightPhaseStartTime) && // BE AWARE: ESP32 HAS DUAL CORE, TIMESTAMPS DISAGREE BY ABOUT 3MS!!
+                  (currentTime - straightPhaseStartTime >= STRAIGHT_PHASE_DURATION) && 
+                  initialStraightPhase) {
+                      initialStraightPhase = false;
               }
           } else {
               // Normal navigation with steering correction
@@ -179,10 +188,9 @@ void loop() {
               // If the target is reached, handle waypoint or end session
               if (distance < WAYPOINT_REACHED_RADIUS) {
                   handleWaypointReached();
-                  // No longer reset the straight-line phase for each waypoint
               }
               
-              steeringAngle = applyObstacleAvoidance(steeringAngle);
+              //steeringAngle = applyObstacleAvoidance(steeringAngle);
               
               // Constrain and apply the steering angle
               steeringAngle = constrain(steeringAngle, STEERING_CENTER - STEERING_MAX, STEERING_CENTER + STEERING_MAX);
@@ -199,5 +207,5 @@ void loop() {
           newPVTDataAvailable = false;
       }
   }
-  delay(2);
+  delay(1);
 }
