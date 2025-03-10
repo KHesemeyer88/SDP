@@ -13,6 +13,15 @@ AsyncWebSocket ws("/ws");
 SFE_UBLOX_GNSS myGNSS;
 
 volatile double lat_current, lon_current, lat_phone, lon_phone;
+
+
+double lat_waypoint, lon_waypoint;
+bool atWaypoint = false;
+float distance_to_waypoint;
+double waypoint_tolerance = 10; //cm
+
+
+
 int enable_RTK = 0;
 int incrementor = 0;
 int counter = 0;
@@ -25,6 +34,22 @@ volatile double horizontal_accuracy = 0;
 unsigned long lastReceivedRTCM_ms = 0;          //5 RTCM messages take approximately ~300ms to arrive at 115200bps
 const unsigned long maxTimeBeforeHangup_ms = 10000UL; //If we fail to get a complete RTCM frame after 10s, then disconnect from caster
 bool transmitLocation = true;
+
+
+float calculateDistance(float lat1, float lon1, float lat2, float lon2) {
+    float lat1Rad = lat1 * PI / 180.0;
+    float lon1Rad = lon1 * PI / 180.0;
+    float lat2Rad = lat2 * PI / 180.0;
+    float lon2Rad = lon2 * PI / 180.0;
+
+    float dLat = lat2Rad - lat1Rad;
+    float dLon = lon2Rad - lon1Rad;
+    float a = sin(dLat/2) * sin(dLat/2) +
+              cos(lat1Rad) * cos(lat2Rad) *
+              sin(dLon/2) * sin(dLon/2);
+    float c = 2 * atan2(sqrt(a), sqrt(1-a));
+    return c * 6371000; // Earth radius in meters
+}
 
 void pushGPGGA(NMEA_GGA_data_t *nmeaData) {
   //Provide the caster with our current position as needed
@@ -128,26 +153,26 @@ void printRTCMdata1006(RTCM_1006_data_t *rtcmData1006) {
   Serial.print(F("  Height: "));
   Serial.println(h, 4); // 4 decimal places
 }
-
-//         function sendInput() {
-//             let inputVal = document.getElementById('inputBox').value;
-//             socket.send('input:' + inputVal);
-//         }
-// <body onload="init()">
-
-//   body<div>
-//     <input id="inputText" type="text" placeholder="Type a message">
-//     <button onclick="sendMessage()">Send</button>
-//   </div>
-//     <script>
-//         ws.onmessage = function(event) {
-//             document.getElementById("status").innerText = event.data;
-//         };
-//         function sendMessage() {
-//             var message = document.getElementById("inputText").value;
-//             ws.send(message);
-//         }
-//     </script>
+/*
+        function sendInput() {
+            let inputVal = document.getElementById('inputBox').value;
+            socket.send('input:' + inputVal);
+        }
+  <body onload="init()">
+  body<div>
+    <input id="inputText" type="text" placeholder="Type a message">
+    <button onclick="sendMessage()">Send</button>
+  </div>
+    <script>
+        ws.onmessage = function(event) {
+            document.getElementById("status").innerText = event.data;
+        };
+        function sendMessage() {
+            var message = document.getElementById("inputText").value;
+            ws.send(message);
+        }
+    </script>
+*/
 
 
 const char* myWebpage PROGMEM = R"rawliteral(
@@ -161,19 +186,24 @@ const char* myWebpage PROGMEM = R"rawliteral(
   <div>
     <h1>CDR RTK</h1>
 
-    <p>lat: <span id="lat">html</span></p>
-    <p>lon: <span id="lon">lon</span></p>
-    <p>phone lat: <span id="lat_phone">plat</span></p>
-    <p>phone lon: <span id="lon_phone">plon</span></p>
+    <p>Current lat: <span id="lat">lat</span></p>
+    <p>Current lon: <span id="lon">lon</span></p>
+    <!-- <p>phone lat: <span id="lat_phone"></span></p>
+    <p>phone lon: <span id="lon_phone"></span></p> -->
     <button id="RTK_indicator" onclick="toggle_RTK()">RTK is disabled</button>
-    <button onclick="increment()">Increment Counter <span id="counter">0</span></button>
-    <p>incrementor check: <span id="incrementor">0</span></p>
-    <button onclick="requestLocation()">Send Location</button>
 
-    <p>NTRIP: <span id="NTRIP_conn">Not connected</span></p>
-    <p>RTK fix: <span id="RTK_fix">None</span></p>
-    <p>RTK carrier: <span id="RTK_carrier">None</span></p>
-    <p>horizontal accuracy estimate: <span id="horizontal_accuracy">0m</span></p>
+    <!-- <button onclick="increment()">Increment Counter <span id="counter">0</span></button>
+    <p>incrementor check: <span id="incrementor">0</span></p>
+    <button onclick="requestLocation()">Send Location</button> -->
+
+    <p>NTRIP: <span id="NTRIP_conn"></span></p>
+    <p>Fix Type: <span id="RTK_fix"></span></p>
+    <p>RTK carrier: <span id="RTK_carrier"></span></p>
+    <p>horizontal accuracy estimate: <span id="horizontal_accuracy"></span></p>
+
+    <br></br>
+    <button id="waypoint_button" onclick="recordWaypoint()">Record Waypoint</button>
+    <p>Dist to waypoint: <span id="dist">Unkown</span></p>
   </div>
 
   <script>
@@ -200,15 +230,30 @@ const char* myWebpage PROGMEM = R"rawliteral(
 
         document.getElementById("lat").innerText = data[0];
         document.getElementById("lon").innerText = data[1];
-        document.getElementById("lat_phone").innerText = data[2] || "N/A";;
-        document.getElementById("lon_phone").innerText = data[3] || "N/A";;
+        //document.getElementById("lat_phone").innerText = data[2] || "N/A";;
+        //document.getElementById("lon_phone").innerText = data[3] || "N/A";;
         document.getElementById("RTK_indicator").innerText = data[4] === "1" ? "RTK enabled" : "RTK disabled";
-        document.getElementById("counter").innerText = data[5];
-        document.getElementById("incrementor").innerText = data[6];
+        //document.getElementById("counter").innerText = data[5];
+        //document.getElementById("incrementor").innerText = data[6];
 
         document.getElementById("NTRIP_conn").innerText = data[7] === "1" ? "Connected" : "Not connected";
 
-        document.getElementById("RTK_fix").innerText = data[8] === "0" ? "none" : "not none";
+        let text_fixType = "Blank"
+        if (data[8] == 0)
+          text_fixType = "None";
+        else if (data[8] == 1)
+          text_fixType = "Dead Reckoning";
+        else if (data[8] == 2)
+          text_fixType = "2D";
+        else if (data[8] == 3)
+          text_fixType = "3D";
+        else if (data[8] == 4)
+          text_fixType = "GNSS + Dead Reckoning";
+        else if (data[8] == 5)
+          text_fixType = "Time Only";
+        else
+          text_fixType = "UNKNOWN";
+        document.getElementById("RTK_fix").innerText = text_fixType;
 
         let text_carrier = "Blank"
         if (data[9] == 0) 
@@ -219,11 +264,12 @@ const char* myWebpage PROGMEM = R"rawliteral(
           text_carrier = "Fixed";
         else
           text_carrier = "UNKNOWN";
-
         document.getElementById("RTK_carrier").innerText = text_carrier;
 
+        document.getElementById("horizontal_accuracy").innerText = data[10] + "m";
 
-    //<p>horizontal accuracy estimate: <span id="horizontal_accuracy">0m</span></p>
+        document.getElementById("dist").innerText = data[11] + "m";
+        document.getElementById("waypoint_button").innerText = data[12] + " " + data[13];
       };
     }
 
@@ -248,6 +294,10 @@ const char* myWebpage PROGMEM = R"rawliteral(
       }
     }
     function error(err) { alert(`ERROR(${err.code}): ${err.message}`);}
+    function recordWaypoint() { 
+      ws.send("recordWaypoint");
+      alert("waypoint recorded");
+    }
     function toggle_RTK() { ws.send("toggle"); }
     function increment() { ws.send("increment"); }
     window.onload = init();
@@ -265,7 +315,10 @@ void notifyClients() {
     String(incrementor) + "," +
     String(NTRIP_conn) + "," +
     String(RTK_fix) + "," +
-    String(RTK_carrier);
+    String(RTK_carrier) + "," +
+    String(horizontal_accuracy) + "," +
+    String(distance_to_waypoint, 4) + "," +
+    String(lat_waypoint, 8) + "," + String(lon_waypoint, 8);
     
     //Serial.println("Sending WebSocket message: " + message);
     ws.textAll(message);
@@ -290,11 +343,13 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
         if (message == "toggle") {
             enable_RTK = !enable_RTK;
             Serial.printf("RTK: %s\n", enable_RTK ? "enabled" : "disabled");
-        } 
-        else if (message == "increment") {
+        } else if (message == "increment") {
             counter++;
             Serial.printf("Counter: %d\n", counter);
-        } 
+        } else if (message == "recordWaypoint") {
+          lat_waypoint = lat_current;
+          lon_waypoint = lon_current;          
+        }
         // else if (message.startsWith("GPS:")) {
         //   phoneGPS = message.substring(4);  // Extract the GPS data from the message
         //   Serial.println("Received GPS data: " + phoneGPS);
@@ -485,6 +540,7 @@ bool processConnection() {
   else
   {
     Serial.println(F("Connection dropped!"));
+     NTRIP_conn = 0;
     return (false); // Connection has dropped - return false
   }  
   
@@ -547,11 +603,11 @@ void setup() {
   myGNSS.setI2COutput(COM_TYPE_UBX | COM_TYPE_NMEA);                                //Set the I2C port to output both NMEA and UBX messages
   myGNSS.setI2CInput(COM_TYPE_UBX | COM_TYPE_NMEA | COM_TYPE_RTCM3); //Be sure RTCM3 input is enabled. UBX + RTCM3 is not a valid state.
   myGNSS.setDGNSSConfiguration(SFE_UBLOX_DGNSS_MODE_FIXED); // Set the differential mode - ambiguities are fixed whenever possible
-  myGNSS.setNavigationFrequency(15); //Set output in Hz.
+  myGNSS.setNavigationFrequency(20); //Set output in Hz.
     // Set the Main Talker ID to "GP". The NMEA GGA messages will be GPGGA instead of GNGGA
   myGNSS.setMainTalkerID(SFE_UBLOX_MAIN_TALKER_ID_GP);
   myGNSS.setNMEAGPGGAcallbackPtr(&pushGPGGA); // Set up the callback for GPGGA
-  myGNSS.setVal8(UBLOX_CFG_MSGOUT_NMEA_ID_GGA_I2C, 10); // Tell the module to output GGA every 10 seconds
+  myGNSS.setVal8(UBLOX_CFG_MSGOUT_NMEA_ID_GGA_I2C, 20); // Tell the module to output GGA every 10 seconds
   myGNSS.setAutoPVTcallbackPtr(&printPVTdata); // Enable automatic NAV PVT messages with callback to printPVTdata so we can watch the carrier solution go to fixed
   myGNSS.setRTCM1005InputcallbackPtr(&printRTCMdata1005); // Set up a callback to print the RTCM 1005 Antenna Reference Position from the correction data
   myGNSS.setRTCM1006InputcallbackPtr(&printRTCMdata1006); // Set up a callback to print the RTCM 1006 Antenna Reference Position from the correction data
@@ -584,8 +640,9 @@ void loop() {
 
   myGNSS.checkUblox(); // Check for the arrival of new GNSS data and process it.
   myGNSS.checkCallbacks(); // Check if any GNSS callbacks are waiting to be processed.
-
   processConnection();
+
+  distance_to_waypoint = calculateDistance(lat_current, lon_current, lat_waypoint, lon_waypoint);
 
   //Serial.printf(":  lat: %.8f lon: %.8f", lat_current, lon_current);
   incrementor++;
