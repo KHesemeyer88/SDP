@@ -1,37 +1,32 @@
 #include <WiFi.h>
 #include <AsyncTCP.h> // https://randomnerdtutorials.com/esp32-websocket-server-arduino/
 #include <ESPAsyncWebServer.h> // download off git -> sketch include library .zip
-// #include <WiFiClient.h>
-// syronous stuff #include <WebServer.h> // #include <WebSocketsServer.h> // WebServer server(80); // WebSocketsServer webSocket(81);
 #include <Wire.h>
 #include <SparkFun_u-blox_GNSS_v3.h>
 #include "base64.h"  // Install "ArduinoBase64" library
 #include "credentials.h"
+// #include <WiFiClient.h>// syronous stuff #include <WebServer.h> // #include <WebSocketsServer.h> // WebServer server(80); // WebSocketsServer webSocket(81);
 
 WiFiClient ntripClient;
 AsyncWebServer server(80);
 AsyncWebSocket ws("/ws");
 SFE_UBLOX_GNSS myGNSS;
 
-volatile double lat_current, lon_current;
-double lat_phone = 0;
-double lon_phone = 0;
+volatile double lat_current, lon_current, lat_phone, lon_phone;
 int enable_RTK = 0;
 int incrementor = 0;
 int counter = 0;
-int RTK_fix = 0;
 
-
-String phoneGPS = "";
-String rtcm = "";
+volatile int NTRIP_conn = 0;
+volatile int RTK_fix = 0;
+volatile int RTK_carrier = 0;
+volatile double horizontal_accuracy = 0;
 
 unsigned long lastReceivedRTCM_ms = 0;          //5 RTCM messages take approximately ~300ms to arrive at 115200bps
 const unsigned long maxTimeBeforeHangup_ms = 10000UL; //If we fail to get a complete RTCM frame after 10s, then disconnect from caster
+bool transmitLocation = true;
 
-bool transmitLocation = true; 
-
-void pushGPGGA(NMEA_GGA_data_t *nmeaData)
-{
+void pushGPGGA(NMEA_GGA_data_t *nmeaData) {
   //Provide the caster with our current position as needed
   if ((ntripClient.connected() == true) && (transmitLocation == true))
   {
@@ -43,69 +38,62 @@ void pushGPGGA(NMEA_GGA_data_t *nmeaData)
   }
 }
 
-void printPVTdata(UBX_NAV_PVT_data_t *ubxDataStruct)
-{
-  double latitude = ubxDataStruct->lat; // Print the latitude
-  Serial.print(F("Lat: "));
-  Serial.print(latitude / 10000000.0, 7);
+void printPVTdata(UBX_NAV_PVT_data_t *ubxDataStruct) {
+  lat_current = ubxDataStruct->lat / 10000000.0;
+  // Serial.print(F("Lat: "));
+  // Serial.print(lat_current / 10000000.0, 7);
+  lon_current = ubxDataStruct->lon / 10000000.0;
+  // Serial.print(F("  Long: "));
+  // Serial.print(lon_current / 10000000.0, 7);
 
-  double longitude = ubxDataStruct->lon; // Print the longitude
-  Serial.print(F("  Long: "));
-  Serial.print(longitude / 10000000.0, 7);
+  // double altitude = ubxDataStruct->hMSL; // Print the height above mean sea level
+  // Serial.print(F("  Height: "));
+  // Serial.print(altitude / 1000.0, 3);
 
-  double altitude = ubxDataStruct->hMSL; // Print the height above mean sea level
-  Serial.print(F("  Height: "));
-  Serial.print(altitude / 1000.0, 3);
+  uint8_t fixType = ubxDataStruct->fixType;
+  RTK_fix = fixType;
+  // Serial.print(F("  Fix: "));
+  // Serial.print(fixType);
+  // if (fixType == 0)
+  //   Serial.print(F(" (None)"));
+  // else if (fixType == 1)
+  //   Serial.print(F(" (Dead Reckoning)"));
+  // else if (fixType == 2)
+  //   Serial.print(F(" (2D)"));
+  // else if (fixType == 3)
+  //   Serial.print(F(" (3D)"));
+  // else if (fixType == 4)
+  //   Serial.print(F(" (GNSS + Dead Reckoning)"));
+  // else if (fixType == 5)
+  //   Serial.print(F(" (Time Only)"));
+  // else
+  //   Serial.print(F(" (UNKNOWN)"));
 
-  uint8_t fixType = ubxDataStruct->fixType; // Print the fix type
-  Serial.print(F("  Fix: "));
-  Serial.print(fixType);
-  if (fixType == 0)
-    Serial.print(F(" (None)"));
-  else if (fixType == 1)
-    Serial.print(F(" (Dead Reckoning)"));
-  else if (fixType == 2)
-    Serial.print(F(" (2D)"));
-  else if (fixType == 3)
-    Serial.print(F(" (3D)"));
-  else if (fixType == 4)
-    Serial.print(F(" (GNSS + Dead Reckoning)"));
-  else if (fixType == 5)
-    Serial.print(F(" (Time Only)"));
-  else
-    Serial.print(F(" (UNKNOWN)"));
+  uint8_t carrSoln = ubxDataStruct->flags.bits.carrSoln;
+  RTK_carrier = carrSoln;
+  // Serial.print(F("  Carrier Solution: "));
+  // Serial.print(carrSoln);
+  // if (carrSoln == 0)
+  //   Serial.print(F(" (None)"));
+  // else if (carrSoln == 1)
+  //   Serial.print(F(" (Floating)"));
+  // else if (carrSoln == 2)
+  //   Serial.print(F(" (Fixed)"));
+  // else
+  //   Serial.print(F(" (UNKNOWN)"));
 
-  uint8_t carrSoln = ubxDataStruct->flags.bits.carrSoln; // Print the carrier solution
-  Serial.print(F("  Carrier Solution: "));
-  Serial.print(carrSoln);
-  if (carrSoln == 0)
-    Serial.print(F(" (None)"));
-  else if (carrSoln == 1)
-    Serial.print(F(" (Floating)"));
-  else if (carrSoln == 2)
-    Serial.print(F(" (Fixed)"));
-  else
-    Serial.print(F(" (UNKNOWN)"));
 
   uint32_t hAcc = ubxDataStruct->hAcc; // Print the horizontal accuracy estimate
-  Serial.print(F("  Horizontal Accuracy Estimate: "));
-  Serial.print(hAcc);
-  Serial.print(F(" (mm)"));
+  horizontal_accuracy = hAcc / 1000.0;
+  // Serial.print(F("  Horizontal Accuracy Estimate: "));
+  // Serial.print(hAcc / 1000.0);
+  // Serial.print(F(" (m)"));
 
-  Serial.println();    
+  // Serial.println();    
 }
 
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
 // Callback: printRTCMdata1005 will be called when new RTCM 1005 data has been parsed from pushRawData
-// See u-blox_structs.h for the full definition of RTCM_1005_data_t
-//         _____  You can use any name you like for the callback. Use the same name when you call setRTCM1005InputcallbackPtr
-//        /                 _____  This _must_ be RTCM_1005_data_t
-//        |                /                   _____ You can use any name you like for the struct
-//        |                |                  /
-//        |                |                  |
-void printRTCMdata1005(RTCM_1005_data_t *rtcmData1005)
-{
+void printRTCMdata1005(RTCM_1005_data_t *rtcmData1005) {
   double x = rtcmData1005->AntennaReferencePointECEFX;
   x /= 10000.0; // Convert to m
   double y = rtcmData1005->AntennaReferencePointECEFY;
@@ -120,18 +108,8 @@ void printRTCMdata1005(RTCM_1005_data_t *rtcmData1005)
   Serial.print(F("  Z: "));
   Serial.println(z, 4); // 4 decimal places
 }
-
-//=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
-
 // Callback: printRTCMdata1006 will be called when new RTCM 1006 data has been parsed from pushRawData
-// See u-blox_structs.h for the full definition of RTCM_1006_data_t
-//         _____  You can use any name you like for the callback. Use the same name when you call setRTCM1006InputcallbackPtr
-//        /                 _____  This _must_ be RTCM_1006_data_t
-//        |                /                   _____ You can use any name you like for the struct
-//        |                |                  /
-//        |                |                  |
-void printRTCMdata1006(RTCM_1006_data_t *rtcmData1006)
-{
+void printRTCMdata1006(RTCM_1006_data_t *rtcmData1006) {
   double x = rtcmData1006->AntennaReferencePointECEFX;
   x /= 10000.0; // Convert to m
   double y = rtcmData1006->AntennaReferencePointECEFY;
@@ -183,7 +161,7 @@ const char* myWebpage PROGMEM = R"rawliteral(
   <div>
     <h1>CDR RTK</h1>
 
-    <p>lat: <span id="lat">lat</span></p>
+    <p>lat: <span id="lat">html</span></p>
     <p>lon: <span id="lon">lon</span></p>
     <p>phone lat: <span id="lat_phone">plat</span></p>
     <p>phone lon: <span id="lon_phone">plon</span></p>
@@ -191,6 +169,11 @@ const char* myWebpage PROGMEM = R"rawliteral(
     <button onclick="increment()">Increment Counter <span id="counter">0</span></button>
     <p>incrementor check: <span id="incrementor">0</span></p>
     <button onclick="requestLocation()">Send Location</button>
+
+    <p>NTRIP: <span id="NTRIP_conn">Not connected</span></p>
+    <p>RTK fix: <span id="RTK_fix">None</span></p>
+    <p>RTK carrier: <span id="RTK_carrier">None</span></p>
+    <p>horizontal accuracy estimate: <span id="horizontal_accuracy">0m</span></p>
   </div>
 
   <script>
@@ -222,6 +205,25 @@ const char* myWebpage PROGMEM = R"rawliteral(
         document.getElementById("RTK_indicator").innerText = data[4] === "1" ? "RTK enabled" : "RTK disabled";
         document.getElementById("counter").innerText = data[5];
         document.getElementById("incrementor").innerText = data[6];
+
+        document.getElementById("NTRIP_conn").innerText = data[7] === "1" ? "Connected" : "Not connected";
+
+        document.getElementById("RTK_fix").innerText = data[8] === "0" ? "none" : "not none";
+
+        let text_carrier = "Blank"
+        if (data[9] == 0) 
+          text_carrier = "None";
+        else if (data[9] == 1)
+          text_carrier = "Floating";
+        else if (data[9] == 2)
+          text_carrier = "Fixed";
+        else
+          text_carrier = "UNKNOWN";
+
+        document.getElementById("RTK_carrier").innerText = text_carrier;
+
+
+    //<p>horizontal accuracy estimate: <span id="horizontal_accuracy">0m</span></p>
       };
     }
 
@@ -256,7 +258,15 @@ const char* myWebpage PROGMEM = R"rawliteral(
 
 // Send updates to all clients
 void notifyClients() {
-    String message = String(lat_current) + "," + String(lon_current) + "," + String(lat_phone) + "," + String(lon_phone) + "," + (enable_RTK ? "1" : "0") + "," + String(counter) + "," + String(incrementor);
+    String message = String(lat_current, 8) + "," + String(lon_current, 8) + "," + 
+    String(lat_phone) + "," + String(lon_phone) + "," + 
+    (enable_RTK ? "1" : "0") + "," + 
+    String(counter) + "," + 
+    String(incrementor) + "," +
+    String(NTRIP_conn) + "," +
+    String(RTK_fix) + "," +
+    String(RTK_carrier);
+    
     //Serial.println("Sending WebSocket message: " + message);
     ws.textAll(message);
 }
@@ -284,10 +294,11 @@ void handleWebSocketMessage(void *arg, uint8_t *data, size_t len) {
         else if (message == "increment") {
             counter++;
             Serial.printf("Counter: %d\n", counter);
-        } else if (message.startsWith("GPS:")) {
-          phoneGPS = message.substring(4);  // Extract the GPS data from the message
-          Serial.println("Received GPS data: " + phoneGPS);
         } 
+        // else if (message.startsWith("GPS:")) {
+        //   phoneGPS = message.substring(4);  // Extract the GPS data from the message
+        //   Serial.println("Received GPS data: " + phoneGPS);
+        // } 
         
 //         if (receivedMessage == "toggle") {
 //             toggleState = !toggleState;
@@ -338,28 +349,21 @@ void onWebSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsE
 //     }
 // }
 
-// Connect to NTRIP caster
-bool beginClient() {
-  Serial.print(F("Opening socket to "));
-  Serial.println(casterHost);
+void connectToNTRIP() {
   if (ntripClient.connect(casterHost, casterPort) == false) {
-    Serial.println(F("Connection to caster failed"));
-    return (false);
+    Serial.println("Connection to caster failed");
   } else {
-    Serial.print(F("Connected to "));
+    Serial.print("Connected to ");
     Serial.print(casterHost);
-    Serial.print(F(" : "));
-    Serial.println(casterPort);
-    Serial.print(F("Requesting NTRIP Data from mount point "));
+    Serial.print(" : ");
+    Serial.print(casterPort);
+    Serial.print(" mount point : ");
     Serial.println(mountPoint);
 
     // Set up the server request (GET)
     const int SERVER_BUFFER_SIZE = 512;
     char serverRequest[SERVER_BUFFER_SIZE + 1];
-    snprintf(serverRequest,
-             SERVER_BUFFER_SIZE,
-             "GET /%s HTTP/1.0\r\nUser-Agent: NTRIP SparkFun u-blox Client v1.0\r\n",
-             mountPoint);
+    snprintf(serverRequest, SERVER_BUFFER_SIZE, "GET /%s HTTP/1.0\r\nUser-Agent: NTRIP SparkFun u-blox Client v1.0\r\n", mountPoint);
 
     // Set up the credentials
     char credentials[512];
@@ -369,8 +373,8 @@ bool beginClient() {
       //Pass base64 encoded user:pw
       char userCredentials[sizeof(casterUser) + sizeof(casterUserPW) + 1]; //The ':' takes up a spot
       snprintf(userCredentials, sizeof(userCredentials), "%s:%s", casterUser, casterUserPW);
-      Serial.print(F("Sending credentials: "));
-      Serial.println(userCredentials);
+      // Serial.print(F("Sending credentials: "));
+      // Serial.println(userCredentials);
 
       //Encode with ESP32 built-in library
       base64 b;
@@ -383,16 +387,15 @@ bool beginClient() {
     // Add the encoded credentials to the server request
     strncat(serverRequest, credentials, SERVER_BUFFER_SIZE);
     strncat(serverRequest, "\r\n", SERVER_BUFFER_SIZE);
-
-    Serial.print(F("serverRequest size: "));
-    Serial.print(strlen(serverRequest));
-    Serial.print(F(" of "));
-    Serial.print(sizeof(serverRequest));
-    Serial.println(F(" bytes available"));
+    // Serial.print(F("serverRequest size: "));
+    // Serial.print(strlen(serverRequest));
+    // Serial.print(F(" of "));
+    // Serial.print(sizeof(serverRequest));
+    // Serial.println(F(" bytes available"));
 
     // Send the server request
-    Serial.println(F("Sending server request: "));
-    Serial.println(serverRequest);
+    // Serial.println(F("Sending server request: "));
+    // Serial.println(serverRequest);
     ntripClient.write(serverRequest, strlen(serverRequest));
 
     //Wait up to 5 seconds for response
@@ -403,7 +406,6 @@ bool beginClient() {
       {
         Serial.println(F("Caster timed out!"));
         ntripClient.stop();
-        return (false);
       }
       delay(10);
     }
@@ -440,7 +442,7 @@ bool beginClient() {
     {
       Serial.print(F("Failed to connect to "));
       Serial.println(casterHost);
-      return (false);
+      //return;
     }
     else
     {
@@ -448,14 +450,12 @@ bool beginClient() {
       Serial.println(casterHost);
       lastReceivedRTCM_ms = millis(); //Reset timeout
     }
-  } //End attempt to connect
-  return (true);
+  }
 }
 
 //Check for the arrival of any correction data. Push it to the GNSS.
 //Return false if: the connection has dropped, or if we receive no data for maxTimeBeforeHangup_ms
-bool processConnection()
-{
+bool processConnection() {
   if (ntripClient.connected() == true) // Check that the connection is still open
   {
     uint8_t rtcmData[512 * 4]; //Most incoming data is around 500 bytes but may be larger
@@ -477,9 +477,9 @@ bool processConnection()
       //Push RTCM to GNSS module over I2C
       myGNSS.pushRawData(rtcmData, rtcmCount);
       
-      Serial.print(F("Pushed "));
-      Serial.print(rtcmCount);
-      Serial.println(F(" RTCM bytes to ZED"));
+      // Serial.print(F("Pushed "));
+      // Serial.print(rtcmCount);
+      // Serial.println(F(" RTCM bytes to ZED"));
     }
   }
   else
@@ -499,44 +499,34 @@ bool processConnection()
 }
 
 
-void sendRTCMMessage(String rtcmMessage) {
-    // Send RTCM message over WebSocket to the webpage
-    //String jsonRtcm = "{\"rtcm\":\"" + rtcmMessage + "\"}";
-    //webSocket.broadcastTXT(jsonRtcm);
-    Serial.println(rtcmMessage);
-}
 // Read RTCM data from NTRIP caster and send to ZED-F9R
-void readRTCM() {
-    uint8_t rtcmBuffer[512];  // Buffer for RTCM data
-    size_t bytesRead = 0;
-
-    while (ntripClient.available()) {
-        rtcmBuffer[bytesRead++] = ntripClient.read();
-
-        // Send when buffer is full or after a batch of data
-        if (bytesRead >= sizeof(rtcmBuffer)) {
-            // Convert buffer to a String and send as RTCM message
-            String rtcmMessage = "RTCM Data: ";
-            for (size_t i = 0; i < bytesRead; i++) {
-                rtcmMessage += String(rtcmBuffer[i], HEX) + " ";
-            }
-            sendRTCMMessage(rtcmMessage);  // Send to webpage
-
-            myGNSS.pushRawData(rtcmBuffer, bytesRead, true);  // Process RTCM data
-            bytesRead = 0;
-        }
-    }
-
-    // Send remaining bytes if any
-    if (bytesRead > 0) {
-        String rtcmMessage = "RTCM Data: ";
-        for (size_t i = 0; i < bytesRead; i++) {
-            rtcmMessage += String(rtcmBuffer[i], HEX) + " ";
-        }
-        sendRTCMMessage(rtcmMessage);  // Send to webpage
-        myGNSS.pushRawData(rtcmBuffer, bytesRead, true);
-    }
-}
+// void readRTCM() {
+//     uint8_t rtcmBuffer[512];  // Buffer for RTCM data
+//     size_t bytesRead = 0;
+//     while (ntripClient.available()) {
+//         rtcmBuffer[bytesRead++] = ntripClient.read();
+//         // Send when buffer is full or after a batch of data
+//         if (bytesRead >= sizeof(rtcmBuffer)) {
+//             // Convert buffer to a String and send as RTCM message
+//             String rtcmMessage = "RTCM Data: ";
+//             for (size_t i = 0; i < bytesRead; i++) {
+//                 rtcmMessage += String(rtcmBuffer[i], HEX) + " ";
+//             }
+//             sendRTCMMessage(rtcmMessage);  // Send to webpage
+//             myGNSS.pushRawData(rtcmBuffer, bytesRead, true);  // Process RTCM data
+//             bytesRead = 0;
+//         }
+//     }
+//     // Send remaining bytes if any
+//     if (bytesRead > 0) {
+//         String rtcmMessage = "RTCM Data: ";
+//         for (size_t i = 0; i < bytesRead; i++) {
+//             rtcmMessage += String(rtcmBuffer[i], HEX) + " ";
+//         }
+//         sendRTCMMessage(rtcmMessage);  // Send to webpage
+//         myGNSS.pushRawData(rtcmBuffer, bytesRead, true);
+//     }
+// }
 
 void setup() {
   Serial.begin(115200);
@@ -580,38 +570,25 @@ void loop() {
       Serial.println(WiFi.localIP());
     }
   }
+  while (enable_RTK && !ntripClient.connected()) {
+    Serial.println(F("Connecting to the NTRIP caster..."));
+    connectToNTRIP();
+    NTRIP_conn = 1;
+  }
+  if (!enable_RTK && ntripClient.connected()) {
+    ntripClient.stop();
+    NTRIP_conn = 0;
+  }
+
+
 
   myGNSS.checkUblox(); // Check for the arrival of new GNSS data and process it.
   myGNSS.checkCallbacks(); // Check if any GNSS callbacks are waiting to be processed.
 
+  processConnection();
 
-  lat_current = myGNSS.getLatitude() / 10000000.0;
-  lon_current = myGNSS.getLongitude() / 10000000.0;
-  //Serial.print(incrementor);
   //Serial.printf(":  lat: %.8f lon: %.8f", lat_current, lon_current);
-  //Serial.printf("phonelat: %.8f phonelon: %.8f\n", lat_phone, lon_phone);
-   // connectToNTRIP();
-  //readRTCM();
   incrementor++;
-
-
-if (!ntripClient.connected()) {
-      Serial.println(F("Connecting to the NTRIP caster..."));
-      if (beginClient()) // Try to open the connection to the caster
-      {
-        Serial.println(F("Connected to the NTRIP caster! Press any key to disconnect..."));
-      }
-      else
-      {
-        Serial.print(F("Could not connect to the caster. Trying again in 5 seconds."));
-        for (int i = 0; i < 5; i++)
-        {
-          delay(1000);
-          Serial.print(F("."));
-        }
-        Serial.println();
-      }
-}
 
   notifyClients();
   delay(1000);
