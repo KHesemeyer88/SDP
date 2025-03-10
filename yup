@@ -1,0 +1,45 @@
+#include "base64.h" //Built-in ESP32 library
+WiFiClient ntripClient;
+
+
+long lastReceivedRTCM_ms = 0;       //5 RTCM messages take approximately ~300ms to arrive at 115200bps
+int maxTimeBeforeHangup_ms = 10000; //If we fail to get a complete RTCM frame after 10s, then disconnect from caster
+
+bool transmitLocation = true;        //By default we will transmit the units location via GGA sentence.
+int timeBetweenGGAUpdate_ms = 10000; //GGA is required for Rev2 NTRIP casters. Don't transmit but once every 10 seconds
+long lastTransmittedGGA_ms = 0;
+
+//Used for GGA sentence parsing from incoming NMEA
+bool ggaSentenceStarted = false;
+bool ggaSentenceComplete = false;
+bool ggaTransmitComplete = false; //Goes true once we transmit GGA to the caster
+
+char ggaSentence[128] = {0};
+byte ggaSentenceSpot = 0;
+int ggaSentenceEndSpot = 0;
+
+
+void setup() {
+myGNSS.setI2COutput(COM_TYPE_UBX | COM_TYPE_NMEA);                                //Set the I2C port to output both NMEA and UBX messages
+myGNSS.setI2CInput(COM_TYPE_UBX | COM_TYPE_NMEA | COM_TYPE_RTCM3); //Be sure RTCM3 input is enabled. UBX + RTCM3 is not a valid state.
+myGNSS.setVal8(UBLOX_CFG_MSGOUT_NMEA_ID_GGA_I2C, 1); //Verify the GGA sentence is enabled on I2C
+
+
+WiFi.begin(ssid, password);
+Serial.println(WiFi.localIP());
+}
+
+void loop() {
+ while (enable_RTK && !ntripClient.connected()) {
+    Serial.println(F("Connecting to the NTRIP caster..."));
+    connectToNTRIP();
+  }
+  if (!enable_RTK && ntripClient.connected()) {
+    ntripClient.stop();
+  }
+
+  myGNSS.checkUblox(); // Check for the arrival of new GNSS data and process it.
+  myGNSS.checkCallbacks(); // Check if any GNSS callbacks are waiting to be processed.
+
+  processConnection();
+}
