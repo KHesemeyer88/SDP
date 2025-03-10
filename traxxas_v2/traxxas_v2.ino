@@ -167,7 +167,7 @@ void loop() {
           if (distance < WAYPOINT_REACHED_RADIUS) {
               handleWaypointReached();
           }
-          steeringAngle = applyObstacleAvoidance(steeringAngle);
+          //steeringAngle = applyObstacleAvoidance(steeringAngle);
           // Update pace control
           updatePaceControl();
           // Constrain and apply the steering angle
