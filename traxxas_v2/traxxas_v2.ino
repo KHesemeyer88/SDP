@@ -1,15 +1,11 @@
 /*
- * Autonomous car control with GPS navigation and obstacle avoidance.
+ This is the first pass at integrating RTK.
+ Switched to client mode from AP. 
+ On 3/11/25, tried field test. Car went nowhere near the WP, wild and erratic.
 
- * Broke out main file using modular structure with separate header files.
-
- * Obstacle detection and avoidance is not currently working well.
-
-  ** needs further testing on - 
-  ** average pace and instantaneous pace, both need improvement.
-  ** general improvements for pace tracking and correction. 
-
- * Last updated: 3/9/2025
+ To do:
+ (1) implement websockets
+ (2) investigate better RTK code that doesn't block while waiting for corrections.
  */
 
 #include <Arduino.h>
