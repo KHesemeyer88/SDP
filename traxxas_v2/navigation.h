@@ -5,7 +5,7 @@
 #include <SparkFun_u-blox_GNSS_v3.h>
 #include "config.h" // For constants like WAYPOINT_REACHED_RADIUS
 
-// External GNSS variables
+// External GPS variables
 extern SFE_UBLOX_GNSS myGPS;
 extern float targetLat, targetLon;
 extern float waypointLats[], waypointLons[];
@@ -33,6 +33,13 @@ extern volatile float currentLat, currentLon;
 extern volatile float currentSpeed;
 extern volatile uint8_t currentFixType;
 extern volatile bool newPVTDataAvailable;
+extern volatile int carrSoln;
+extern volatile double hAcc;
+
+unsigned long lastReceivedRTCM_ms = 0;          //5 RTCM messages take approximately ~300ms to arrive at 115200bps
+const unsigned long maxTimeBeforeHangup_ms = 10000UL; //If we fail to get a complete RTCM frame after 10s, then disconnect from caster
+bool transmitLocation = true;
+extern WiFiClient ntripClient;
 
 // Add this to the top of navigation.h
 void pvtCallback(UBX_NAV_PVT_data_t *pvtData);
@@ -48,23 +55,45 @@ void pvtCallback(UBX_NAV_PVT_data_t *pvtData)
     currentSpeed = pvtData->gSpeed / 1000.0;  // Convert from mm/s to m/s
     currentFixType = pvtData->fixType;
     
+    carrSoln = pvtData->flags.bits.carrSoln;
+    hAcc = pvtData->hAcc / 10.0; //cm
     // Set flag to indicate new data is available
     newPVTDataAvailable = true;
+}
+
+void pushGPGGA(NMEA_GGA_data_t *nmeaData) {
+  //Provide the caster with our current position as needed
+  if ((ntripClient.connected() == true) && (transmitLocation == true))
+  {
+    Serial.print(F("Pushing GGA to server: "));
+    Serial.print((const char *)nmeaData->nmea); // .nmea is printable (NULL-terminated) and already has \r\n on the end
+
+    //Push our current GGA sentence to caster
+    ntripClient.print((const char *)nmeaData->nmea);
+  }
 }
 
 // Initialize GPS module
 bool initializeGPS() {
     Wire.begin(32, 33);
     if (!myGPS.begin()) {
-        Serial.println("u-blox GNSS not detected. Check wiring.");
+        Serial.println("u-blox GPS not detected. Check wiring.");
         return false;
     }
     
-    Serial.println("GNSS module found!");
+    Serial.println("GPS module found!");
     
-    myGPS.setI2COutput(COM_TYPE_UBX);
+    //myGPS.setI2COutput(COM_TYPE_UBX);
     myGPS.setNavigationFrequency(NAV_FREQ);
     
+    myGPS.setI2CInput(COM_TYPE_UBX | COM_TYPE_NMEA | COM_TYPE_RTCM3); //Be sure RTCM3 input is enabled. UBX + RTCM3 is not a valid state.
+    myGPS.setDGNSSConfiguration(SFE_UBLOX_DGNSS_MODE_FIXED); // Set the differential mode - ambiguities are fixed whenever possible
+    //myGNSS.setNavigationFrequency(20); //Set output in Hz.
+      // Set the Main Talker ID to "GP". The NMEA GGA messages will be GPGGA instead of GNGGA
+    myGPS.setMainTalkerID(SFE_UBLOX_MAIN_TALKER_ID_GP);
+    myGPS.setNMEAGPGGAcallbackPtr(&pushGPGGA); // Set up the callback for GPGGA
+    myGPS.setVal8(UBLOX_CFG_MSGOUT_NMEA_ID_GGA_I2C, 20); // Tell the module to output GGA every 10 seconds
+
     // Enable the callback for PVT messages
     myGPS.setAutoPVTcallbackPtr(&pvtCallback);
     
@@ -348,5 +377,126 @@ void handleWaypointReached() {
       escServo.write(ESC_NEUTRAL);
     }
   }
+
+
+
+
+
+//Check for the arrival of any correction data. Push it to the GPS.
+//Return false if: the connection has dropped, or if we receive no data for maxTimeBeforeHangup_ms
+bool processConnection() {
+  if (ntripClient.connected() == true) // Check that the connection is still open
+  {
+    uint8_t rtcmData[512 * 4]; //Most incoming data is around 500 bytes but may be larger
+    size_t rtcmCount = 0;
+
+    //Collect any available RTCM data
+    while (ntripClient.available())
+    {
+      //Serial.write(ntripClient.read()); //Pipe to serial port is fine but beware, it's a lot of binary data!
+      rtcmData[rtcmCount++] = ntripClient.read();
+      if (rtcmCount == sizeof(rtcmData))
+        break;
+    }
+
+    if (rtcmCount > 0)
+    {
+      lastReceivedRTCM_ms = millis();
+
+      //Push RTCM to GPS module over I2C
+      myGPS.pushRawData(rtcmData, rtcmCount);
+      
+      // Serial.print(F("Pushed "));
+      // Serial.print(rtcmCount);
+      // Serial.println(F(" RTCM bytes to ZED"));
+    }
+  }
+  else
+  {
+    return (false); // Connection has dropped - return false
+  }  
+  
+  //Timeout if we don't have new data for maxTimeBeforeHangup_ms
+  if ((millis() - lastReceivedRTCM_ms) > maxTimeBeforeHangup_ms)
+  {
+    Serial.println(F("RTCM timeout!"));
+    return (false); // Connection has timed out - return false
+  }
+
+  return (true);
+}
+// Add this function to navigation.h - place it before the #endif
+bool connectToNTRIP() {
+  if (!ntripClient.connected()) {
+    Serial.print("Connecting to NTRIP caster: ");
+    Serial.println(casterHost);
+    
+    if (!ntripClient.connect(casterHost, casterPort)) {
+      Serial.println("Connection to caster failed");
+      return false;
+    }
+    
+    // Formulate the NTRIP request
+    char serverRequest[512];
+    snprintf(serverRequest, sizeof(serverRequest),
+           "GET /%s HTTP/1.0\r\n"
+           "User-Agent: NTRIP SparkFun u-blox Client v1.0\r\n"
+           "Accept: */*\r\n"
+           "Connection: close\r\n"
+           "Authorization: Basic %s\r\n"
+           "\r\n",
+           mountPoint, base64::encode(String(casterUser) + ":" + String(casterUserPW)).c_str());
+    
+    ntripClient.write(serverRequest, strlen(serverRequest));
+    
+    // Wait up to 5 seconds for response
+    unsigned long startTimeLocal = millis();
+    while (ntripClient.available() == 0) {
+      if (millis() > (startTimeLocal + 5000)) {
+        Serial.println("Caster timed out!");
+        ntripClient.stop();
+        return false;
+      }
+      delay(10);
+    }
+    
+    // Check reply
+    int connectionResult = 0;
+    char response[512];
+    size_t responseSpot = 0;
+    
+    while (ntripClient.available()) { // Read bytes from the caster and store them
+      if (responseSpot == sizeof(response) - 1) // Exit the loop if we get too much data
+        break;
+        
+      response[responseSpot++] = ntripClient.read();
+      
+      if (connectionResult == 0) { // Only print success/fail once
+        if (strstr(response, "200") != nullptr) { //Look for '200 OK'
+          connectionResult = 200;
+        }
+        if (strstr(response, "401") != nullptr) { //Look for '401 Unauthorized'
+          Serial.println("Hey - your credentials look bad! Check your caster username and password.");
+          connectionResult = 401;
+        }
+      }
+    }
+    
+    response[responseSpot] = '\0'; // NULL-terminate the response
+    
+    if (connectionResult != 200) {
+      Serial.print("Failed to connect to ");
+      Serial.println(casterHost);
+      return false;
+    } else {
+      Serial.print("Connected to: ");
+      Serial.println(casterHost);
+      lastReceivedRTCM_ms = millis(); // Reset timeout
+      return true;
+    }
+  }
+  
+  return true; // Already connected
+}
 
 #endif // NAVIGATION_H

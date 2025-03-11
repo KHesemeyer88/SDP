@@ -1,5 +1,5 @@
 /*
- * Autonomous car control with GNSS navigation and obstacle avoidance.
+ * Autonomous car control with GPS navigation and obstacle avoidance.
 
  * Broke out main file using modular structure with separate header files.
 
@@ -83,6 +83,9 @@ volatile float currentSpeed;
 volatile uint8_t currentFixType;
 volatile bool newPVTDataAvailable;
 
+volatile int carrSoln;
+volatile double hAcc;
+
 // Initial straight-line phase variables
 bool initialStraightPhase = false;
 unsigned long straightPhaseStartTime = 0;
@@ -127,7 +130,9 @@ void setup() {
   }
   
   // Setup WiFi as an access point
-  WiFi.softAP(ssid, password);
+  //WiFi.softAP(ssid, password);
+  // hotspot setup:
+  WiFi.begin(ssid, password);
   
   // Setup web server routes and start the server
   setupWebServerRoutes();
@@ -135,7 +140,7 @@ void setup() {
 }
 
 void loop() {
-  // Process incoming GNSS messages
+  // Process incoming GPS messages
   myGPS.checkUblox();  // Check for the arrival of new data and process it
   myGPS.checkCallbacks(); // Check if any callbacks are waiting to be processed
   
@@ -143,11 +148,26 @@ void loop() {
   unsigned long currentTime = millis();
   
   // Safety check: if no clients connected to the AP, stop the vehicle
-  if (WiFi.softAPgetStationNum() == 0) {
-      autonomousMode = false;
-      escServo.write(ESC_NEUTRAL);
-      steeringServo.write(STEERING_CENTER);
+  // if (WiFi.softAPgetStationNum() == 0) {
+  //     autonomousMode = false;
+  //     escServo.write(ESC_NEUTRAL);
+  //     steeringServo.write(STEERING_CENTER);
+  // }
+  while (WiFi.status() != WL_CONNECTED) {
+    // WiFi.begin(ssid, password); take new ssid & pass for other users
+    Serial.println("Stop car... Connecting to WiFi...");
+
+    delay(500);
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.printf("Connected to %s\nESP32 IP Address: ", ssid);
+      Serial.println(WiFi.localIP());
+    }
   }
+  while (!ntripClient.connected()) {
+    connectToNTRIP();
+  }
+
+  processConnection();
 
   // Check for command staleness in manual mode
   if (!autonomousMode && (currentTime - lastCommandTime > COMMAND_TIMEOUT_MS)) {
@@ -166,7 +186,7 @@ void loop() {
   // do autonomous navigation if in auto mode:
   if (autonomousMode) { //only update status messages in auto mode
       updateStatusMessages();
-      // only do navigation in auto mode with good GNSS fix
+      // only do navigation in auto mode with good GPS fix
       if (currentFixType > 0 ) {
           // Calculate distance to target and base steering angle
           float distance = calculateDistance(currentLat, currentLon, targetLat, targetLon);

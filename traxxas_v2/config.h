@@ -7,6 +7,8 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <SparkFun_u-blox_GNSS_v3.h>
+#include "base64.h" //Built-in ESP32 library
+#include <WiFiClient.h>
 
 // Pin Definitions
 const int STEERING_PIN = 5;   // GPIO5 for steering servo
@@ -35,8 +37,21 @@ const int TURN_ANGLE = 20;       // Angle to turn
 const int TRIM_ANGLE = 2; //car lists left
 
 // WiFi settings
-const char* ssid = "RC_Car_Control";
-const char* password = "12345678";
+// const char* ssid = "RC_Car_Control";
+// const char* password = "12345678";
+// Hotspot:
+const char ssid[] = "Kians iPhone";
+const char password[] = "Dove'sHamster";
+
+// const char ssid[] = "Galaxy XCover FieldPro8858";
+// const char password[] = "bugo4303";
+
+// MaCORS
+const char casterHost[] = "macorsrtk.massdot.state.ma.us"; 
+const char casterUser[] = "KHesemeyer88";
+const char casterUserPW[] = "kN7?6jtG9YiNMgD@";
+const uint16_t casterPort = 32000;
+const char mountPoint[] = "RTCM3MSM_MAGS"; // RTCM 3.2 MSM_MAXX(GNSS) MAGS
 
 // Timing constants
 const unsigned long COMMAND_TIMEOUT_MS = 500;
@@ -105,5 +120,7 @@ extern unsigned long lastDistanceUpdate;
 extern bool initialStraightPhase;
 extern unsigned long straightPhaseStartTime;
 extern const unsigned long STRAIGHT_PHASE_DURATION;
+
+WiFiClient ntripClient;
 
 #endif // CONFIG_H
