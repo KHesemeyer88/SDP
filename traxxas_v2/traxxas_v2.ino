@@ -1,15 +1,5 @@
 /*
- * Autonomous car control with GNSS navigation and obstacle avoidance.
-
- * Broke out main file using modular structure with separate header files.
-
- * Obstacle detection and avoidance is not currently working well.
-
-  ** needs further testing on - 
-  ** average pace and instantaneous pace, both need improvement.
-  ** general improvements for pace tracking and correction. 
-
- * Last updated: 3/9/2025
+This is the code we used for CDR demo
  */
 
 #include <Arduino.h>
