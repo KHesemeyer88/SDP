@@ -165,6 +165,12 @@ const char webPage[] PROGMEM = R"rawliteral(
     </div>
 
 <script>
+        // WebSocket connection
+        let ws;
+        let wsConnected = false;
+        let reconnectInterval;
+        const WS_RECONNECT_INTERVAL = 3000; // 3 seconds between reconnect attempts
+
         const canvas = document.getElementById('joystick');
         const ctx = canvas.getContext('2d');
         const joystickSize = 150;
@@ -326,6 +332,10 @@ const char webPage[] PROGMEM = R"rawliteral(
             handleEnd();
         });
 
+        document.addEventListener('DOMContentLoaded', function() {
+            initWebSocket();
+        });
+
         function handleMouseMove(e) {
             const rect = canvas.getBoundingClientRect();
             const mouseX = e.clientX - rect.left;
@@ -375,8 +385,20 @@ const char webPage[] PROGMEM = R"rawliteral(
 
         function sendUpdate() {
             const { normalizedY, normalizedX } = calculateValues();
-            fetch(`/control?vertical=${normalizedY}&horizontal=${normalizedX}`)
-                .catch((e) => console.error('Error:', e));
+            
+            if (wsConnected) {
+                // Send over WebSocket if connected
+                ws.send(JSON.stringify({
+                    control: {
+                        vertical: normalizedY,
+                        horizontal: normalizedX
+                    }
+                }));
+            } else {
+                // Fall back to HTTP if WebSocket is not connected
+                fetch(`/control?vertical=${normalizedY}&horizontal=${normalizedX}`)
+                    .catch((e) => console.error('Error:', e));
+            }
         }
 
         function updateSensorReadings() {
@@ -396,6 +418,51 @@ const char webPage[] PROGMEM = R"rawliteral(
                     }
                 })
                 .catch(console.error);
+        }
+
+        // Initialize WebSocket connection
+        function initWebSocket() {
+            // Get current location host and use it to build WebSocket URL
+            const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${wsProtocol}//${window.location.hostname}:81`;
+            
+            console.log(`Connecting to WebSocket at ${wsUrl}`);
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function(evt) {
+                console.log('WebSocket connected');
+                wsConnected = true;
+                clearInterval(reconnectInterval);
+                // Add a connected indicator to the UI
+            };
+            
+            ws.onclose = function(evt) {
+                console.log('WebSocket disconnected');
+                wsConnected = false;
+                // Start reconnection attempts
+                if (!reconnectInterval) {
+                    reconnectInterval = setInterval(initWebSocket, WS_RECONNECT_INTERVAL);
+                }
+            };
+            
+            ws.onerror = function(evt) {
+                console.error('WebSocket error:', evt);
+            };
+            
+            ws.onmessage = function(evt) {
+                try {
+                    const data = JSON.parse(evt.data);
+                    // Handle different message types
+                    if (data.type === "sensors") {
+                        updateSensorDisplay(data);
+                    } else if (data.type === "gps") {
+                        updateGPSDisplay(data);
+                    }
+                    // Add more handlers as needed
+                } catch (e) {
+                    console.error('Error parsing WebSocket message:', e);
+                }
+            };
         }
 
         // Start sensor polling only in manual mode (initial state)

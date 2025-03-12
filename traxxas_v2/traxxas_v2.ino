@@ -21,6 +21,7 @@
 #include "navigation.h"
 #include "webhandlers.h"
 #include "webpage.h"
+#include "websocket_handler.h" 
 
 // Global objects
 WebServer server(80);
@@ -91,7 +92,6 @@ bool initialStraightPhase = false;
 unsigned long straightPhaseStartTime = 0;
 const unsigned long STRAIGHT_PHASE_DURATION = 1000; // initial straight phase
 
-
 void setup() {
   Serial.begin(115200);
   delay(1000); // Give serial more time to stabilize
@@ -151,6 +151,7 @@ void setup() {
   
   // Setup web server
   setupWebServerRoutes();
+  initWebSockets();
   server.begin();
   Serial.println("Web server started");
   
@@ -191,6 +192,8 @@ void loop() {
   // }
   while (WiFi.status() != WL_CONNECTED) {
     server.handleClient(); // Process web requests while waiting
+    webSocket.loop();
+    updateWebSocketClients();
     // WiFi.begin(ssid, password); take new ssid & pass for other users
     delay(100);
 
@@ -225,6 +228,8 @@ void loop() {
 
   // handle web requests
   server.handleClient();
+  webSocket.loop();
+  updateWebSocketClients();
 
   // ALWAYS update sonar readings
   updateSonarReadings();
