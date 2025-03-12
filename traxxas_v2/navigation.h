@@ -41,6 +41,9 @@ const unsigned long maxTimeBeforeHangup_ms = 10000UL; //If we fail to get a comp
 bool transmitLocation = true;
 extern WiFiClient ntripClient;
 
+extern volatile CorrectionStatus rtcmCorrectionStatus;
+extern unsigned long correctionAge;
+
 // Add this to the top of navigation.h
 void pvtCallback(UBX_NAV_PVT_data_t *pvtData);
 
@@ -65,8 +68,8 @@ void pushGPGGA(NMEA_GGA_data_t *nmeaData) {
   //Provide the caster with our current position as needed
   if ((ntripClient.connected() == true) && (transmitLocation == true))
   {
-    Serial.print(F("Pushing GGA to server: "));
-    Serial.print((const char *)nmeaData->nmea); // .nmea is printable (NULL-terminated) and already has \r\n on the end
+    //Serial.print(F("Pushing GGA to server: "));
+    //Serial.print((const char *)nmeaData->nmea); // .nmea is printable (NULL-terminated) and already has \r\n on the end
 
     //Push our current GGA sentence to caster
     ntripClient.print((const char *)nmeaData->nmea);
@@ -200,25 +203,34 @@ void clearWaypoints() {
 }
 
 // Calculate steering angle based on heading error (simple proportional control)
-int calculateSteeringAngle(float currentLat, float currentLon) {
-    if(!initialStraightPhase){
-        float distance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
-        float bearing = calculateBearing(currentLat, currentLon, targetLat, targetLon);
-        float currentHeading = myGPS.getHeading() / 100000.0;  // Still need to poll for heading
-        
-        float headingError = bearing - currentHeading;
-        if (headingError > 180)
-            headingError -= 360;
-        
-        if (headingError < -180)
-            headingError += 360;
-        
-        int steeringAngle = STEERING_CENTER + (headingError * 0.35);
-
-        return steeringAngle;
+// In your navigation code where you calculate steering
+float calculateSteeringAngle(float currentLat, float currentLon) {
+    // Adjust proportional gain based on correction quality
+    float correctionFactor = 0.35; // Default value
+    
+    if (rtcmCorrectionStatus == CORR_FRESH) {
+        // Full confidence in position - use normal gain
+        correctionFactor = 0.35;
+    } else if (rtcmCorrectionStatus == CORR_STALE) {
+        // Reduced confidence - use more conservative steering
+        correctionFactor = 0.25;
     } else {
-        return STEERING_CENTER + TRIM_ANGLE;
+        // No corrections - use very conservative steering
+        correctionFactor = 0.15;
     }
+    
+    // Your existing bearing/heading calculation
+    float distance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
+    float bearing = calculateBearing(currentLat, currentLon, targetLat, targetLon);
+    float currentHeading = myGPS.getHeading() / 100000.0;
+    
+    float headingError = bearing - currentHeading;
+    if (headingError > 180) headingError -= 360;
+    if (headingError < -180) headingError += 360;
+    
+    int steeringAngle = STEERING_CENTER + (headingError * correctionFactor);
+    
+    return steeringAngle;
 }
 
 // Only adjust speed if we have a target pace and no obstacle avoidance active
@@ -385,47 +397,51 @@ void handleWaypointReached() {
 //Check for the arrival of any correction data. Push it to the GPS.
 //Return false if: the connection has dropped, or if we receive no data for maxTimeBeforeHangup_ms
 bool processConnection() {
-  if (ntripClient.connected() == true) // Check that the connection is still open
-  {
-    uint8_t rtcmData[512 * 4]; //Most incoming data is around 500 bytes but may be larger
-    size_t rtcmCount = 0;
-
-    //Collect any available RTCM data
-    while (ntripClient.available())
-    {
-      //Serial.write(ntripClient.read()); //Pipe to serial port is fine but beware, it's a lot of binary data!
-      rtcmData[rtcmCount++] = ntripClient.read();
-      if (rtcmCount == sizeof(rtcmData))
-        break;
-    }
-
-    if (rtcmCount > 0)
-    {
-      lastReceivedRTCM_ms = millis();
-
-      //Push RTCM to GPS module over I2C
-      myGPS.pushRawData(rtcmData, rtcmCount);
-      
-      // Serial.print(F("Pushed "));
-      // Serial.print(rtcmCount);
-      // Serial.println(F(" RTCM bytes to ZED"));
-    }
+  if (!ntripClient.connected()) {
+    return false;
   }
-  else
-  {
-    return (false); // Connection has dropped - return false
-  }  
   
-  //Timeout if we don't have new data for maxTimeBeforeHangup_ms
-  if ((millis() - lastReceivedRTCM_ms) > maxTimeBeforeHangup_ms)
-  {
-    Serial.println(F("RTCM timeout!"));
-    return (false); // Connection has timed out - return false
+  if (ntripClient.available()) {
+    // Create a buffer large enough to hold multiple RTCM messages
+    uint8_t rtcmBuffer[512*4];
+    size_t rtcmCount = 0;
+    
+    // Collect all available RTCM data
+    while (ntripClient.available() && rtcmCount < sizeof(rtcmBuffer)) {
+      rtcmBuffer[rtcmCount++] = ntripClient.read();
+    }
+    
+    if (rtcmCount > 0) {
+      // Update the timestamp for when we last received any correction data
+      lastReceivedRTCM_ms = millis();
+      
+      // Push all collected data to the GPS module at once
+      myGPS.pushRawData(rtcmBuffer, rtcmCount);
+      
+      Serial.print("Pushed ");
+      Serial.print(rtcmCount);
+      Serial.println(" RTCM bytes to GPS");
+    }
+  }
+  
+  // Check for timeout, but don't block - just report status
+  if ((millis() - lastReceivedRTCM_ms) > maxTimeBeforeHangup_ms) {
+    return false;
   }
 
-  return (true);
+  // Update correction status based on age
+  correctionAge = millis() - lastReceivedRTCM_ms;
+  if (correctionAge < 5000) { // Less than 5 seconds old
+    rtcmCorrectionStatus = CORR_FRESH;
+  } else if (correctionAge < 30000) { // Less than 30 seconds old
+    rtcmCorrectionStatus = CORR_STALE;
+  } else {
+    rtcmCorrectionStatus = CORR_NONE;
+  }
+  
+  return true;
 }
-// Add this function to navigation.h - place it before the #endif
+
 bool connectToNTRIP() {
   if (!ntripClient.connected()) {
     Serial.print("Connecting to NTRIP caster: ");

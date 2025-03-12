@@ -82,6 +82,10 @@ volatile bool newPVTDataAvailable;
 volatile int carrSoln;
 volatile double hAcc;
 
+volatile CorrectionStatus rtcmCorrectionStatus = CORR_NONE;
+unsigned long correctionAge = 0;
+
+
 // Initial straight-line phase variables
 bool initialStraightPhase = false;
 unsigned long straightPhaseStartTime = 0;
@@ -90,51 +94,87 @@ const unsigned long STRAIGHT_PHASE_DURATION = 1000; // initial straight phase
 
 void setup() {
   Serial.begin(115200);
+  delay(1000); // Give serial more time to stabilize
+  Serial.println("\n\nRC Car starting up...");
   
   // Initialize sonar sensors
   initializeSonar();
+  delay(100);
   
-  // Allocate timers for the servo library
+  // Servo setup with delays between operations
   ESP32PWM::allocateTimer(0);
   ESP32PWM::allocateTimer(1);
   ESP32PWM::allocateTimer(2);
   ESP32PWM::allocateTimer(3);
+  delay(100);
   
-  // Configure servo objects
   steeringServo.setPeriodHertz(50);
   escServo.setPeriodHertz(50);
+  delay(100);
   
   steeringServo.attach(STEERING_PIN, 1000, 2000);
   escServo.attach(ESC_PIN, 1000, 2000);
+  delay(100);
   
   // Initialize ESC to neutral and allow time to initialize
   escServo.write(ESC_NEUTRAL);
-  delay(3000);
+  Serial.println("Servos initialized, waiting for ESC...");
+  delay(2000);
   
   // Center steering
   steeringServo.write(STEERING_CENTER);
+  delay(100);
   
-  // Initialize GPS
-  if (!initializeGPS()) {
-    while(1){
-        Serial.println("GPS initialization failed!");
-        delay(1000);
-        if(initializeGPS()){
-          break;
-        }
-    }
-  }
-  
-  // Setup WiFi as an access point
-  //WiFi.softAP(ssid, password);
-  // hotspot setup:
+  // Setup WiFi first to get IP address
+  Serial.printf("Connecting to WiFi network: %s\n", ssid);
   WiFi.begin(ssid, password);
   
-  // Setup web server routes and start the server
+  // Wait for connection with timeout
+  int wifiTimeout = 0;
+  while (WiFi.status() != WL_CONNECTED && wifiTimeout < 20) {
+    delay(500);
+    Serial.print(".");
+    wifiTimeout++;
+  }
+  
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println();
+    Serial.printf("Connected to %s\n", ssid);
+    Serial.print("ESP32 IP Address: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println();
+    Serial.println("Failed to connect to WiFi");
+  }
+  
+  delay(500); // Extra delay before web server setup
+  
+  // Setup web server
   setupWebServerRoutes();
   server.begin();
+  Serial.println("Web server started");
+  
+  delay(500); // Extra delay before GNSS init
+  
+  // Initialize GNSS
+  Serial.println("Initializing GPS...");
+  if (!initializeGPS()) {
+    Serial.println("GNSS initialization failed. Will retry in loop");
+    while(1) {
+      server.handleClient(); // Process web requests while waiting
+      Serial.println("Retrying GNSS initialization...");
+      delay(1000);
+      if (initializeGPS()){
+        Serial.println("GNSS initialized successfully");
+        break;
+      }
+    }
+  } else {
+    Serial.println("GNSS initialized successfully");
+  }
+  
+  Serial.println("Setup complete. Entering main loop.");
 }
-
 void loop() {
   // Process incoming GPS messages
   myGPS.checkUblox();  // Check for the arrival of new data and process it
@@ -150,20 +190,32 @@ void loop() {
   //     steeringServo.write(STEERING_CENTER);
   // }
   while (WiFi.status() != WL_CONNECTED) {
+    server.handleClient(); // Process web requests while waiting
     // WiFi.begin(ssid, password); take new ssid & pass for other users
-    Serial.println("Stop car... Connecting to WiFi...");
+    delay(100);
 
-    delay(500);
+    Serial.println("Stop car... Connecting to WiFi...");
     if (WiFi.status() == WL_CONNECTED) {
       Serial.printf("Connected to %s\nESP32 IP Address: ", ssid);
       Serial.println(WiFi.localIP());
     }
   }
-  while (!ntripClient.connected()) {
-    connectToNTRIP();
+  if (!ntripClient.connected()) {
+      connectToNTRIP();
   }
 
-  processConnection();
+  // Try to process RTK connection but don't block if not available
+  bool rtcmStatus = false;
+  if (ntripClient.connected()) {
+    rtcmStatus = processConnection();
+  } else if (WiFi.status() == WL_CONNECTED) {
+    // Try reconnecting to NTRIP occasionally, but don't block
+    static unsigned long lastReconnectAttempt = 0;
+    if (millis() - lastReconnectAttempt > 1000) { // Try every 1 seconds
+      lastReconnectAttempt = millis();
+      connectToNTRIP();
+    }
+  }
 
   // Check for command staleness in manual mode
   if (!autonomousMode && (currentTime - lastCommandTime > COMMAND_TIMEOUT_MS)) {

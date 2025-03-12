@@ -252,6 +252,30 @@ void setupWebServerRoutes() {
         }
         server.send(200, "application/json", json);
     });
+
+    server.on("/status", HTTP_GET, []() {
+        String correctionStatus;
+        unsigned long age = millis() - lastReceivedRTCM_ms;
+        
+        if (rtcmCorrectionStatus == CORR_FRESH) {
+            correctionStatus = "Fresh";
+        } else if (rtcmCorrectionStatus == CORR_STALE) {
+            correctionStatus = "Stale";
+        } else {
+            correctionStatus = "None";
+        }
+        
+        String json = "{\"rtk\":{";
+        json += "\"status\":\"" + correctionStatus + "\",";
+        json += "\"age\":" + String(age) + ",";
+        json += "\"connected\":" + String(ntripClient.connected() ? "true" : "false") + ",";
+        json += "\"carrSoln\":" + String(carrSoln) + ",";
+        json += "\"hAcc\":" + String(hAcc, 2) + ",";
+        json += "\"fixType\":" + String(currentFixType);
+        json += "}}";
+        
+        server.send(200, "application/json", json);
+    });
 }
 
 #endif // WEBHANDLERS_H

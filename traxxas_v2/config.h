@@ -40,11 +40,11 @@ const int TRIM_ANGLE = 2; //car lists left
 // const char* ssid = "RC_Car_Control";
 // const char* password = "12345678";
 // Hotspot:
-const char ssid[] = "Kians iPhone";
-const char password[] = "Dove'sHamster";
+//const char ssid[] = "Kians iPhone";
+//const char password[] = "Dove'sHamster";
 
-// const char ssid[] = "Galaxy XCover FieldPro8858";
-// const char password[] = "bugo4303";
+const char ssid[] = "Galaxy XCover FieldPro8858";
+const char password[] = "bugo4303";
 
 // MaCORS
 const char casterHost[] = "macorsrtk.massdot.state.ma.us"; 
@@ -62,7 +62,7 @@ const unsigned long DESTINATION_MESSAGE_TIMEOUT = 5000;  // 5 seconds
 // Navigation constants
 const float WAYPOINT_REACHED_RADIUS = 2.0; //meters
 const int MAX_WAYPOINTS = 20;
-const int NAV_FREQ = 30;
+const int NAV_FREQ = 10;
 
 // Sonar filtering
 const int FILTER_SAMPLES = 5;  // Number of samples to average
@@ -120,6 +120,13 @@ extern unsigned long lastDistanceUpdate;
 extern bool initialStraightPhase;
 extern unsigned long straightPhaseStartTime;
 extern const unsigned long STRAIGHT_PHASE_DURATION;
+
+// RTK Correction status tracking
+enum CorrectionStatus {
+  CORR_NONE,
+  CORR_STALE,
+  CORR_FRESH
+};
 
 WiFiClient ntripClient;
 

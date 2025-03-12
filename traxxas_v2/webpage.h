@@ -148,6 +148,14 @@ const char webPage[] PROGMEM = R"rawliteral(
                         <p>Time: <span id="elapsed-time">00:00:00</span></p>
                     </div>
                 </div>
+                <div id="rtk-status-panel" style="margin-top: 20px; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
+                    <p>Correction Status: <span id="rtk-correction-status">Unknown</span></p>
+                    <p>Correction Age: <span id="rtk-correction-age">--</span> ms</p>
+                    <p>RTK Connection: <span id="rtk-connected">--</span></p>
+                    <p>RTK Solution: <span id="rtk-solution">--</span></p>
+                    <p>Horizontal Accuracy: <span id="rtk-hacc">--</span> cm</p>
+                    <p>Fix Type: <span id="rtk-fix-type">--</span></p>
+                </div>
             </div>
                         
             <div id="avoidance-alert" style="display: none; margin-top: 10px; padding: 10px; background-color: #ffc107; border-radius: 4px;"></div>
@@ -437,6 +445,62 @@ const char webPage[] PROGMEM = R"rawliteral(
                     })
                     .catch(console.error);
             }
+        }, 1000);
+
+        // RTK status
+        setInterval(() => {
+            fetch('/status')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('rtk-correction-status').textContent = data.rtk.status;
+                    document.getElementById('rtk-correction-age').textContent = data.rtk.age;
+                    document.getElementById('rtk-connected').textContent = data.rtk.connected ? 'Connected' : 'Disconnected';
+                    
+                    // Display RTK solution status
+                    if (data.rtk.carrSoln !== undefined) {
+                        let solutionText = 'None';
+                        if (data.rtk.carrSoln === 1) solutionText = 'Float';
+                        if (data.rtk.carrSoln === 2) solutionText = 'Fixed';
+                        document.getElementById('rtk-solution').textContent = solutionText;
+                    }
+                    
+                    // Display horizontal accuracy (hAcc)
+                    if (data.rtk.hAcc !== undefined) {
+                        document.getElementById('rtk-hacc').textContent = data.rtk.hAcc.toFixed(2);
+                    }
+                    
+                    // Display fix type
+                    if (data.rtk.fixType !== undefined) {
+                        let fixTypeText = 'No Fix';
+                        if (data.rtk.fixType === 1) fixTypeText = '1 (Dead Reckoning)';
+                        if (data.rtk.fixType === 2) fixTypeText = '2 (2D)';
+                        if (data.rtk.fixType === 3) fixTypeText = '3 (3D)';
+                        if (data.rtk.fixType === 4) fixTypeText = '4 (GNSS + Dead Reckoning)';
+                        if (data.rtk.fixType === 5) fixTypeText = '5 (Time Only)';
+                        document.getElementById('rtk-fix-type').textContent = fixTypeText;
+                    }
+                    
+                    // Color coding for different statuses
+                    const statusElement = document.getElementById('rtk-correction-status');
+                    if (data.rtk.status === 'Fresh') {
+                        statusElement.style.color = 'green';
+                    } else if (data.rtk.status === 'Stale') {
+                        statusElement.style.color = 'orange';
+                    } else {
+                        statusElement.style.color = 'red';
+                    }
+                    
+                    // Color coding for RTK solution
+                    const solutionElement = document.getElementById('rtk-solution');
+                    if (data.rtk.carrSoln === 2) {
+                        solutionElement.style.color = 'green'; // Fixed solution
+                    } else if (data.rtk.carrSoln === 1) {
+                        solutionElement.style.color = 'orange'; // Float solution
+                    } else {
+                        solutionElement.style.color = 'red'; // No RTK solution
+                    }
+                })
+                .catch(console.error);
         }, 1000);
 
         function getFusionStatus() {
