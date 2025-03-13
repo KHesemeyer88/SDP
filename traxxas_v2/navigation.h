@@ -391,9 +391,6 @@ void handleWaypointReached() {
   }
 
 
-
-
-
 //Check for the arrival of any correction data. Push it to the GPS.
 //Return false if: the connection has dropped, or if we receive no data for maxTimeBeforeHangup_ms
 bool processConnection() {

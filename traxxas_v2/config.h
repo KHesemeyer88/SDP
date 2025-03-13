@@ -22,8 +22,8 @@ const int TRIGGER_PIN_RIGHT = 19;
 const int ECHO_PIN_RIGHT = 21;
 
 // Sonar thresholds (cm)
-const int FRONT_STOP_THRESHOLD = 0; // zero to suppress obst. avoidance
-const int SIDE_AVOID_THRESHOLD = 0;
+const int FRONT_STOP_THRESHOLD = 150; // zero to suppress obst. avoidance
+const int SIDE_AVOID_THRESHOLD = 50;
 
 // Traxxas XL-2.5 ESC & servo values. Note ESC takes angles like a servo, but converts them to speed
 const int ESC_NEUTRAL = 90;     // Neutral position (1.5ms pulse)

@@ -204,21 +204,12 @@ const char webPage[] PROGMEM = R"rawliteral(
                 document.getElementById('auto-btn').className = 'inactive';
                 document.getElementById('manual-gps-data').style.display = 'block';
                 stopAutonomousMode();
-                // Start sensor polling in manual mode
-                if (sensorPollingInterval === null) {
-                    sensorPollingInterval = setInterval(updateSensorReadings, 500);
-                }
             } else {
                 document.getElementById('manual-control').style.display = 'none';
                 document.getElementById('autonomous-control').style.display = 'block';
                 document.getElementById('manual-btn').className = 'inactive';
                 document.getElementById('auto-btn').className = 'active';
                 document.getElementById('manual-gps-data').style.display = 'none';
-                // Stop sensor polling in autonomous mode
-                if (sensorPollingInterval !== null) {
-                    clearInterval(sensorPollingInterval);
-                    sensorPollingInterval = null;
-                }
             }
         }
 
@@ -227,61 +218,99 @@ const char webPage[] PROGMEM = R"rawliteral(
             const targetPace = document.getElementById('target-pace').value;
             const targetDistance = document.getElementById('target-distance').value;
             
-            let url = '/setDestination';
-            const params = [];
-            
-            if (coordsInput) {
-                const coords = coordsInput.split(',').map(coord => coord.trim());
-                if (coords.length !== 2 || isNaN(coords[0]) || isNaN(coords[1])) {
-                    alert('Please enter valid coordinates or clear input to use recorded waypoint');
-                    return;
+            if (wsConnected) {
+                // Build command object
+                const command = {
+                    autonomous: "start",
+                    pace: parseFloat(targetPace),
+                    distance: parseFloat(targetDistance)
+                };
+                
+                // Add coordinates if provided
+                if (coordsInput) {
+                    const coords = coordsInput.split(',').map(coord => coord.trim());
+                    if (coords.length !== 2 || isNaN(coords[0]) || isNaN(coords[1])) {
+                        alert('Please enter valid coordinates or clear input to use recorded waypoint');
+                        return;
+                    }
+                    command.lat = parseFloat(coords[0]);
+                    command.lng = parseFloat(coords[1]);
                 }
-                params.push(`lat=${coords[0]}`);
-                params.push(`lng=${coords[1]}`);
+                
+                // Send command via WebSocket
+                ws.send(JSON.stringify(command));
+                
+                // Reset UI elements
+                document.getElementById('total-distance').textContent = '0.0';
+                document.getElementById('current-pace').textContent = '0.0';
+                document.getElementById('average-pace').textContent = '0.0';
+                document.getElementById('elapsed-time').textContent = '00:00:00';
+            } else {
+                // Fall back to HTTP if WebSocket is not connected
+                let url = '/setDestination';
+                const params = [];
+                
+                if (coordsInput) {
+                    const coords = coordsInput.split(',').map(coord => coord.trim());
+                    if (coords.length !== 2 || isNaN(coords[0]) || isNaN(coords[1])) {
+                        alert('Please enter valid coordinates or clear input to use recorded waypoint');
+                        return;
+                    }
+                    params.push(`lat=${coords[0]}`);
+                    params.push(`lng=${coords[1]}`);
+                }
+                
+                params.push(`pace=${targetPace}`);
+                params.push(`distance=${targetDistance}`);
+                
+                if (params.length > 0) {
+                    url += '?' + params.join('&');
+                }
+                
+                fetch(url)
+                    .then(response => response.text())
+                    .then(result => {
+                        console.log('Navigation started:', result);
+                        document.getElementById('total-distance').textContent = '0.0';
+                        document.getElementById('current-pace').textContent = '0.0';
+                        document.getElementById('average-pace').textContent = '0.0';
+                        document.getElementById('elapsed-time').textContent = '00:00:00';
+                    })
+                    .catch(error => {
+                        console.error('Error starting navigation:', error);
+                        alert('Failed to start navigation');
+                    });
             }
-            
-            params.push(`pace=${targetPace}`);
-            params.push(`distance=${targetDistance}`);
-            
-            if (params.length > 0) {
-                url += '?' + params.join('&');
-            }
-            
-            fetch(url)
-                .then(response => response.text())
-                .then(result => {
-                    console.log('Navigation started:', result);
-                    document.getElementById('total-distance').textContent = '0.0';
-                    document.getElementById('current-pace').textContent = '0.0';
-                    document.getElementById('average-pace').textContent = '0.0';
-                    document.getElementById('elapsed-time').textContent = '00:00:00';
-                })
-                .catch(error => {
-                    console.error('Error starting navigation:', error);
-                    alert('Failed to start navigation');
-                });
         }
 
         function stopAutonomousMode() {
-            fetch('/stopNavigation')
-                .then(response => response.text())
-                .then(result => {
-                    console.log('Navigation stopped:', result);
-                })
-                .catch(error => {
-                    console.error('Error stopping navigation:', error);
-                });
+            if (wsConnected) {
+                ws.send(JSON.stringify({ autonomous: "stop" }));
+            } else {
+                fetch('/stopNavigation')
+                    .then(response => response.text())
+                    .then(result => {
+                        console.log('Navigation stopped:', result);
+                    })
+                    .catch(error => {
+                        console.error('Error stopping navigation:', error);
+                    });
+            }
         }
 
         function resetTracking() {
-            fetch('/resetTracking')
-                .then(response => response.text())
-                .then(result => {
-                    console.log('Tracking reset:', result);
-                })
-                .catch(error => {
-                    console.error('Error resetting tracking:', error);
-                });
+            if (wsConnected) {
+                ws.send(JSON.stringify({ tracking: "reset" }));
+            } else {
+                fetch('/resetTracking')
+                    .then(response => response.text())
+                    .then(result => {
+                        console.log('Tracking reset:', result);
+                    })
+                    .catch(error => {
+                        console.error('Error resetting tracking:', error);
+                    });
+            }
         }
 
         function formatTime(ms) {
@@ -292,6 +321,56 @@ const char webPage[] PROGMEM = R"rawliteral(
             return String(hours).padStart(2, '0') + ':' +
                   String(minutes).padStart(2, '0') + ':' +
                   String(seconds).padStart(2, '0');
+        }
+
+        function updateRTKDisplay(data) {
+            document.getElementById('rtk-correction-status').textContent = data.status;
+            document.getElementById('rtk-correction-age').textContent = data.age;
+            document.getElementById('rtk-connected').textContent = data.connected ? 'Connected' : 'Disconnected';
+            
+            // Display RTK solution status
+            if (data.carrSoln !== undefined) {
+                let solutionText = 'None';
+                if (data.carrSoln === 1) solutionText = 'Float';
+                if (data.carrSoln === 2) solutionText = 'Fixed';
+                document.getElementById('rtk-solution').textContent = solutionText;
+            }
+            
+            // Display horizontal accuracy (hAcc)
+            if (data.hAcc !== undefined) {
+                document.getElementById('rtk-hacc').textContent = data.hAcc.toFixed(2);
+            }
+            
+            // Display fix type
+            if (data.fixType !== undefined) {
+                let fixTypeText = 'No Fix';
+                if (data.fixType === 1) fixTypeText = '1 (Dead Reckoning)';
+                if (data.fixType === 2) fixTypeText = '2 (2D)';
+                if (data.fixType === 3) fixTypeText = '3 (3D)';
+                if (data.fixType === 4) fixTypeText = '4 (GNSS + Dead Reckoning)';
+                if (data.fixType === 5) fixTypeText = '5 (Time Only)';
+                document.getElementById('rtk-fix-type').textContent = fixTypeText;
+            }
+            
+            // Color coding for different statuses
+            const statusElement = document.getElementById('rtk-correction-status');
+            if (data.status === 'Fresh') {
+                statusElement.style.color = 'green';
+            } else if (data.status === 'Stale') {
+                statusElement.style.color = 'orange';
+            } else {
+                statusElement.style.color = 'red';
+            }
+            
+            // Color coding for RTK solution
+            const solutionElement = document.getElementById('rtk-solution');
+            if (data.carrSoln === 2) {
+                solutionElement.style.color = 'green'; // Fixed solution
+            } else if (data.carrSoln === 1) {
+                solutionElement.style.color = 'orange'; // Float solution
+            } else {
+                solutionElement.style.color = 'red'; // No RTK solution
+            }
         }
 
         canvas.addEventListener('mousedown', (e) => {
@@ -452,13 +531,69 @@ const char webPage[] PROGMEM = R"rawliteral(
             ws.onmessage = function(evt) {
                 try {
                     const data = JSON.parse(evt.data);
+                    
                     // Handle different message types
-                    if (data.type === "sensors") {
-                        updateSensorDisplay(data);
-                    } else if (data.type === "gps") {
-                        updateGPSDisplay(data);
+                    switch(data.type) {
+                        case "sensors":
+                            // Update sensor displays
+                            document.getElementById('sensor-readout').textContent = 
+                                `Front: ${data.front} cm | Left: ${data.left} cm | Right: ${data.right} cm`;
+                            
+                            if (data.message && data.message !== "") {
+                                const alert = document.getElementById('avoidance-alert');
+                                alert.textContent = data.message;
+                                alert.style.display = 'block';
+                                setTimeout(() => {
+                                    alert.style.display = 'none';
+                                }, 3000);
+                            }
+                            break;
+                            
+                        case "gps":
+                            // Update GPS displays
+                            document.getElementById('manual-fix').textContent = data.fix;
+                            document.getElementById('manual-lat').textContent = data.lat || '--';
+                            document.getElementById('manual-lng').textContent = data.lng || '--';
+                            break;
+                            
+                        case "rtk":
+                            // Update RTK status
+                            updateRTKDisplay(data);
+                            break;
+                            
+                        case "navstats":
+                            // Update navigation stats
+                            document.getElementById('total-distance').textContent = data.totalDistance.toFixed(1);
+                            document.getElementById('current-pace').textContent = data.currentPace.toFixed(2);
+                            document.getElementById('average-pace').textContent = data.averagePace.toFixed(2);
+                            document.getElementById('elapsed-time').textContent = formatTime(data.totalTime);
+                            break;
+                            
+                        case "waypoint":
+                            // Update waypoint info
+                            document.getElementById('waypoint-count').textContent = `Waypoints: ${data.count}/20`;
+                            if (data.lat && data.lng) {
+                                document.getElementById('recorded-waypoint').textContent = data.lat + ", " + data.lng;
+                                document.getElementById('recorded-waypoint-display').style.display = 'block';
+                            }
+                            break;
+                            
+                        case "status":
+                            // Show status message
+                            const statusAlert = document.getElementById('avoidance-alert');
+                            statusAlert.textContent = data.message;
+                            statusAlert.style.display = 'block';
+                            setTimeout(() => {
+                                statusAlert.style.display = 'none';
+                            }, 3000);
+                            break;
+                            
+                        case "error":
+                            // Show error message
+                            console.error("Error received:", data.message);
+                            alert(data.message);
+                            break;
                     }
-                    // Add more handlers as needed
                 } catch (e) {
                     console.error('Error parsing WebSocket message:', e);
                 }
@@ -466,7 +601,7 @@ const char webPage[] PROGMEM = R"rawliteral(
         }
 
         // Start sensor polling only in manual mode (initial state)
-        sensorPollingInterval = setInterval(updateSensorReadings, 500);
+        //sensorPollingInterval = setInterval(updateSensorReadings, 500);
 
         drawJoystick();
 
@@ -578,21 +713,42 @@ const char webPage[] PROGMEM = R"rawliteral(
             button.textContent = 'Getting Status...';
             display.style.display = 'block';
             
-            fetch('/fusionStatus')
-                .then(response => response.json())
-                .then(data => {
-                    statusSpan.textContent = data.status;
-                    display.style.display = 'block';
-                })
-                .catch(error => {
-                    statusSpan.textContent = 'Error getting status';
-                    console.error('Error:', error);
-                })
-                .finally(() => {
-                    button.disabled = false;
-                    button.textContent = 'Get Fusion Status';
-                    display.style.display = 'block';
-                });
+            if (wsConnected) {
+                // For fusion status, we'll continue using HTTP since it's not a frequent operation
+                // and requires special handling on the ESP32 side
+                fetch('/fusionStatus')
+                    .then(response => response.json())
+                    .then(data => {
+                        statusSpan.textContent = data.status;
+                        display.style.display = 'block';
+                    })
+                    .catch(error => {
+                        statusSpan.textContent = 'Error getting status';
+                        console.error('Error:', error);
+                    })
+                    .finally(() => {
+                        button.disabled = false;
+                        button.textContent = 'Get Fusion Status';
+                        display.style.display = 'block';
+                    });
+            } else {
+                // Same as above if WebSocket is not connected
+                fetch('/fusionStatus')
+                    .then(response => response.json())
+                    .then(data => {
+                        statusSpan.textContent = data.status;
+                        display.style.display = 'block';
+                    })
+                    .catch(error => {
+                        statusSpan.textContent = 'Error getting status';
+                        console.error('Error:', error);
+                    })
+                    .finally(() => {
+                        button.disabled = false;
+                        button.textContent = 'Get Fusion Status';
+                        display.style.display = 'block';
+                    });
+            }
         }
 
         function recordWaypoint() {
@@ -602,24 +758,34 @@ const char webPage[] PROGMEM = R"rawliteral(
             const countDisplay = document.getElementById('waypoint-count');
             button.disabled = true;
             button.textContent = 'Recording WP...';
-            display.style.display = 'block';
             
-            fetch('/currentWP')
-                .then(response => response.json())
-                .then(data => {
-                    waypointSpan.textContent = data.lat + ", " + data.lng;
-                    countDisplay.textContent = `Waypoints: ${data.count}/20`;
-                    display.style.display = 'block';
-                })
-                .catch(error => {
-                    waypointSpan.textContent = 'Error getting WP';
-                    console.error('Error:', error);
-                })
-                .finally(() => {
-                    button.disabled = false;
-                    button.textContent = 'Record WP';
-                    display.style.display = 'block';
-                });
+            if (wsConnected) {
+                ws.send(JSON.stringify({ waypoint: "record" }));
+                // The response will come through the WebSocket message handler
+            } else {
+                fetch('/currentWP')
+                    .then(response => response.json())
+                    .then(data => {
+                        waypointSpan.textContent = data.lat + ", " + data.lng;
+                        countDisplay.textContent = `Waypoints: ${data.count}/20`;
+                        display.style.display = 'block';
+                    })
+                    .catch(error => {
+                        waypointSpan.textContent = 'Error getting WP';
+                        console.error('Error:', error);
+                    })
+                    .finally(() => {
+                        button.disabled = false;
+                        button.textContent = 'Record WP';
+                        display.style.display = 'block';
+                    });
+            }
+            
+            // Always re-enable the button after a short delay
+            setTimeout(() => {
+                button.disabled = false;
+                button.textContent = 'Record WP';
+            }, 1000);
         }
 
         function clearWaypoints() {
@@ -628,19 +794,30 @@ const char webPage[] PROGMEM = R"rawliteral(
             button.disabled = true;
             button.textContent = 'Clearing...';
             
-            fetch('/clearWaypoints')
-                .then(response => response.json())
-                .then(data => {
-                    countDisplay.textContent = `Waypoints: ${data.count}/20`;
-                    document.getElementById('recorded-waypoint-display').style.display = 'none';
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                })
-                .finally(() => {
-                    button.disabled = false;
-                    button.textContent = 'Clear WP';
-                });
+            if (wsConnected) {
+                ws.send(JSON.stringify({ waypoint: "clear" }));
+                // The response will come through the WebSocket message handler
+            } else {
+                fetch('/clearWaypoints')
+                    .then(response => response.json())
+                    .then(data => {
+                        countDisplay.textContent = `Waypoints: ${data.count}/20`;
+                        document.getElementById('recorded-waypoint-display').style.display = 'none';
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                    })
+                    .finally(() => {
+                        button.disabled = false;
+                        button.textContent = 'Clear WP';
+                    });
+            }
+            
+            // Always re-enable the button after a short delay
+            setTimeout(() => {
+                button.disabled = false;
+                button.textContent = 'Clear WP';
+            }, 1000);
         }
     </script>
 </body>
