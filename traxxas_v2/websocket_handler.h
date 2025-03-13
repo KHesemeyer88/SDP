@@ -2,7 +2,6 @@
 #define WEBSOCKET_HANDLER_H
 
 #include <WebSocketsServer.h>
-#include <WebSocketsClient.h>
 #include <ArduinoJson.h>
 #include "config.h"
 
@@ -23,15 +22,37 @@ unsigned long lastWSGPSUpdate = 0;
 unsigned long lastWSRTKUpdate = 0;
 unsigned long lastWSStatsUpdate = 0;
 
-// Buffer for RTCM data
-const size_t RTCM_BUFFER_SIZE = 2048;
-uint8_t rtcmBuffer[RTCM_BUFFER_SIZE];
-size_t rtcmBufferPos = 0;
-
-// WebSocket server and client instances
+// WebSocket server instance
 WebSocketsServer webSocket(81);  // WebSocket server on port 81
-WebSocketsClient ntripWebSocket;
-bool useNtripWebSocket = false;  // Start with standard HTTP for NTRIP
+
+// Forward declarations of external variables
+extern float lastFrontDist, lastLeftDist, lastRightDist;
+extern String lastAvoidanceMessage;
+extern float targetLat, targetLon;
+extern float waypointLats[], waypointLons[];
+extern int waypointCount, currentWaypointIndex;
+extern bool followingWaypoints, autonomousMode, destinationReached;
+extern volatile float currentLat, currentLon;
+extern volatile float currentSpeed;
+extern volatile uint8_t currentFixType;
+extern bool initialStraightPhase;
+extern unsigned long straightPhaseStartTime;
+extern float targetPace;
+extern float targetDistance;
+extern float totalDistance;
+extern float currentPace;
+extern float averagePace;
+extern unsigned long startTime;
+extern unsigned long finalElapsedTime;
+extern unsigned long lastCommandTime;
+extern Servo escServo, steeringServo;
+extern unsigned long destinationReachedTime;
+extern CorrectionStatus rtcmCorrectionStatus;
+extern unsigned long lastReceivedRTCM_ms;
+extern unsigned long correctionAge;
+extern int carrSoln;
+extern double hAcc;
+extern WiFiClient ntripClient;
 
 // Forward declarations of all functions
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length);
@@ -44,24 +65,12 @@ void sendNavigationStats(uint8_t clientNum = 255);
 void sendStatusMessage(const String& message);
 void sendErrorMessage(const String& message);
 void updateWebSocketClients();
-void ntripWebSocketEvent(WStype_t type, uint8_t * payload, size_t length);
-bool connectToNtripWebSocket();
-void sendNtripConnectionRequest();
-void sendGGAToNtripWebSocket(const char* nmeaData);
-bool processNtripWebSocketConnection();
-void pushGGAWebSocket(NMEA_GGA_data_t *nmeaData);
 
-// Initialize WebSocket server and optionally the NTRIP client
+// Initialize WebSocket server
 void initWebSockets() {
-  // Initialize WebSocket server
   webSocket.begin();
   webSocket.onEvent(webSocketEvent);
   Serial.println("WebSocket server started on port 81");
-  
-  // Initialize NTRIP WebSocket client if enabled
-  if (useNtripWebSocket) {
-    connectToNtripWebSocket();
-  }
 }
 
 // Send a generic status message
@@ -94,8 +103,23 @@ void sendSensorData(uint8_t clientNum) {
   doc["left"] = lastLeftDist;
   doc["right"] = lastRightDist;
   
+  // Only include destination reached messages if within the timeout period
   if (lastAvoidanceMessage != "") {
-    doc["message"] = lastAvoidanceMessage;
+    bool shouldSendMessage = true;
+    
+    // For destination messages, check if they should be suppressed based on timeout
+    if ((lastAvoidanceMessage == "Destination reached" || 
+         lastAvoidanceMessage == "Target distance reached") && 
+         destinationReached) {
+      // Only send the message if the timeout hasn't expired
+      if (millis() - destinationReachedTime > DESTINATION_MESSAGE_TIMEOUT) {
+        shouldSendMessage = false;
+      }
+    }
+    
+    if (shouldSendMessage) {
+      doc["message"] = lastAvoidanceMessage;
+    }
   }
   
   String jsonString;
@@ -220,7 +244,6 @@ void processWebSocketCommand(const JsonDocument& doc) {
     float normalizedY = doc["control"]["vertical"];
     float normalizedX = doc["control"]["horizontal"];
     
-    // Apply the same control logic as in your HTTP handler
     // Map to ESC values
     int escValue;
     if (abs(normalizedY) < 0.05) { // Small deadzone for joystick
@@ -414,129 +437,6 @@ void updateWebSocketClients() {
   if (autonomousMode && now - lastWSStatsUpdate >= WS_STATS_UPDATE_INTERVAL) {
     sendNavigationStats();
     lastWSStatsUpdate = now;
-  }
-}
-
-// Send the NTRIP connection request with authentication
-void sendNtripConnectionRequest() {
-  // Formulate the NTRIP request
-  char serverRequest[512];
-  snprintf(serverRequest, sizeof(serverRequest),
-         "GET /%s HTTP/1.0\r\n"
-         "User-Agent: NTRIP SparkFun u-blox Client v1.0\r\n"
-         "Accept: */*\r\n"
-         "Connection: Upgrade\r\n"
-         "Authorization: Basic %s\r\n"
-         "\r\n",
-         mountPoint, base64::encode(String(casterUser) + ":" + String(casterUserPW)).c_str());
-  
-  // Send as text message
-  ntripWebSocket.sendTXT(serverRequest);
-}
-
-// NTRIP WebSocket event handler
-void ntripWebSocketEvent(WStype_t type, uint8_t * payload, size_t length) {
-  switch(type) {
-    case WStype_DISCONNECTED:
-      Serial.println("[NTRIP WebSocket] Disconnected");
-      break;
-      
-    case WStype_CONNECTED:
-      Serial.println("[NTRIP WebSocket] Connected");
-      // After connection, send the connection request with authentication
-      sendNtripConnectionRequest();
-      break;
-      
-    case WStype_TEXT:
-      // Server response to our connection request
-      Serial.printf("[NTRIP WebSocket] Received text: %s\n", payload);
-      break;
-      
-    case WStype_BIN:
-      // Handle binary data (RTCM corrections)
-      Serial.printf("[NTRIP WebSocket] Received binary data: %u bytes\n", length);
-      
-      // Update the timestamp for when we last received correction data
-      lastReceivedRTCM_ms = millis();
-      
-      // Push the data directly to the GPS module
-      myGPS.pushRawData(payload, length);
-      break;
-  }
-}
-
-// Connect to NTRIP caster using WebSockets
-bool connectToNtripWebSocket() {
-  Serial.print("Connecting to NTRIP caster via WebSocket: ");
-  Serial.println(casterHost);
-  
-  // Initialize WebSocket client
-  ntripWebSocket.begin(casterHost, casterPort, "/"); // Replace with the proper endpoint
-  ntripWebSocket.onEvent(ntripWebSocketEvent);
-  
-  // Use a more frequent ping interval
-  ntripWebSocket.setReconnectInterval(5000);
-  ntripWebSocket.enableHeartbeat(15000, 3000, 2);
-  
-  // Wait for connection (with timeout)
-  unsigned long connectionStartTime = millis();
-  while (!ntripWebSocket.isConnected() && millis() - connectionStartTime < 5000) {
-    ntripWebSocket.loop();
-    delay(10);
-  }
-  
-  if (!ntripWebSocket.isConnected()) {
-    Serial.println("Failed to connect to NTRIP WebSocket server");
-    return false;
-  }
-  
-  return true;
-}
-
-// Send NMEA GGA data to NTRIP caster
-void sendGGAToNtripWebSocket(const char* nmeaData) {
-  if (ntripWebSocket.isConnected() && transmitLocation) {
-    ntripWebSocket.sendTXT(nmeaData);
-  }
-}
-
-// Process the NTRIP WebSocket connection
-bool processNtripWebSocketConnection() {
-  if (!ntripWebSocket.isConnected()) {
-    return false;
-  }
-  
-  // Process WebSocket events
-  ntripWebSocket.loop();
-  
-  // Check for timeout
-  if ((millis() - lastReceivedRTCM_ms) > maxTimeBeforeHangup_ms) {
-    return false;
-  }
-  
-  // Update correction status based on age
-  correctionAge = millis() - lastReceivedRTCM_ms;
-  if (correctionAge < 5000) { // Less than 5 seconds old
-    rtcmCorrectionStatus = CORR_FRESH;
-  } else if (correctionAge < 30000) { // Less than 30 seconds old
-    rtcmCorrectionStatus = CORR_STALE;
-  } else {
-    rtcmCorrectionStatus = CORR_NONE;
-  }
-  
-  return true;
-}
-
-// Modified callback function for NMEA GGA data
-void pushGGAWebSocket(NMEA_GGA_data_t *nmeaData) {
-  if (useNtripWebSocket) {
-    // Send GGA via WebSocket
-    sendGGAToNtripWebSocket((const char *)nmeaData->nmea);
-  } else {
-    // Original HTTP implementation
-    if ((ntripClient.connected() == true) && (transmitLocation == true)) {
-      ntripClient.print((const char *)nmeaData->nmea);
-    }
   }
 }
 

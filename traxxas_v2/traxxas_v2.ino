@@ -232,7 +232,7 @@ void loop() {
   updateWebSocketClients();
 
   // ALWAYS update sonar readings
-  updateSonarReadings();
+  // updateSonarReadings();
   // emergency check for avoidance
   // int emergencyAovidance = applyObstacleAvoidance(STEERING_CENTER);
   
