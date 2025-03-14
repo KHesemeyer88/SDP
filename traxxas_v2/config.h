@@ -1,6 +1,9 @@
 // config.h
 #ifndef CONFIG_H
 #define CONFIG_H
+// LIDAR pins
+#define LIDAR_SDA_PIN 16  // Using previous ECHO_PIN_FRONT
+#define LIDAR_SCL_PIN 17  // Using previous TRIGGER_PIN_FRONT
 
 #include <Arduino.h>
 #include <ESP32Servo.h>

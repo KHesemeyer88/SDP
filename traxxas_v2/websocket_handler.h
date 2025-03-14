@@ -47,11 +47,11 @@ extern unsigned long finalElapsedTime;
 extern unsigned long lastCommandTime;
 extern Servo escServo, steeringServo;
 extern unsigned long destinationReachedTime;
-extern CorrectionStatus rtcmCorrectionStatus;
+extern volatile CorrectionStatus rtcmCorrectionStatus;
 extern unsigned long lastReceivedRTCM_ms;
 extern unsigned long correctionAge;
-extern int carrSoln;
-extern double hAcc;
+extern volatile int carrSoln;
+extern volatile double hAcc;
 extern WiFiClient ntripClient;
 
 // Forward declarations of all functions
