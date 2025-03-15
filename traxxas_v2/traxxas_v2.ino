@@ -181,128 +181,100 @@ void setup() {
   Serial.println("Setup complete. Entering main loop.");
 }
 void loop() {
-  // Always process WebSocket messages for responsiveness
+  // SECTION 1: Things that ALWAYS happen regardless of state
   webSocket.loop();
-  
-  // Update driving state based on grace period
-  if (drivingState && !autonomousMode && (millis() - lastNonNeutralCommand > DRIVING_GRACE_PERIOD)) {
-    drivingState = false;
-  }
-  
-  // Force non-driving state when in autonomous mode
-  if (autonomousMode) {
-    drivingState = false;
-  }
-  
-  // Always handle these safety and connectivity checks regardless of state
+  server.handleClient();
+  updateWebSocketClients();
   unsigned long currentTime = millis();
   
-  // Check WiFi connectivity
-  while (WiFi.status() != WL_CONNECTED) {
-    server.handleClient();
-    webSocket.loop();
-    updateWebSocketClients();
-    delay(100);
-    Serial.println("Stop car... Connecting to WiFi...");
-    if (WiFi.status() == WL_CONNECTED) {
-      Serial.printf("Connected to %s\nESP32 IP Address: ", ssid);
-      Serial.println(WiFi.localIP());
-    }
+  // Update driving state
+  if (autonomousMode) {
+    drivingState = false;  // Force non-driving state in autonomous mode
+  } else if (drivingState && (currentTime - lastNonNeutralCommand > DRIVING_GRACE_PERIOD)) {
+    drivingState = false;  // Exit driving state after grace period
   }
   
-  // Check for command staleness in manual mode
+  // Safety timeouts
   if (!autonomousMode && (currentTime - lastCommandTime > COMMAND_TIMEOUT_MS)) {
     escServo.write(ESC_NEUTRAL);
     steeringServo.write(STEERING_CENTER);
   }
   
-  // Handle web requests (always needed)
-  server.handleClient();
+  // Handle WiFi reconnection if needed (without Serial prints)
+  while (WiFi.status() != WL_CONNECTED) {
+    // Stop the car for safety during disconnection
+    escServo.write(ESC_NEUTRAL);
+    steeringServo.write(STEERING_CENTER);
+    server.handleClient();
+    webSocket.loop();
+    updateWebSocketClients();
+    delay(100);
+  }
   
-  // Send regular updates to clients
-  updateWebSocketClients();
-  
-  // Always update sonar readings for safety
-  updateSonarReadings();
-  
-  // Different processing based on driving state
-  if (drivingState) {
-    // DRIVING STATE - Minimal processing for maximum responsiveness
+  // SECTION 2: State-specific processing (drivingState means we are actively driving in manual mode)
+  if (!drivingState) {
+    // NON-DRIVING STATE - Full processing for idle or autonomous mode
     
-    // Process the minimum GPS data needed for safety and basic tracking
+    // Always process in non-driving state
     myGPS.checkUblox();
     myGPS.checkCallbacks();
+    updateSonarReadings();
     
-    // Skip RTK corrections during active driving
-    // Skip intensive sensor updates
-    // Skip non-critical processing
-  } 
-  else {
-    // NON-DRIVING STATE - Normal processing
-    
-    // Process incoming GPS messages
-    myGPS.checkUblox();
-    myGPS.checkCallbacks();
-    
-    // Handle RTK corrections
+    // RTK connection handling
     if (!ntripClient.connected()) {
       connectToNTRIP();
+    } else {
+      processConnection();
     }
     
-    if (ntripClient.connected()) {
-      processConnection();
-    } else if (WiFi.status() == WL_CONNECTED) {
-      // Try reconnecting to NTRIP occasionally
+    // Reconnect to NTRIP if needed and connected to WiFi
+    if (!ntripClient.connected() && WiFi.status() == WL_CONNECTED) {
       static unsigned long lastReconnectAttempt = 0;
-      if (millis() - lastReconnectAttempt > 1000) { // Try every 1 second
-        lastReconnectAttempt = millis();
+      if (currentTime - lastReconnectAttempt > 1000) { // Try every 1 second
+        lastReconnectAttempt = currentTime;
         connectToNTRIP();
       }
     }
     
-    // Process autonomous mode logic if needed
-    if (autonomousMode) {
+    // Autonomous mode processing
+    if (autonomousMode && currentFixType > 0) {
+      // Process status messages
       updateStatusMessages();
       
-      if (currentFixType > 0) {
-        // Calculate distance to target and base steering angle
-        float distance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
+      // Calculate distance to target
+      float distance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
+      
+      // Handle initial straight-line phase or normal navigation
+      if (initialStraightPhase) {
+        // During straight phase, keep steering centered
+        steeringServo.write(STEERING_CENTER + TRIM_ANGLE);
         
-        // Check if we're in initial straight-line phase
-        if (initialStraightPhase) {
-          // During straight phase, keep steering centered
-          steeringServo.write(STEERING_CENTER + TRIM_ANGLE);
-          
-          // If straight phase duration has elapsed, exit straight phase
-          if ((currentTime >= straightPhaseStartTime) && 
-              (currentTime - straightPhaseStartTime >= STRAIGHT_PHASE_DURATION) && 
-              initialStraightPhase) {
-                initialStraightPhase = false;
-          }
-        } else {
-          // Normal navigation with steering correction
-          int steeringAngle = calculateSteeringAngle(currentLat, currentLon);
-          
-          // If the target is reached, handle waypoint or end session
-          if (distance < WAYPOINT_REACHED_RADIUS) {
-            handleWaypointReached();
-          }
-          
-          // Constrain and apply the steering angle
-          steeringAngle = constrain(steeringAngle, STEERING_CENTER - STEERING_MAX, STEERING_CENTER + STEERING_MAX);
-          steeringServo.write(steeringAngle);
+        // Exit straight phase after duration elapsed
+        if (currentTime - straightPhaseStartTime >= STRAIGHT_PHASE_DURATION) {
+          initialStraightPhase = false;
         }
+      } else {
+        // Normal navigation with steering correction
+        int steeringAngle = calculateSteeringAngle(currentLat, currentLon);
         
-        // Update pace control (do this regardless of straight phase)
-        updatePaceControl();
-        
-        // Update distance tracking
-        updateDistanceTracking();
-        
-        // Reset the new data flag after processing
-        newPVTDataAvailable = false;
+        // Check if waypoint reached
+        if (distance < WAYPOINT_REACHED_RADIUS) {
+          handleWaypointReached();
+        }
+        // steeringAngle = applyObstacleAvoidance(steeringAngle);
+
+        // Apply steering angle
+        steeringServo.write(steeringAngle);
       }
+      
+      // Always update pace and distance in autonomous mode
+      updatePaceControl();
+      updateDistanceTracking();
+      newPVTDataAvailable = false;
     }
+  } else {
+    // DRIVING STATE - Minimal processing for maximum responsiveness
+    // Currently everything is skipped in driving state
   }
   
   delay(1); // Small delay for stability

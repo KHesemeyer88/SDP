@@ -380,19 +380,18 @@ void processWebSocketCommand(const JsonDocument& doc) {
     sendStatusMessage("Tracking reset");
   }
 }
-
-// WebSocket event handler function
+// WebSocket event handler function with fast path for control commands
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
   switch(type) {
     case WStype_DISCONNECTED:
-      Serial.printf("[WebSocket] #%u Disconnected\n", num);
-      if (num == 0) webSocketActive = false;  // Consider main control client disconnected
+      // Client disconnected
+      if (num == 0) webSocketActive = false;
       break;
       
     case WStype_CONNECTED:
       {
+        // Client connected
         IPAddress ip = webSocket.remoteIP(num);
-        Serial.printf("[WebSocket] #%u Connected from %d.%d.%d.%d\n", num, ip[0], ip[1], ip[2], ip[3]);
         webSocketActive = true;
         lastWSActivity = millis();
         
@@ -403,51 +402,201 @@ void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length
       
     case WStype_TEXT:
       {
-        Serial.printf("[WebSocket] #%u Received: %s\n", num, payload);
         lastWSActivity = millis();
         
-        // Parse the incoming JSON
+        // Fast path for control messages - check if this looks like a joystick command
+        // This quick check avoids JSON parsing overhead for common control messages
+        if (strstr((char*)payload, "control") != NULL) {
+          // It looks like a control message - use lightweight parsing
+          float normalizedY = 0.0f;
+          float normalizedX = 0.0f;
+          
+          // Fast string parsing technique to extract control values
+          // Look for "vertical": and "horizontal": and extract the values
+          char* verticalPtr = strstr((char*)payload, "vertical\":");
+          char* horizontalPtr = strstr((char*)payload, "horizontal\":");
+          
+          if (verticalPtr && horizontalPtr) {
+            // Move past the property name
+            verticalPtr += 10;
+            horizontalPtr += 12;
+            
+            // Parse float values directly
+            normalizedY = atof(verticalPtr);
+            normalizedX = atof(horizontalPtr);
+            
+            // Set driving state for non-neutral commands
+            const float JOYSTICK_DEADZONE = 0.03f;
+            if (abs(normalizedY) > JOYSTICK_DEADZONE || abs(normalizedX) > JOYSTICK_DEADZONE) {
+              drivingState = true;
+              lastNonNeutralCommand = millis();
+            }
+            
+            // Map joystick to servo values
+            int escValue;
+            if (abs(normalizedY) < JOYSTICK_DEADZONE) {
+              escValue = ESC_NEUTRAL;
+            }
+            else if (normalizedY > 0) {
+              escValue = ESC_NEUTRAL + normalizedY * (ESC_MAX_FWD - ESC_NEUTRAL);
+            }
+            else {
+              escValue = ESC_NEUTRAL + normalizedY * (ESC_NEUTRAL - ESC_MAX_REV);
+            }
+            
+            // Apply ESC deadzone
+            if (escValue < ESC_MIN_FWD && escValue > ESC_MIN_REV) {
+              escValue = ESC_NEUTRAL;
+            }
+            
+            // Map to steering value - STEERING_CENTER is typically 90
+            int steeringValue = STEERING_CENTER + normalizedX * STEERING_MAX;
+            
+            // Constrain values to valid ranges
+            steeringValue = constrain(steeringValue, STEERING_CENTER - STEERING_MAX, STEERING_CENTER + STEERING_MAX);
+            escValue = constrain(escValue, ESC_MAX_REV, ESC_MAX_FWD);
+            
+            // Apply immediately
+            escServo.write(escValue);
+            steeringServo.write(steeringValue);
+            lastCommandTime = millis();
+            
+            // Skip the rest of processing since we've handled the control message
+            return;
+          }
+        }
+        
+        // Regular path for other commands - use full JSON parsing
         DynamicJsonDocument doc(JSON_CAPACITY);
         DeserializationError error = deserializeJson(doc, payload);
         
         if (error) {
-          Serial.printf("[WebSocket] Parsing failed: %s\n", error.c_str());
           return;
         }
         
+        // Process other types of commands through the normal path
         processWebSocketCommand(doc);
       }
       break;
   }
 }
+// // WebSocket event handler function
+// void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
+//   switch(type) {
+//     case WStype_DISCONNECTED:
+//       Serial.printf("[WebSocket] #%u Disconnected\n", num);
+//       if (num == 0) webSocketActive = false;  // Consider main control client disconnected
+//       break;
+      
+//     case WStype_CONNECTED:
+//       {
+//         IPAddress ip = webSocket.remoteIP(num);
+//         Serial.printf("[WebSocket] #%u Connected from %d.%d.%d.%d\n", num, ip[0], ip[1], ip[2], ip[3]);
+//         webSocketActive = true;
+//         lastWSActivity = millis();
+        
+//         // Send initial state to newly connected client
+//         sendCurrentState(num);
+//       }
+//       break;
+      
+//     case WStype_TEXT:
+//       {
+//         Serial.printf("[WebSocket] #%u Received: %s\n", num, payload);
+//         lastWSActivity = millis();
+        
+//         // Parse the incoming JSON
+//         DynamicJsonDocument doc(JSON_CAPACITY);
+//         DeserializationError error = deserializeJson(doc, payload);
+        
+//         if (error) {
+//           Serial.printf("[WebSocket] Parsing failed: %s\n", error.c_str());
+//           return;
+//         }
+        
+//         processWebSocketCommand(doc);
+//       }
+//       break;
+//   }
+// }
 
-// Function to update all WebSocket clients
+// Simplified WebSocket client update function that matches main loop behavior
 void updateWebSocketClients() {
   unsigned long now = millis();
   
-  // Send sensor data
-  if (now - lastWSSensorUpdate >= WS_SENSOR_UPDATE_INTERVAL) {
-    sendSensorData();
-    lastWSSensorUpdate = now;
-  }
-  
-  // Send GPS data
-  if (now - lastWSGPSUpdate >= WS_GPS_UPDATE_INTERVAL) {
-    sendGPSData();
-    lastWSGPSUpdate = now;
-  }
-  
-  // Send RTK status
-  if (now - lastWSRTKUpdate >= WS_RTK_UPDATE_INTERVAL) {
-    sendRTKStatus();
-    lastWSRTKUpdate = now;
-  }
-  
-  // Send navigation stats if in autonomous mode
-  if (autonomousMode && now - lastWSStatsUpdate >= WS_STATS_UPDATE_INTERVAL) {
-    sendNavigationStats();
-    lastWSStatsUpdate = now;
+  if (drivingState) {
+    // DRIVING STATE: Don't send any data updates while actively driving
+    // This matches the main loop which also skips GPS and sensor updates during driving
+    // The active joystick commands still work through webSocketEvent
+    
+    // send a heartbeat every few seconds just to maintain connection
+    static unsigned long lastHeartbeat = 0;
+    if (now - lastHeartbeat > 3000) { // Every 3 seconds
+      lastHeartbeat = now;
+      
+      // Very minimal status update just to keep connection alive
+      DynamicJsonDocument doc(32);
+      doc["type"] = "driving";
+      String jsonString;
+      serializeJson(doc, jsonString);
+      webSocket.broadcastTXT(jsonString);
+    }
+  } 
+  else {
+    // NON-DRIVING STATE: Send all data as normal
+    
+    // Send sensor data
+    if (now - lastWSSensorUpdate >= WS_SENSOR_UPDATE_INTERVAL) {
+      sendSensorData();
+      lastWSSensorUpdate = now;
+    }
+    
+    // Send GPS data
+    if (now - lastWSGPSUpdate >= WS_GPS_UPDATE_INTERVAL) {
+      sendGPSData();
+      lastWSGPSUpdate = now;
+    }
+    
+    // Send RTK status
+    if (now - lastWSRTKUpdate >= WS_RTK_UPDATE_INTERVAL) {
+      sendRTKStatus();
+      lastWSRTKUpdate = now;
+    }
+    
+    // Send navigation stats if in autonomous mode
+    if (autonomousMode && now - lastWSStatsUpdate >= WS_STATS_UPDATE_INTERVAL) {
+      sendNavigationStats();
+      lastWSStatsUpdate = now;
+    }
   }
 }
+// // Function to update all WebSocket clients
+// void updateWebSocketClients() {
+//   unsigned long now = millis();
+  
+//   // Send sensor data
+//   if (now - lastWSSensorUpdate >= WS_SENSOR_UPDATE_INTERVAL) {
+//     sendSensorData();
+//     lastWSSensorUpdate = now;
+//   }
+  
+//   // Send GPS data
+//   if (now - lastWSGPSUpdate >= WS_GPS_UPDATE_INTERVAL) {
+//     sendGPSData();
+//     lastWSGPSUpdate = now;
+//   }
+  
+//   // Send RTK status
+//   if (now - lastWSRTKUpdate >= WS_RTK_UPDATE_INTERVAL) {
+//     sendRTKStatus();
+//     lastWSRTKUpdate = now;
+//   }
+  
+//   // Send navigation stats if in autonomous mode
+//   if (autonomousMode && now - lastWSStatsUpdate >= WS_STATS_UPDATE_INTERVAL) {
+//     sendNavigationStats();
+//     lastWSStatsUpdate = now;
+//   }
+// }
 
 #endif // WEBSOCKET_HANDLER_H

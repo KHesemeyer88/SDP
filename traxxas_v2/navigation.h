@@ -202,36 +202,84 @@ void clearWaypoints() {
     waypointCount = 0;
 }
 
-// Calculate steering angle based on heading error (simple proportional control)
-// In your navigation code where you calculate steering
 float calculateSteeringAngle(float currentLat, float currentLon) {
-    // Adjust proportional gain based on correction quality
-    float correctionFactor = 0.35; // Default value
-    
-    if (rtcmCorrectionStatus == CORR_FRESH) {
-        // Full confidence in position - use normal gain
-        correctionFactor = 0.35;
-    } else if (rtcmCorrectionStatus == CORR_STALE) {
-        // Reduced confidence - use more conservative steering
-        correctionFactor = 0.25;
-    } else {
-        // No corrections - use very conservative steering
-        correctionFactor = 0.15;
-    }
-    
-    // Your existing bearing/heading calculation
+    // Calculate distance and bearings
     float distance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
     float bearing = calculateBearing(currentLat, currentLon, targetLat, targetLon);
     float currentHeading = myGPS.getHeading() / 100000.0;
     
+    // Calculate heading error (difference between where we want to go and where we're facing)
     float headingError = bearing - currentHeading;
     if (headingError > 180) headingError -= 360;
     if (headingError < -180) headingError += 360;
     
-    int steeringAngle = STEERING_CENTER + (headingError * correctionFactor);
+    // Determine base correction factor based on correction quality
+    float correctionFactor = 0.35; // Default value
+    
+    // if (rtcmCorrectionStatus == CORR_FRESH) {
+    //     correctionFactor = 0.35; // Full confidence
+    // } else if (rtcmCorrectionStatus == CORR_STALE) {
+    //     correctionFactor = 0.25; // Reduced confidence
+    // } else {
+    //     correctionFactor = 0.15; // No corrections
+    // }
+    
+    int steeringAngle;
+    
+    // For large errors (> 45°), use full steering capability
+    if (abs(headingError) > 45.0) {
+        // Apply maximum steering in the appropriate direction
+        steeringAngle = (headingError > 0) ? 
+                        STEERING_CENTER + STEERING_MAX : 
+                        STEERING_CENTER - STEERING_MAX;
+    } 
+    // For moderate to small errors, use proportional control
+    else {
+        // Linear scaling for smooth transition to maximum steering
+        // This creates a ramp that reaches STEERING_MAX at exactly 45 degrees
+        float scaleFactor = correctionFactor * (45.0 / STEERING_MAX);
+        steeringAngle = STEERING_CENTER + (headingError * scaleFactor);
+    }
+    
+    // Apply steering limits to ensure we don't exceed mechanical limits
+    // (This is redundant but kept as a safety feature)
+    steeringAngle = constrain(steeringAngle, 
+                             STEERING_CENTER - STEERING_MAX, 
+                             STEERING_CENTER + STEERING_MAX);
     
     return steeringAngle;
 }
+// Calculate steering angle based on heading error (simple proportional control)
+// float calculateSteeringAngle(float currentLat, float currentLon) {
+//     // Adjust proportional gain based on correction quality
+//     float correctionFactor = 0.35; // Default value
+    
+//     // if (rtcmCorrectionStatus == CORR_FRESH) {
+//     //     // Full confidence in position - use normal gain
+//     //     correctionFactor = 0.35;
+//     // } else if (rtcmCorrectionStatus == CORR_STALE) {
+//     //     // Reduced confidence - use more conservative steering
+//     //     correctionFactor = 0.25;
+//     // } else {
+//     //     // No corrections - use very conservative steering
+//     //     correctionFactor = 0.15;
+//     // }
+    
+//     // Your existing bearing/heading calculation
+//     float distance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
+//     float bearing = calculateBearing(currentLat, currentLon, targetLat, targetLon);
+//     float currentHeading = myGPS.getHeading() / 100000.0;
+    
+//     float headingError = bearing - currentHeading;
+//     if (headingError > 180) headingError -= 360;
+//     if (headingError < -180) headingError += 360;
+    
+//     int steeringAngle = STEERING_CENTER + (headingError * correctionFactor);
+    // steeringAngle = constrain(steeringAngle, 
+    //                       STEERING_CENTER - STEERING_MAX, 
+    //                       STEERING_CENTER + STEERING_MAX);
+//     return steeringAngle;
+// }
 
 // Only adjust speed if we have a target pace and no obstacle avoidance active
 void updatePaceControl() {
