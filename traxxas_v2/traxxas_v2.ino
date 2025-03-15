@@ -98,7 +98,7 @@ void setup() {
   Serial.println("\n\nRC Car starting up...");
   
   // Initialize lidar sensors
-  initializeSensors();
+  initializeSonar();
   delay(100);
   
   // Servo setup with delays between operations
@@ -232,7 +232,7 @@ void loop() {
   updateWebSocketClients();
 
   // ALWAYS update sonar readings
-   updateDistanceReadings();
+   updateSonarReadings();
   // emergency check for avoidance
   // int emergencyAovidance = applyObstacleAvoidance(STEERING_CENTER);
   
