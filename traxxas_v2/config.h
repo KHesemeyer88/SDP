@@ -35,7 +35,7 @@ const int ESC_MAX_REV = 50;     // Max reverse allowed (~1.1ms pulse)
 const int ESC_MIN_FWD = 95;     // Minimum forward throttle
 const int ESC_MIN_REV = 85;     // Minimum reverse throttle
 const int STEERING_CENTER = 90;  // Center steering
-const int STEERING_MAX = 55;     // Maximum steering angle deviation
+const int STEERING_MAX = 65;     // Maximum steering angle deviation
 const int TURN_ANGLE = 20;       // Angle to turn 
 const int TRIM_ANGLE = 2; //car lists left
 

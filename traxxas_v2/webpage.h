@@ -468,7 +468,7 @@ const char webPage[] PROGMEM = R"rawliteral(
         
         return { normalizedY, normalizedX };
     }
-
+    
     // Send joystick update
     function sendUpdate() {
         if (!wsConnected) {

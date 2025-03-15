@@ -66,6 +66,10 @@ void sendStatusMessage(const String& message);
 void sendErrorMessage(const String& message);
 void updateWebSocketClients();
 
+// Forward declarations of external variables
+extern bool drivingState;
+extern unsigned long lastNonNeutralCommand;
+
 // Initialize WebSocket server
 void initWebSockets() {
   webSocket.begin();
@@ -244,6 +248,12 @@ void processWebSocketCommand(const JsonDocument& doc) {
     float normalizedY = doc["control"]["vertical"];
     float normalizedX = doc["control"]["horizontal"];
     
+    // Check if this is a non-neutral command
+    if (abs(normalizedY) > 0.05 || abs(normalizedX) > 0.05) {
+      drivingState = true;
+      lastNonNeutralCommand = millis();
+    }
+    
     // Map to ESC values
     int escValue;
     if (abs(normalizedY) < 0.05) { // Small deadzone for joystick
@@ -263,7 +273,7 @@ void processWebSocketCommand(const JsonDocument& doc) {
     
     // Map to steering values
     int steeringValue = STEERING_CENTER + normalizedX * STEERING_MAX;
-    
+
     // Apply the values
     escServo.write(escValue);
     steeringServo.write(steeringValue);
