@@ -1,32 +1,5 @@
 /*
- * Autonomous car control with GNSS navigation and obstacle avoidance.
-
- fuuuuuuuuuuuuuuuuuckn this shit for real bruh
- * Broke out main file using modular structure with separate header files.
- * Eliminated all mapping to 0-255 for speed. Speed is set only by servo style angles.
-  ** where 0=max reverse, 90=neutral, 180=max forward.
- * Obstacle detection and avoidance is not currently working well, I may have broken it.
- * Pace tracking and control implemented but very poorly. 
- 
- **Improvements:
-  **  distance tracking doesn't increment while no power is applied to motor
-    ** (currently distance increments from GNSS noise alone even while car is still).
-  ** Fixed time tracking so it increments once start navigation is selected and pauses 
-     when stop navigation is selected.
-  ** Added functionality to reset distance and time tracking (button probably).
-  ** Added functionality to show average pace using reported distance and time.
-
-  ** needs further testing on - 
-  ** average pace and instantaneous pace, both need improvement.
-  ** general improvements for pace tracking and correction. 
-
-  **** MOST IMPORTANT ****
-  * NEED TO IMPLEMENT HEARTBEAT/SAFETY TIMEOUT IN AUTONOMOUS MODE
-  * CURRENTLY CAR CAN LOSE CONNECTION WITH PHONE BUT CONTINUE NAVIGATING
-  * RESULT IS THAT STOP NAVIGATION BUTTON HAS NO EFFECT
-  ************************
-
- * Last updated: 3/3/2025
+This is the code we used for CDR demo
  */
 
 #include <Arduino.h>
@@ -94,6 +67,18 @@ float lastTrackedLon = 0;
 unsigned long lastDistanceUpdate = 0;
 float averagePace = 0.0;
 
+// GPS data from PVT callback
+volatile float currentLat, currentLon;
+volatile float currentSpeed;
+volatile uint8_t currentFixType;
+volatile bool newPVTDataAvailable;
+
+// Initial straight-line phase variables
+bool initialStraightPhase = false;
+unsigned long straightPhaseStartTime = 0;
+const unsigned long STRAIGHT_PHASE_DURATION = 1000; // initial straight phase
+
+
 void setup() {
   Serial.begin(115200);
   
@@ -122,7 +107,13 @@ void setup() {
   
   // Initialize GPS
   if (!initializeGPS()) {
-    Serial.println("GPS initialization failed!");
+    while(1){
+        Serial.println("GPS initialization failed!");
+        delay(1000);
+        if(initializeGPS()){
+          break;
+        }
+    }
   }
   
   // Setup WiFi as an access point
@@ -134,47 +125,77 @@ void setup() {
 }
 
 void loop() {
+  // Process incoming GNSS messages
+  myGPS.checkUblox();  // Check for the arrival of new data and process it
+  myGPS.checkCallbacks(); // Check if any callbacks are waiting to be processed
+  
   // Safety checks run regardless of MODE
   unsigned long currentTime = millis();
+  
   // Safety check: if no clients connected to the AP, stop the vehicle
   if (WiFi.softAPgetStationNum() == 0) {
       autonomousMode = false;
       escServo.write(ESC_NEUTRAL);
       steeringServo.write(STEERING_CENTER);
   }
+
   // Check for command staleness in manual mode
   if (!autonomousMode && (currentTime - lastCommandTime > COMMAND_TIMEOUT_MS)) {
     escServo.write(ESC_NEUTRAL);
     steeringServo.write(STEERING_CENTER);
   }
+
   // handle web requests
   server.handleClient();
-  // only update sonar readings if in manual mode
-  if (!autonomousMode){
-      updateSonarReadings();
-  } else{ //only update status messages in auto mode
+
+  // ALWAYS update sonar readings
+  updateSonarReadings();
+  // emergency check for avoidance
+  // int emergencyAovidance = applyObstacleAvoidance(STEERING_CENTER);
+  
+  // do autonomous navigation if in auto mode:
+  if (autonomousMode) { //only update status messages in auto mode
       updateStatusMessages();
       // only do navigation in auto mode with good GNSS fix
-      if (myGPS.getFixType() > 0) {
-          float currentLat, currentLon;
-          getCurrentPosition(currentLat, currentLon);
-          // Update distance tracking (only when the motor is active)
-          updateDistanceTracking();
+      if (currentFixType > 0 ) {
           // Calculate distance to target and base steering angle
           float distance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
-          int steeringAngle = calculateSteeringAngle(currentLat, currentLon);
-          // If the target is reached, handle waypoint or end session
-          if (distance < WAYPOINT_REACHED_RADIUS) {
-              handleWaypointReached();
+          // Check if we're in initial straight-line phase
+          if (initialStraightPhase) {
+              // During straight phase, keep steering centered
+              steeringServo.write(STEERING_CENTER + TRIM_ANGLE);
+              
+              // If straight phase duration has elapsed, exit straight phase
+              if ((currentTime >= straightPhaseStartTime) && // BE AWARE: ESP32 HAS DUAL CORE, TIMESTAMPS DISAGREE BY ABOUT 3MS!!
+                  (currentTime - straightPhaseStartTime >= STRAIGHT_PHASE_DURATION) && 
+                  initialStraightPhase) {
+                      initialStraightPhase = false;
+              }
+          } else {
+              // Normal navigation with steering correction
+              int steeringAngle = calculateSteeringAngle(currentLat, currentLon);
+              
+              // If the target is reached, handle waypoint or end session
+              if (distance < WAYPOINT_REACHED_RADIUS) {
+                  handleWaypointReached();
+              }
+              
+              //steeringAngle = applyObstacleAvoidance(steeringAngle);
+              
+              // Constrain and apply the steering angle
+              steeringAngle = constrain(steeringAngle, STEERING_CENTER - STEERING_MAX, STEERING_CENTER + STEERING_MAX);
+              steeringServo.write(steeringAngle);
           }
-          //steeringAngle = applyObstacleAvoidance(steeringAngle);
-          // Update pace control
+          
+          // Update pace control (do this regardless of straight phase)
           updatePaceControl();
-          // Constrain and apply the steering angle
-          steeringAngle = constrain(steeringAngle, STEERING_CENTER - STEERING_MAX, STEERING_CENTER + STEERING_MAX);
-          steeringServo.write(steeringAngle);
+          
+          // Update distance tracking
+          updateDistanceTracking();
+          
+          // Reset the new data flag after processing
+          newPVTDataAvailable = false;
       }
   }
-  delay(2);
+  delay(1);
 }
-

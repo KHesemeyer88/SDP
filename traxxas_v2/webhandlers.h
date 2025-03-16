@@ -31,6 +31,9 @@ extern unsigned long totalTimeMs;
 extern float currentPace;
 extern float averagePace;
 extern unsigned long lastCommandTime;
+// Straight phase variables
+extern bool initialStraightPhase;
+extern unsigned long straightPhaseStartTime;
 
 // Function to set up all web server routes
 void setupWebServerRoutes() {
@@ -88,14 +91,10 @@ void setupWebServerRoutes() {
     });
 
     server.on("/gps", HTTP_GET, []() {
-        float currentLat = myGPS.getLatitude() / 10000000.0;
-        float currentLon = myGPS.getLongitude() / 10000000.0;
-        
         float distance = 0;
         float bearing = 0;
-        unsigned char fixType = myGPS.getFixType();
         
-        if (fixType && (targetLat != 0 || targetLon != 0)) {
+        if (currentFixType && (targetLat != 0 || targetLon != 0)) {
             distance = calculateDistance(currentLat, currentLon, targetLat, targetLon);
             bearing = calculateBearing(currentLat, currentLon, targetLat, targetLon);
         }
@@ -104,18 +103,16 @@ void setupWebServerRoutes() {
                       ",\"bearing\":" + String(bearing, 1) +
                       ",\"lat\":" + String(currentLat, 6) +
                       ",\"lng\":" + String(currentLon, 6) +
-                      ",\"fix\":\"" + String(fixType) + "\"" +
+                      ",\"fix\":\"" + String(currentFixType) + "\"" +
                       ",\"destLat\":" + String(targetLat, 6) +
                       ",\"destLng\":" + String(targetLon, 6) +
                       "}";
         server.send(200, "application/json", json);
     });
 
-
     server.on("/setDestination", HTTP_GET, []() {
         String lat = server.arg("lat");
         String lng = server.arg("lng");
-        // Remove loops = server.arg("loops");
         String pace = server.arg("pace");
         String distance = server.arg("distance");
         
@@ -133,17 +130,15 @@ void setupWebServerRoutes() {
             server.send(400, "text/plain", "No destination coordinates provided or waypoints recorded");
             return;
         }
+        
         // Reset navigation tracking variables
-        //waypointLoopCount = 0;
         totalDistance = 0.0;
         startTime = millis();  // Set the start time when autonomous mode begins
         finalElapsedTime = 0;
         currentPace = 0.0;
         lastPaceUpdate = millis();
         
-        float currentLat = myGPS.getLatitude() / 10000000.0;
-        float currentLon = myGPS.getLongitude() / 10000000.0;
-
+        // Set pace and distance targets
         if (pace != "") {
             targetPace = pace.toFloat();
         }
@@ -161,7 +156,9 @@ void setupWebServerRoutes() {
         autonomousMode = true;
         followingWaypoints = (waypointCount > 0);
         lastAvoidanceMessage = "";
-        
+        // Initialize straight-line phase
+        initialStraightPhase = true;
+        straightPhaseStartTime = millis();
         server.send(200, "text/plain", "Navigation started");
     });
     
@@ -205,9 +202,6 @@ void setupWebServerRoutes() {
     });
     
     server.on("/currentWP", HTTP_GET, []() {
-        float currentLat = myGPS.getLatitude() / 10000000.0;
-        float currentLon = myGPS.getLongitude() / 10000000.0;
-        
         // Only store if we haven't hit the limit
         if (waypointCount < MAX_WAYPOINTS) {
             waypointLats[waypointCount] = currentLat;
@@ -249,6 +243,14 @@ void setupWebServerRoutes() {
     server.on("/resetTracking", HTTP_GET, []() {
         resetTracking();
         server.send(200, "text/plain", "Tracking reset");
+    });
+
+    server.on("/messages", HTTP_GET, []() {
+        String json = "{\"message\":\"" + lastAvoidanceMessage + "\"}";
+        if (lastAvoidanceMessage != "Destination reached") {
+            lastAvoidanceMessage = "";
+        }
+        server.send(200, "application/json", json);
     });
 }
 
