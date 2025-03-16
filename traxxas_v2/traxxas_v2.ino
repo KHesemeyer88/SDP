@@ -22,6 +22,8 @@
 #include "webhandlers.h"
 #include "webpage.h"
 #include "websocket_handler.h" 
+#include "logging.h"
+#include "route_logger.h"
 
 // Global objects
 WebServer server(80);
@@ -101,21 +103,35 @@ void setup() {
   delay(1000); // Give serial more time to stabilize
   Serial.println("\n\nRC Car starting up...");
   
+  // Initialize SD card logging as early as possible
+  bool loggingInitialized = initLogging();
+  if (loggingInitialized) {
+    log("RC Car starting up...");
+  }
+  
   // Initialize lidar sensors
+  Serial.println("Initializing LIDAR sensors...");
+  if (loggingInitialized) log("Initializing LIDAR sensors...");
   initializeSonar();
   delay(100);
   
   // Servo setup with delays between operations
+  Serial.println("Setting up servo timers...");
+  if (loggingInitialized) log("Setting up servo timers...");
   ESP32PWM::allocateTimer(0);
   ESP32PWM::allocateTimer(1);
   ESP32PWM::allocateTimer(2);
   ESP32PWM::allocateTimer(3);
   delay(100);
   
+  Serial.println("Configuring servo frequency...");
+  if (loggingInitialized) log("Configuring servo frequency...");
   steeringServo.setPeriodHertz(50);
   escServo.setPeriodHertz(50);
   delay(100);
   
+  Serial.println("Attaching servos to pins...");
+  if (loggingInitialized) log("Attaching servos to pins...");
   steeringServo.attach(STEERING_PIN, 1000, 2000);
   escServo.attach(ESC_PIN, 1000, 2000);
   delay(100);
@@ -123,14 +139,18 @@ void setup() {
   // Initialize ESC to neutral and allow time to initialize
   escServo.write(ESC_NEUTRAL);
   Serial.println("Servos initialized, waiting for ESC...");
+  if (loggingInitialized) log("Servos initialized, waiting for ESC...");
   delay(2000);
   
   // Center steering
   steeringServo.write(STEERING_CENTER);
+  Serial.println("Centering steering...");
+  if (loggingInitialized) log("Centering steering...");
   delay(100);
   
   // Setup WiFi first to get IP address
   Serial.printf("Connecting to WiFi network: %s\n", ssid);
+  if (loggingInitialized) log("Connecting to WiFi network: " + String(ssid));
   WiFi.begin(ssid, password);
   
   // Wait for connection with timeout
@@ -146,40 +166,103 @@ void setup() {
     Serial.printf("Connected to %s\n", ssid);
     Serial.print("ESP32 IP Address: ");
     Serial.println(WiFi.localIP());
+    
+    if (loggingInitialized) {
+      log("Connected to " + String(ssid));
+      log("ESP32 IP Address: " + WiFi.localIP().toString());
+    }
   } else {
     Serial.println();
     Serial.println("Failed to connect to WiFi");
+    if (loggingInitialized) log("Failed to connect to WiFi");
   }
   
   delay(500); // Extra delay before web server setup
   
   // Setup web server
+  Serial.println("Setting up web server...");
+  if (loggingInitialized) log("Setting up web server...");
   setupWebServerRoutes();
+  
+  Serial.println("Initializing WebSockets...");
+  if (loggingInitialized) log("Initializing WebSockets...");
   initWebSockets();
+  
   server.begin();
   Serial.println("Web server started");
+  if (loggingInitialized) log("Web server started");
   
   delay(500); // Extra delay before GNSS init
   
   // Initialize GNSS
   Serial.println("Initializing GPS...");
+  if (loggingInitialized) log("Initializing GPS...");
+  
   if (!initializeGPS()) {
     Serial.println("GNSS initialization failed. Will retry in loop");
+    if (loggingInitialized) log("GNSS initialization failed. Will retry in loop");
+    
+    // Only track the count of attempts for logging
+    int retryCount = 0;
+    unsigned long startTime = millis();
+    
     while(1) {
       server.handleClient(); // Process web requests while waiting
       Serial.println("Retrying GNSS initialization...");
       delay(1000);
+      retryCount++;
+      
       if (initializeGPS()){
         Serial.println("GNSS initialized successfully");
+        unsigned long duration = millis() - startTime;
+        
+        // Only log the final result with statistics
+        if (loggingInitialized) {
+          log("GNSS initialized successfully after " + String(retryCount) + 
+              " attempts (" + String(duration/1000.0) + " seconds)");
+        }
         break;
+      }
+      
+      // Log a status update every 10 attempts but continue trying
+      if (retryCount % 10 == 0 && loggingInitialized) {
+        log("Still trying to initialize GNSS... " + String(retryCount) + 
+            " attempts so far (" + String((millis()-startTime)/1000.0) + " seconds)");
       }
     }
   } else {
     Serial.println("GNSS initialized successfully");
+    if (loggingInitialized) log("GNSS initialized successfully on first try");
+  }
+    
+  // Log any other setup details you want to capture
+  if (loggingInitialized) {
+    log("Hardware configuration:");
+    log("- STEERING_PIN: " + String(STEERING_PIN));
+    log("- ESC_PIN: " + String(ESC_PIN));
+    log("- SD card logging enabled");
+    log("- Using LIDAR for distance sensing");
+    log("- FRONT_STOP_THRESHOLD: " + String(FRONT_STOP_THRESHOLD) + " cm");
+    log("- SIDE_AVOID_THRESHOLD: " + String(SIDE_AVOID_THRESHOLD) + " cm");
   }
   
   Serial.println("Setup complete. Entering main loop.");
+  if (loggingInitialized) {
+    log("Setup complete. Entering main loop.");
+    closeLog(); // Close the setup log file
+  }
+
+  // Initialize route logging system (uses same SD card)
+  if (loggingInitialized) {
+    bool routeLoggingInit = initRouteLogging();
+    if (routeLoggingInit) {
+      log("Route logging system initialized");
+    } else {
+      log("Route logging initialization failed");
+    }
+  }
 }
+
 void loop() {
   // SECTION 1: Things that ALWAYS happen regardless of state
   webSocket.loop();

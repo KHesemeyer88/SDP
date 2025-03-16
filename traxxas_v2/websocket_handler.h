@@ -4,6 +4,7 @@
 #include <WebSocketsServer.h>
 #include <ArduinoJson.h>
 #include "config.h"
+#include "route_logger.h"
 
 // WebSocket configuration
 const size_t JSON_CAPACITY = 512;  // Adjust based on your data needs
@@ -347,6 +348,16 @@ void processWebSocketCommand(const JsonDocument& doc) {
         waypointLats[waypointCount] = currentLat;
         waypointLons[waypointCount] = currentLon;
         waypointCount++;
+
+        // If route logging enabled:
+        if (routeLoggingEnabled) {
+          // Get RTK status
+          int rtkStatus = 0; // Default to no RTK
+          if (carrSoln == 2) rtkStatus = 2; // Fixed
+          else if (carrSoln == 1) rtkStatus = 1; // Float
+          
+          recordRouteWaypoint(currentLat, currentLon, rtkStatus, currentFixType);
+        }
         
         DynamicJsonDocument response(128);
         response["type"] = "waypoint";

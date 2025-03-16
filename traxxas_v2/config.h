@@ -4,6 +4,13 @@
 // LIDAR pins
 #define LIDAR_SDA_PIN 16  // Using previous ECHO_PIN_FRONT
 #define LIDAR_SCL_PIN 17  // Using previous TRIGGER_PIN_FRONT
+// SD Card pins
+#define SD_CS_PIN 12
+#define SD_MISO_PIN 14
+#define SD_SCK_PIN 27
+#define SD_MOSI_PIN 26
+#define SD_CD_PIN 25
+#define SD_FREQUENCY 20000000  // 20 MHz SPI frequency for SD card
 
 #include <Arduino.h>
 #include <ESP32Servo.h>
