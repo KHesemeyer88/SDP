@@ -82,32 +82,6 @@ const int NAV_FREQ = 10;
 // Sonar filtering
 const int FILTER_SAMPLES = 5;  // Number of samples to average
 
-// Global variables
-// extern WebServer server;
-// extern SFE_UBLOX_GNSS myGPS;
-// extern Servo steeringServo, escServo;
-
-// GPS and waypoints
-// extern float targetLat, targetLon;
-// extern float waypointLats[], waypointLons[];
-// extern int waypointCount, currentWaypointIndex;
-// extern bool followingWaypoints, autonomousMode, destinationReached;
-// extern volatile float currentLat, currentLon;
-// extern volatile float currentSpeed;
-// extern volatile uint8_t currentFixType;
-// extern volatile bool newPVTDataAvailable;
-
-// Sensor readings
-// extern float lastFrontDist, lastLeftDist, lastRightDist;
-// extern String lastAvoidanceMessage;
-
-// Timing variables
-// extern unsigned long lastSonarUpdate;
-// extern unsigned long lastAvoidanceTime, destinationReachedTime;
-
-// HTML content for webpage
-// extern const char webPage[] PROGMEM;
-
 // Waypoint loop settings
 //const int DEFAULT_LOOP_COUNT = 1;     // Default number of times to loop through waypoints
 const float DEFAULT_TARGET_PACE = 1;  // Default target pace in m/s (0 = no pace control)
@@ -116,25 +90,6 @@ const float DEFAULT_TARGET_DISTANCE = 0; // Default target distance in meters (0
 // Speed control values
 const int SPEED_CORRECTION_INTERVAL = 200; // How often to adjust speed for pace (ms)
 const float SPEED_CORRECTION_THRESHOLD = 0.05;  // How aggressively to correct speed (0-1)
-
-// Extended extern declarations for new tracking variables
-// extern int waypointLoopCount;         // Current count of completed loops
-// extern int targetLoopCount;           // Target number of loops to complete
-// extern float targetPace;              // Target pace in m/s
-// extern float targetDistance;          // Target total distance in meters
-// extern float totalDistance;           // Total distance traveled so far
-// extern unsigned long totalTimeMs;     // Total time elapsed in ms
-// extern float currentPace;             // Current pace in m/s
-// extern unsigned long lastPaceUpdate;  // Last time pace was calculated
-// extern float lastSegmentDistance;     // Distance of last segment for pace calculation
-// extern float lastTrackedLat;
-// extern float lastTrackedLon; 
-// extern unsigned long lastDistanceUpdate;
-
-// Straight phase variables
-// extern bool initialStraightPhase;
-// extern unsigned long straightPhaseStartTime;
-// extern const unsigned long STRAIGHT_PHASE_DURATION;
 
 // RTK Correction status tracking
 enum CorrectionStatus {

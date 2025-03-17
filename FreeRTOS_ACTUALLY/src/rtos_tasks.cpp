@@ -10,45 +10,16 @@ TaskHandle_t blinkTaskHandle = NULL;
 // Mutex for accessing shared resources
 SemaphoreHandle_t servoMutex = NULL;
 
+// Queue for passing commands from WebSocket to control task
+QueueHandle_t commandQueue = NULL;
+
+// Servo objects - these need to be defined here
 Servo steeringServo;
 Servo escServo;
 
-// Control task - handles servo commands
-void ControlTask(void *pvParameters) {
-    // Initialize task
-    Serial.println("Control Task Started");
-    
-    // Task loop
-    for (;;) {
-        // Take the mutex before accessing servos
-        if (xSemaphoreTake(servoMutex, portMAX_DELAY) == pdTRUE) {
-            // Center servos for now
-            steeringServo.write(STEERING_CENTER);
-            escServo.write(ESC_NEUTRAL);
-            
-            // Release the mutex
-            xSemaphoreGive(servoMutex);
-        }
-        
-        // Delay for 20ms (50Hz)
-        vTaskDelay(pdMS_TO_TICKS(20));
-    }
-}
-
-// WebSocket task - handles communications
-void WebSocketTask(void *pvParameters) {
-    // Initialize task
-    Serial.println("WebSocket Task Started");
-    
-    // Task loop
-    for (;;) {
-        // Simple placeholder - just print a message
-        Serial.println("WebSocket task running");
-        
-        // Delay for 1 second
-        vTaskDelay(pdMS_TO_TICKS(1000));
-    }
-}
+// Forward declarations of functions implemented in other files
+void WebSocketTask(void *pvParameters);
+void ControlTask(void *pvParameters);
 
 // Simple blink task as a sanity check
 void BlinkTask(void *pvParameters) {
@@ -69,9 +40,40 @@ void BlinkTask(void *pvParameters) {
 
 // Initialize all RTOS components
 void initRTOS() {
+    Serial.println("Initializing RTOS components...");
+    
     // Create mutex for servo access
     servoMutex = xSemaphoreCreateMutex();
-
+    if (servoMutex == NULL) {
+        Serial.println("Failed to create servo mutex!");
+    }
+    
+    // Create command queue
+    commandQueue = xQueueCreate(10, sizeof(ControlCommand));
+    if (commandQueue == NULL) {
+        Serial.println("Failed to create command queue!");
+    }
+    
+    // Initialize servos
+    ESP32PWM::allocateTimer(0);
+    ESP32PWM::allocateTimer(1);
+    ESP32PWM::allocateTimer(2);
+    ESP32PWM::allocateTimer(3);
+    
+    steeringServo.setPeriodHertz(50);
+    escServo.setPeriodHertz(50);
+    
+    steeringServo.attach(STEERING_PIN, 1000, 2000);
+    escServo.attach(ESC_PIN, 1000, 2000);
+    
+    // Initialize ESC to neutral
+    escServo.write(ESC_NEUTRAL);
+    delay(100);
+    steeringServo.write(STEERING_CENTER);
+    delay(100);
+    
+    Serial.println("Servos initialized");
+    
     // Create tasks
     xTaskCreatePinnedToCore(
         ControlTask,                // Task function
@@ -102,4 +104,6 @@ void initRTOS() {
         &blinkTaskHandle,
         0
     );
+    
+    Serial.println("RTOS tasks created");
 }
