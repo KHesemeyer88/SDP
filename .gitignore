@@ -3,3 +3,15 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+
+# Compiled output
+*.o
+*.elf
+*.bin
+
+# Debug files
+*.dSYM/
+
+# System files
+.DS_Store
+Thumbs.db

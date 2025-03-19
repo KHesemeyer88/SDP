@@ -7,6 +7,7 @@
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "esp_task_wdt.h"
+#include "http_server.h"
 #include <ESP32Servo.h>
 
 // Task priorities (1-24, higher number = higher priority)
@@ -18,6 +19,15 @@
 #define CONTROL_TASK_STACK_SIZE     4096
 #define WEBSOCKET_TASK_STACK_SIZE   8192
 #define BLINK_TASK_STACK_SIZE       2048
+// HTTP server task priority and stack size
+#define HTTP_SERVER_TASK_PRIORITY     8
+#define HTTP_SERVER_TASK_STACK_SIZE   8192
+
+// HTTP server task handle
+extern TaskHandle_t httpServerTaskHandle;
+
+// Forward declaration of HTTP server task
+void HttpServerTask(void *pvParameters);
 
 // Command types for the control queue
 enum CommandType {

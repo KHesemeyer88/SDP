@@ -1,4 +1,6 @@
 #include "rtos_tasks.h"
+#include "http_server.h"
+#include "webpage.h"
 #include "config.h"
 #include <ESP32Servo.h>
 
@@ -6,6 +8,7 @@
 TaskHandle_t controlTaskHandle = NULL;
 TaskHandle_t websocketTaskHandle = NULL;
 TaskHandle_t blinkTaskHandle = NULL;
+TaskHandle_t httpServerTaskHandle = NULL;
 
 // Mutex for accessing shared resources
 SemaphoreHandle_t servoMutex = NULL;
@@ -103,6 +106,17 @@ void initRTOS() {
         BLINK_TASK_PRIORITY,
         &blinkTaskHandle,
         0
+    );
+
+    // Create HTTP server task
+    xTaskCreatePinnedToCore(
+        HttpServerTask,
+        "HttpServerTask",
+        HTTP_SERVER_TASK_STACK_SIZE,
+        NULL,
+        HTTP_SERVER_TASK_PRIORITY,
+        &httpServerTaskHandle,
+        0  // Run on core 0, leaving core 1 for control tasks
     );
     
     Serial.println("RTOS tasks created");

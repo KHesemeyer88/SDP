@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "config.h"
 #include "rtos_tasks.h"
+#include "http_server.h"
 #include <WiFi.h>
 
 // Definition for ntripClient (declared as extern in config.h)

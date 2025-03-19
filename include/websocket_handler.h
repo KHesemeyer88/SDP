@@ -4,7 +4,7 @@
 #include <WebSocketsServer.h>
 #include <ArduinoJson.h>
 #include "config.h"
-#include "rtos_tasks.h"  // Include RTOS functionality
+#include "rtos_tasks.h"  
 
 // WebSocket configuration
 const size_t JSON_CAPACITY = 512;  // Adjust based on your data needs
