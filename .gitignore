@@ -28,3 +28,5 @@ build/
 # System files
 .DS_Store
 Thumbs.db
+
+SDP.code-workspace
