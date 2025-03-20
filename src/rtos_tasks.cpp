@@ -3,6 +3,7 @@
 #include "webpage.h"
 #include "config.h"
 #include <ESP32Servo.h>
+#include "gnss.h"
 
 // Task handles
 TaskHandle_t controlTaskHandle = NULL;
@@ -49,6 +50,18 @@ void initRTOS() {
     servoMutex = xSemaphoreCreateMutex();
     if (servoMutex == NULL) {
         Serial.println("Failed to create servo mutex!");
+    }
+    
+    // Create mutex for GNSS data access - NEW
+    gnssMutex = xSemaphoreCreateMutex();
+    if (gnssMutex == NULL) {
+        Serial.println("Failed to create GNSS mutex!");
+    }
+
+    // Create mutex for ntripClient access
+    ntripClientMutex = xSemaphoreCreateMutex();
+    if (ntripClientMutex == NULL) {
+        Serial.println("Failed to create ntripClient mutex!");
     }
     
     // Create command queue
@@ -117,6 +130,17 @@ void initRTOS() {
         HTTP_SERVER_TASK_PRIORITY,
         &httpServerTaskHandle,
         0  // Run on core 0, leaving core 1 for control tasks
+    );
+    
+    // Create GNSS task - NEW
+    xTaskCreatePinnedToCore(
+        GNSSTask,
+        "GNSSTask",
+        GNSS_TASK_STACK_SIZE,
+        NULL,
+        GNSS_TASK_PRIORITY,
+        &gnssTaskHandle,
+        1  // Run on core 1 for time-sensitive operations
     );
     
     Serial.println("RTOS tasks created");

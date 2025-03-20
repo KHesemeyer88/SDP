@@ -100,4 +100,7 @@ enum CorrectionStatus {
 
 extern WiFiClient ntripClient;
 
+// Mutex for thread-safe access to ntripClient
+extern SemaphoreHandle_t ntripClientMutex;
+
 #endif // CONFIG_H
