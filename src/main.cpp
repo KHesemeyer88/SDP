@@ -18,14 +18,13 @@ void setup() {
 
     // Initialize logging system
     if (initLogging()) {
-        LOG_INFO("Logging system initialized successfully");
+        LOG_DEBUG("Logging system initialized successfully");
     } else {
         Serial.println("Failed to initialize logging system");
     }
     
     // Connect to WiFi
-    Serial.printf("Connecting to WiFi network: %s\n", ssid);
-    LOG_INFO("Connecting to WiFi network: %s", ssid);
+    LOG_DEBUG("Connecting to WiFi network: %s", ssid);
     WiFi.begin(ssid, password);
     
     // Wait for connection with timeout
@@ -37,24 +36,17 @@ void setup() {
     }
     
     if (WiFi.status() == WL_CONNECTED) {
-        Serial.println();
-        Serial.printf("Connected to %s\n", ssid);
-        Serial.print("ESP32 IP Address: ");
-        Serial.println(WiFi.localIP());
-        LOG_INFO("Connected to WiFi: %s, IP: %s", ssid, WiFi.localIP().toString().c_str());
+        LOG_DEBUG("Connected to WiFi: %s, IP: %s", ssid, WiFi.localIP().toString().c_str());
     } else {
-        Serial.println();
-        Serial.println("Failed to connect to WiFi. Will retry in RTOS tasks.");
         LOG_ERROR("Failed to connect to WiFi. Will retry in RTOS tasks");
     }
     
     // Initialize RTOS components
-    LOG_INFO("Initializing RTOS components");
+    LOG_DEBUG("Initializing RTOS components");
     initRTOS();
     
     // Nothing else should run here - all code is now in tasks
-    Serial.println("Setup complete. RTOS scheduler taking over.");
-    LOG_INFO("Setup complete. RTOS scheduler taking over");
+    LOG_DEBUG("Setup complete. RTOS scheduler taking over");
 }
 
 void loop() {

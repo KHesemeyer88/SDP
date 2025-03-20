@@ -2,6 +2,7 @@
 #include "rtos_control.h"
 #include "config.h"
 #include <ESP32Servo.h>
+#include "logging.h"
 
 // Control task variables
 unsigned long lastCommandTime = 0;
@@ -16,12 +17,13 @@ extern Servo escServo;
 // Control task - handles servo commands
 void ControlTask(void *pvParameters) {
     // Initialize
-    Serial.println("Control Task Started");
+    LOG_DEBUG("Control Task Started");
     
     // Center steering and set neutral throttle
     if (xSemaphoreTake(servoMutex, portMAX_DELAY) == pdTRUE) {
         steeringServo.write(STEERING_CENTER);
         escServo.write(ESC_NEUTRAL);
+        LOG_DEBUG("Steering and ESC set neutral");
         xSemaphoreGive(servoMutex);
     }
     
@@ -95,14 +97,18 @@ void ControlTask(void *pvParameters) {
         unsigned long currentTime = millis();
         if (currentTime - lastCommandTime > COMMAND_TIMEOUT_MS) {
             if (xSemaphoreTake(servoMutex, portMAX_DELAY) == pdTRUE) {
+                LOG_ERROR("Command timeout - stopping vehicle");
                 escServo.write(ESC_NEUTRAL);
                 steeringServo.write(STEERING_CENTER);
                 xSemaphoreGive(servoMutex);
+            } else {
+                LOG_ERROR("Failed to acquire servo mutex for timeout handling");
             }
         }
         
         // Update driving state - exit driving state after grace period
         if (drivingState && (currentTime - lastNonNeutralCommand > DRIVING_GRACE_PERIOD)) {
+            LOG_DEBUG("Exiting driving state due to inactivity");
             drivingState = false;
         }
         

@@ -4,6 +4,7 @@
 #include "config.h"
 #include <ESP32Servo.h>
 #include "gnss.h"
+#include "logging.h"
 
 // Task handles
 TaskHandle_t controlTaskHandle = NULL;
@@ -44,30 +45,30 @@ void BlinkTask(void *pvParameters) {
 
 // Initialize all RTOS components
 void initRTOS() {
-    Serial.println("Initializing RTOS components...");
+    LOG_DEBUG("Initializing RTOS components...");
     
     // Create mutex for servo access
     servoMutex = xSemaphoreCreateMutex();
     if (servoMutex == NULL) {
-        Serial.println("Failed to create servo mutex!");
+        LOG_ERROR("Failed to create servo mutex!");
     }
     
     // Create mutex for GNSS data access - NEW
     gnssMutex = xSemaphoreCreateMutex();
     if (gnssMutex == NULL) {
-        Serial.println("Failed to create GNSS mutex!");
+        LOG_ERROR("Failed to create GNSS mutex!");
     }
 
     // Create mutex for ntripClient access
     ntripClientMutex = xSemaphoreCreateMutex();
     if (ntripClientMutex == NULL) {
-        Serial.println("Failed to create ntripClient mutex!");
+        LOG_ERROR("Failed to create ntripClient mutex!");
     }
     
     // Create command queue
     commandQueue = xQueueCreate(10, sizeof(ControlCommand));
     if (commandQueue == NULL) {
-        Serial.println("Failed to create command queue!");
+        LOG_ERROR("Failed to create command queue!");
     }
     
     // Initialize servos
@@ -88,7 +89,7 @@ void initRTOS() {
     steeringServo.write(STEERING_CENTER);
     delay(100);
     
-    Serial.println("Servos initialized");
+    LOG_DEBUG("Servos initialized");
     
     // Create tasks
     xTaskCreatePinnedToCore(
@@ -144,4 +145,5 @@ void initRTOS() {
     );
     
     Serial.println("RTOS tasks created");
+    LOG_DEBUG("RTOS tasks created");
 }

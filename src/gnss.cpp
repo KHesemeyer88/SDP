@@ -1,6 +1,10 @@
 #include "gnss.h"
 #include "websocket_handler.h"
 #include "logging.h"
+#include <sys/time.h>
+
+// Flag to track if the system time has been set
+static bool systemTimeSet = false;
 
 // GNSS task handle
 TaskHandle_t gnssTaskHandle = NULL;
@@ -31,6 +35,27 @@ void pvtCallback(UBX_NAV_PVT_data_t *pvtData) {
         gnssData.fixType = pvtData->fixType;
         gnssData.carrSoln = pvtData->flags.bits.carrSoln;
         gnssData.hAcc = pvtData->hAcc / 10.0; // cm
+
+        // Set system time once, after acquiring a valid 3D fix
+        if (!systemTimeSet && pvtData->fixType >= 3) {  
+            struct tm timeinfo = {0};
+            timeinfo.tm_year = pvtData->year - 1900;
+            timeinfo.tm_mon  = pvtData->month - 1;
+            timeinfo.tm_mday = pvtData->day;
+            timeinfo.tm_hour = pvtData->hour;
+            timeinfo.tm_min  = pvtData->min;
+            timeinfo.tm_sec  = 0; // Set seconds to 0 since you don't need precision
+
+            time_t epochTime = mktime(&timeinfo);
+            struct timeval tv = { .tv_sec = epochTime, .tv_usec = 0 };
+            settimeofday(&tv, NULL);
+
+            systemTimeSet = true;  // Prevent future updates
+            LOG_DEBUG("------------------------------------------");
+            LOG_DEBUG("System time set from GNSS: %04d-%02d-%02d %02d:%02d (UTC)",
+                pvtData->year, pvtData->month, pvtData->day, pvtData->hour, pvtData->min);
+            LOG_DEBUG("------------------------------------------");
+        }
         
         // Set flag to indicate new data is available
         gnssData.newDataAvailable = true;
@@ -56,11 +81,11 @@ bool initializeGNSS() {
     Wire.begin(32, 33); // Using default I2C pins
     
     if (!myGPS.begin()) {
-        Serial.println("u-blox GNSS not detected. Check wiring.");
+        LOG_ERROR("u-blox GNSS not detected. Check wiring.");
         return false;
     }
     
-    Serial.println("GNSS module found!");
+    LOG_DEBUG("GNSS module found!");
     
     myGPS.setNavigationFrequency(NAV_FREQ);
     myGPS.setI2CInput(COM_TYPE_UBX | COM_TYPE_NMEA | COM_TYPE_RTCM3);
@@ -74,14 +99,13 @@ bool initializeGNSS() {
     
     // Disable sensor fusion
     if (!myGPS.setVal8(UBLOX_CFG_SFCORE_USE_SF, 0)) {
-        Serial.println("Failed to disable sensor fusion.");
+        LOG_ERROR("Failed to disable sensor fusion.");
     } else {
-        Serial.println("IMU sensor fusion disabled.");
+        LOG_DEBUG("IMU sensor fusion disabled.");
     }
     
     return true;
 }
-
 // Get fusion status from IMU
 String getFusionStatus() {
     // Temporarily set nav frequency to 1Hz for status check
@@ -112,6 +136,7 @@ String getFusionStatus() {
     return fusionStatus;
 }
 
+// Process RTK connection
 // Process RTK connection
 bool processGNSSConnection() {
     bool clientConnected = false;
@@ -165,7 +190,7 @@ bool processGNSSConnection() {
     // Check for timeout, but don't block - just report status
     if ((millis() - lastReceivedRTCM_ms) > maxTimeBeforeHangup_ms) {
         correctionAge = millis() - lastReceivedRTCM_ms;
-        LOG_WARNING("RTCM corrections timed out (%lu ms)", correctionAge);
+        LOG_ERROR("RTCM corrections timed out (%lu ms)", correctionAge);
         return false;
     }
 
@@ -184,13 +209,14 @@ bool processGNSSConnection() {
     }
     
     if (oldStatus != rtcmCorrectionStatus) {
-        LOG_INFO("RTCM correction status changed: %d -> %d", oldStatus, rtcmCorrectionStatus);
+        LOG_DEBUG("RTCM correction status changed: %d -> %d", oldStatus, rtcmCorrectionStatus);
     }
     
-    LOG_DEBUG("Total GNSS connection processing took %lu ms", millis() - startTime);
+    LOG_PERF("Total GNSS connection processing took %lu ms", millis() - startTime);
     return clientConnected;
-}// Connect to NTRIP caster
+}
 
+// Connect to NTRIP caster
 bool connectToNTRIP() {
     bool isConnected = false;
 
@@ -199,11 +225,10 @@ bool connectToNTRIP() {
         isConnected = ntripClient.connected();
         
         if (!isConnected) {
-            Serial.print("Connecting to NTRIP caster: ");
-            Serial.println(casterHost);
+            LOG_DEBUG("Connecting to NTRIP caster: %s", casterHost);
             
             if (!ntripClient.connect(casterHost, casterPort)) {
-                Serial.println("Connection to caster failed");
+                LOG_ERROR("Connection to caster failed");
                 xSemaphoreGive(ntripClientMutex);
                 return false;
             }
@@ -225,7 +250,7 @@ bool connectToNTRIP() {
             unsigned long startTime = millis();
             while (ntripClient.available() == 0) {
                 if (millis() > (startTime + 5000)) {
-                    Serial.println("Caster timed out!");
+                    LOG_ERROR("Caster timed out!");
                     ntripClient.stop();
                     xSemaphoreGive(ntripClientMutex);
                     return false;
@@ -241,7 +266,7 @@ bool connectToNTRIP() {
                 
                 // Recheck if connection is still valid
                 if (!ntripClient.connected()) {
-                    Serial.println("Connection lost during response wait");
+                    LOG_ERROR("Connection lost during response wait");
                     xSemaphoreGive(ntripClientMutex);
                     return false;
                 }
@@ -263,7 +288,7 @@ bool connectToNTRIP() {
                         connectionResult = 200;
                     }
                     if (strstr(response, "401") != nullptr) { //Look for '401 Unauthorized'
-                        Serial.println("Hey - your credentials look bad! Check your caster username and password.");
+                        LOG_ERROR("Bad credentials! Check caster username and password.");
                         connectionResult = 401;
                     }
                 }
@@ -272,13 +297,11 @@ bool connectToNTRIP() {
             response[responseSpot] = '\0'; // NULL-terminate the response
             
             if (connectionResult != 200) {
-                Serial.print("Failed to connect to ");
-                Serial.println(casterHost);
+                LOG_ERROR("Failed to connect to %s", casterHost);
                 xSemaphoreGive(ntripClientMutex);
                 return false;
             } else {
-                Serial.print("Connected to: ");
-                Serial.println(casterHost);
+                LOG_DEBUG("Connected to: %s", casterHost);
                 lastReceivedRTCM_ms = millis(); // Reset timeout
                 isConnected = true;
             }
@@ -293,16 +316,16 @@ bool connectToNTRIP() {
 
 // GNSS task function
 void GNSSTask(void *pvParameters) {
-    LOG_INFO("GNSS Task Started");
+    LOG_DEBUG("GNSS Task Started");
     
     // Initialize GNSS module
     if (!initializeGNSS()) {
-        LOG_WARNING("GNSS initialization failed. Retrying...");
+        LOG_ERROR("GNSS initialization failed. Retrying...");
         
         int retryCount = 0;
         while (!initializeGNSS()) {
             retryCount++;
-            LOG_WARNING("GNSS initialization retry #%d", retryCount);
+            LOG_ERROR("GNSS initialization retry #%d", retryCount);
             vTaskDelay(pdMS_TO_TICKS(1000)); // Wait 1 second between retries
             
             // After 10 retries, reset ESP32
@@ -325,7 +348,7 @@ void GNSSTask(void *pvParameters) {
         myGPS.checkCallbacks();
         unsigned long pollTime = millis() - pollStartTime;
         if (pollTime > 100) {  // Only log if it took significant time
-            LOG_DEBUG("GNSS polling took %lu ms", pollTime);
+            LOG_PERF("GNSS polling took %lu ms", pollTime);
         }
         
         // Process RTK connection with timing
@@ -333,7 +356,7 @@ void GNSSTask(void *pvParameters) {
         bool rtcmConnected = processGNSSConnection();
         unsigned long rtcmProcessTime = millis() - rtcmStartTime;
         if (rtcmProcessTime > 100) {  // Only log if it took significant time
-            LOG_DEBUG("RTCM connection processing took %lu ms", rtcmProcessTime);
+            LOG_PERF("RTCM connection processing took %lu ms", rtcmProcessTime);
         }
         
         // Attempt to reconnect to NTRIP if needed
@@ -365,13 +388,13 @@ void GNSSTask(void *pvParameters) {
             xSemaphoreGive(gnssMutex);
             LOG_DEBUG("GNSS task released GNSS mutex (held for %lu ms)", mutexHeldTime);
         } else {
-            LOG_WARNING("GNSS task failed to acquire GNSS mutex within timeout");
+            LOG_ERROR("GNSS task failed to acquire GNSS mutex within timeout");
         }
         
         // Log total loop time if significant
         unsigned long loopTime = millis() - loopStartTime;
         if (loopTime > 200) {  // Only log if the loop took a significant amount of time
-            LOG_DEBUG("GNSS task loop iteration took %lu ms", loopTime);
+            LOG_PERF("GNSS task loop iteration took %lu ms", loopTime);
         }
         
         // Use a short delay to prevent task starvation

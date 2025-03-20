@@ -1,6 +1,7 @@
 #include "http_server.h"
 #include "webpage.h"
 #include "rtos_tasks.h"
+#include "logging.h"
 
 // HTTP server instance on port 80
 AsyncWebServer server(80);
@@ -23,13 +24,13 @@ void initHttpServer() {
     
     // Start the server
     server.begin();
-    Serial.println("HTTP server initialized and ready to start");
+    LOG_DEBUG("HTTP server initialized and ready to start");
 }
 
 // HTTP server task function
 void HttpServerTask(void *pvParameters) {
     // Initialize task
-    Serial.println("HTTP Server Task Started");
+    LOG_DEBUG("HTTP Server Task Started");
     
     // Initialize server routes and start the server
     initHttpServer();

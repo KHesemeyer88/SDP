@@ -17,13 +17,13 @@ unsigned long lastWSStatsUpdate = 0;
 void webSocketEventRTOS(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
     switch(type) {
         case WStype_DISCONNECTED:
-            LOG_INFO("WebSocket client #%u disconnected", num);
+            LOG_ERROR("WebSocket client #%u disconnected", num);
             break;
             
         case WStype_CONNECTED:
             {
                 IPAddress ip = webSocket.remoteIP(num);
-                LOG_INFO("WebSocket client #%u connected from %d.%d.%d.%d", 
+                LOG_DEBUG("WebSocket client #%u connected from %d.%d.%d.%d", 
                     num, ip[0], ip[1], ip[2], ip[3]);
                 
                 // Send initial state to newly connected client
@@ -119,7 +119,7 @@ void WebSocketTask(void *pvParameters) {
     // Initialize WebSocket server
     webSocket.begin();
     webSocket.onEvent(webSocketEventRTOS);
-    LOG_INFO("WebSocket server started on port 81");
+    LOG_DEBUG("WebSocket server started on port 81");
     
     unsigned long lastStatusLog = 0;
     unsigned long lastSystemStatsLog = 0;
@@ -143,16 +143,16 @@ void WebSocketTask(void *pvParameters) {
         // Log connection status periodically (every 5 seconds)
         if (currentTime - lastStatusLog >= 5000) {
             lastStatusLog = currentTime;
-            LOG_INFO("WebSocket clients connected: %d", webSocket.connectedClients());
+            LOG_DEBUG("WebSocket clients connected: %d", webSocket.connectedClients());
         }
         
         // Log system stats periodically (every 30 seconds)
         if (currentTime - lastSystemStatsLog >= 30000) {
             lastSystemStatsLog = currentTime;
-            LOG_INFO("System stats: Free heap: %u bytes", ESP.getFreeHeap());
-            LOG_INFO("WebSocket task stack high water mark: %u", uxTaskGetStackHighWaterMark(websocketTaskHandle));
-            LOG_INFO("GNSS task stack high water mark: %u", uxTaskGetStackHighWaterMark(gnssTaskHandle));
-            LOG_INFO("Control task stack high water mark: %u", uxTaskGetStackHighWaterMark(controlTaskHandle));
+            LOG_DEBUG("System stats: Free heap: %u bytes", ESP.getFreeHeap());
+            LOG_DEBUG("WebSocket task stack high water mark: %u", uxTaskGetStackHighWaterMark(websocketTaskHandle));
+            LOG_DEBUG("GNSS task stack high water mark: %u", uxTaskGetStackHighWaterMark(gnssTaskHandle));
+            LOG_DEBUG("Control task stack high water mark: %u", uxTaskGetStackHighWaterMark(controlTaskHandle));
         }
         
         // Send periodic updates with timing information

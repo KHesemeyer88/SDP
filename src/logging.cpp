@@ -10,44 +10,39 @@
 #define LOG_FLUSH_INTERVAL 5000  // 5 seconds
 
 // Global variables
-bool loggingEnabled = true;
+LogLevel currentLogLevel = LOG_DEBUG; // Default to debug level
 QueueHandle_t logQueue = NULL;
 TaskHandle_t logTaskHandle = NULL;
 static File logFile;
 static SemaphoreHandle_t logFileMutex = NULL;
-static const char* logLevelNames[] = {"DEBUG", "INFO", "WARNING", "ERROR"};
+static const char* logLevelNames[] = {"NONE", "ERROR", "DEBUG", "PERF"};
 
 // Initialize the logging system
 bool initLogging() {
-    if (!loggingEnabled) return true; // Successfully "disabled"
+    if (currentLogLevel == LOG_NONE) return true; // Logging "disabled"
 
-    Serial.println("Initializing SD card for logging...");
-    
     // Configure SPI for SD card
     SPI.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
     
     // Initialize SD card
     if (!SD.begin(SD_CS_PIN, SPI, SD_FREQUENCY)) {
-        Serial.println("SD Card initialization failed. Logging disabled.");
-        loggingEnabled = false;
+        // Can't use logging here, but we still need some indication
+        // Just return false - the calling function can decide what to do
+        currentLogLevel = LOG_NONE;
         return false;
     }
-    
-    Serial.println("SD Card initialized successfully for logging.");
     
     // Create mutex for file access
     logFileMutex = xSemaphoreCreateMutex();
     if (logFileMutex == NULL) {
-        Serial.println("Failed to create log file mutex!");
-        loggingEnabled = false;
+        currentLogLevel = LOG_NONE;
         return false;
     }
     
     // Create log message queue
     logQueue = xQueueCreate(LOG_QUEUE_SIZE, sizeof(LogMessage));
     if (logQueue == NULL) {
-        Serial.println("Failed to create log queue!");
-        loggingEnabled = false;
+        currentLogLevel = LOG_NONE;
         return false;
     }
     
@@ -63,8 +58,7 @@ bool initLogging() {
     );
     
     if (xReturned != pdPASS) {
-        Serial.println("Failed to create log task!");
-        loggingEnabled = false;
+        currentLogLevel = LOG_NONE;
         return false;
     }
     
@@ -72,9 +66,8 @@ bool initLogging() {
     if (xSemaphoreTake(logFileMutex, portMAX_DELAY) == pdTRUE) {
         logFile = SD.open(LOG_FILE_PATH, FILE_APPEND);
         if (!logFile) {
-            Serial.println("Failed to open log file!");
             xSemaphoreGive(logFileMutex);
-            loggingEnabled = false;
+            currentLogLevel = LOG_NONE;
             return false;
         }
         
@@ -85,13 +78,10 @@ bool initLogging() {
         
         xSemaphoreGive(logFileMutex);
     } else {
-        Serial.println("Failed to obtain log file mutex!");
-        loggingEnabled = false;
+        currentLogLevel = LOG_NONE;
         return false;
     }
     
-    // Log the initialization event
-    LOG_INFO("Logging system initialized successfully");
     return true;
 }
 
@@ -99,8 +89,6 @@ bool initLogging() {
 void logTask(void *pvParameters) {
     LogMessage msg;
     unsigned long lastFlushTime = millis();
-    
-    Serial.println("Log task started");
     
     for (;;) {
         // Check if there are messages in the queue
@@ -140,9 +128,11 @@ void logTask(void *pvParameters) {
     }
 }
 
+
 // Log a message with the given level
 bool logMessage(LogLevel level, const char* format, ...) {
-    if (!loggingEnabled || logQueue == NULL) return false;
+    // Skip if logging is disabled (LOG_NONE) or if level is not included in current setting
+    if (currentLogLevel == LOG_NONE || level > currentLogLevel || logQueue == NULL) return false;
     
     LogMessage msg;
     msg.level = level;
@@ -162,19 +152,13 @@ bool logMessage(LogLevel level, const char* format, ...) {
     vsnprintf(msg.message, sizeof(msg.message), format, args);
     va_end(args);
     
-    // Also print to Serial for debug purposes
-    Serial.printf("[%u][%s][%s] %s\n", msg.timestamp, logLevelNames[msg.level], msg.taskName, msg.message);
-    
     // Send message to queue with timeout to prevent blocking
     return (xQueueSend(logQueue, &msg, pdMS_TO_TICKS(100)) == pdPASS);
 }
 
 // Close the logging system
 void closeLogging() {
-    if (!loggingEnabled) return;
-    
-    // Log the closing event
-    LOG_INFO("Logging system shutting down");
+    if (currentLogLevel == LOG_NONE) return;
     
     // Wait for queue to empty (with timeout)
     unsigned long startTime = millis();
@@ -207,5 +191,5 @@ void closeLogging() {
         logFileMutex = NULL;
     }
     
-    loggingEnabled = false;
+    currentLogLevel = LOG_NONE;
 }

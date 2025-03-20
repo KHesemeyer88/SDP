@@ -9,13 +9,14 @@
 #include "freertos/queue.h"
 #include "config.h"
 
-// Log levels
 enum LogLevel {
-    LOG_DEBUG,
-    LOG_INFO,
-    LOG_WARNING,
-    LOG_ERROR
+    LOG_NONE,       // No logging at all
+    LOG_ERROR,      // Errors and warnings (issues that need attention)
+    LOG_DEBUG,      // General information and debug details
+    LOG_PERF        // Performance metrics and timing data
 };
+
+extern LogLevel currentLogLevel;
 
 // Log message structure
 struct LogMessage {
@@ -38,8 +39,7 @@ void closeLogging();
 
 // Helper macros for easier logging
 #define LOG_DEBUG(fmt, ...) logMessage(LOG_DEBUG, fmt, ##__VA_ARGS__)
-#define LOG_INFO(fmt, ...) logMessage(LOG_INFO, fmt, ##__VA_ARGS__)
-#define LOG_WARNING(fmt, ...) logMessage(LOG_WARNING, fmt, ##__VA_ARGS__)
 #define LOG_ERROR(fmt, ...) logMessage(LOG_ERROR, fmt, ##__VA_ARGS__)
+#define LOG_PERF(fmt, ...) logMessage(LOG_PERF, fmt, ##__VA_ARGS__)
 
 #endif // LOGGING_H
