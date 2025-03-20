@@ -3,6 +3,8 @@
 #include "config.h"
 #include <ESP32Servo.h>
 #include "logging.h"
+#include "navigation.h"
+#include "gnss.h"
 
 // Control task variables
 unsigned long lastCommandTime = 0;
@@ -10,109 +12,251 @@ bool drivingState = false;
 unsigned long lastNonNeutralCommand = 0;
 const unsigned long DRIVING_GRACE_PERIOD = 1500; // 1.5 seconds grace period
 
+// For PI control
+static float cumulativeError = 0;
+static int lastEscCommand = ESC_MIN_FWD;
+
 // Servo objects
 extern Servo steeringServo;
 extern Servo escServo;
 
-// Control task - handles servo commands
+// In rtos_control.cpp
+
+#include "rtos_tasks.h"
+#include "rtos_control.h"
+#include "navigation.h"
+#include "gnss.h"
+#include "logging.h"
+#include "config.h"
+
+// Control task function
 void ControlTask(void *pvParameters) {
-    // Initialize
-    LOG_DEBUG("Control Task Started");
+    ControlCommand currentCmd;
+    TickType_t xLastWakeTime;
+    const TickType_t xFrequency = pdMS_TO_TICKS(1000 / CONTROL_UPDATE_FREQUENCY);
     
-    // Center steering and set neutral throttle
-    if (xSemaphoreTake(servoMutex, portMAX_DELAY) == pdTRUE) {
-        steeringServo.write(STEERING_CENTER);
-        escServo.write(ESC_NEUTRAL);
-        LOG_DEBUG("Steering and ESC set neutral");
-        xSemaphoreGive(servoMutex);
-    }
+    // Local variables for position, heading, target
+    float currentLat, currentLon, currentSpeed, currentHeading;
+    float targetLat, targetLon;
+    bool autonomousActive, isPaused, followingWaypoints;
     
-    // Local command variable
-    ControlCommand cmd;
+    LOG_DEBUG("Control task started");
+    
+    // Initialize time for consistent frequency
+    xLastWakeTime = xTaskGetTickCount();
     
     // Task loop
-    for (;;) {
-        // Check for new commands in queue
-        if (commandQueue != NULL && xQueueReceive(commandQueue, &cmd, 0) == pdPASS) {
-            // Process command based on type
-            switch (cmd.type) {
-                case CMD_MANUAL_CONTROL:
-                    // Update driving state
-                    drivingState = cmd.manual.isDriving;
+    while (true) {
+        unsigned long currentTime = millis();
+        
+        // Check for manual control commands
+        if (xQueueReceive(commandQueue, &currentCmd, 0) == pdTRUE) {
+            // Process the command based on type
+            if (currentCmd.type == CMD_MANUAL_CONTROL) {
+                // Manual control command received
+                
+                // Update driving state and timestamp
+                drivingState = currentCmd.manual.isDriving;
+                if (drivingState) {
+                    lastNonNeutralCommand = currentTime;
+                }
+                
+                // Apply manual control if we're not in autonomous mode
+                if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+                    // Check if we're in autonomous mode
+                    autonomousActive = navStatus.autonomousMode;
+                    xSemaphoreGive(navDataMutex);
                     
-                    if (drivingState) {
-                        lastNonNeutralCommand = millis();
+                    if (!autonomousActive) {
+                        // Apply manual control commands to servos
+                        if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+                            // Map joystick to servo values
+                            int steeringValue = STEERING_CENTER + (currentCmd.manual.steering * STEERING_MAX);
+                            
+                            // Apply steering limit
+                            steeringValue = constrain(steeringValue, 
+                                              STEERING_CENTER - STEERING_MAX, 
+                                              STEERING_CENTER + STEERING_MAX);
+                            
+                            // Apply throttle based on joystick position
+                            int throttleValue;
+                            if (currentCmd.manual.throttle > 0) {
+                                // Forward
+                                throttleValue = ESC_NEUTRAL + (currentCmd.manual.throttle * (ESC_MAX_FWD - ESC_NEUTRAL));
+                            } else if (currentCmd.manual.throttle < 0) {
+                                // Reverse
+                                throttleValue = ESC_NEUTRAL + (currentCmd.manual.throttle * (ESC_NEUTRAL - ESC_MIN_REV));
+                            } else {
+                                // Neutral
+                                throttleValue = ESC_NEUTRAL;
+                            }
+                            
+                            // Apply servo commands
+                            steeringServo.write(steeringValue);
+                            escServo.write(throttleValue);
+                            
+                            // Update command timestamp
+                            lastCommandTime = currentTime;
+                            
+                            xSemaphoreGive(servoMutex);
+                        }
                     }
-                    
-                    // Take mutex before accessing servos
-                    if (xSemaphoreTake(servoMutex, portMAX_DELAY) == pdTRUE) {
-                        // Map joystick values to servo values
-                        float normalizedY = cmd.manual.throttle;
-                        float normalizedX = cmd.manual.steering;
-                        
-                        // Calculate ESC (throttle) value
-                        int escValue;
-                        const float JOYSTICK_DEADZONE = 0.03f;
-                        
-                        if (abs(normalizedY) < JOYSTICK_DEADZONE) {
-                            escValue = ESC_NEUTRAL;
-                        }
-                        else if (normalizedY > 0) {
-                            escValue = ESC_NEUTRAL + normalizedY * (ESC_MAX_FWD - ESC_NEUTRAL);
-                        }
-                        else {
-                            escValue = ESC_NEUTRAL + normalizedY * (ESC_NEUTRAL - ESC_MAX_REV);
-                        }
-                        
-                        // Apply ESC deadzone
-                        if (escValue < ESC_MIN_FWD && escValue > ESC_MIN_REV) {
-                            escValue = ESC_NEUTRAL;
-                        }
-                        
-                        // Calculate steering value
-                        int steeringValue = STEERING_CENTER + normalizedX * STEERING_MAX;
-                        
-                        // Constrain values to valid ranges
-                        steeringValue = constrain(steeringValue, STEERING_CENTER - STEERING_MAX, STEERING_CENTER + STEERING_MAX);
-                        escValue = constrain(escValue, ESC_MAX_REV, ESC_MAX_FWD);
-                        
-                        // Apply to servos
-                        steeringServo.write(steeringValue);
-                        escServo.write(escValue);
-                        lastCommandTime = millis();
-                        
-                        // Release mutex
-                        xSemaphoreGive(servoMutex);
-                    }
-                    break;
-                    
-                // Other command types will be added later
-                default:
-                    // Unknown command type
-                    break;
+                }
+            }
+            // Add other command types as needed
+        }
+        
+        // Check navigation status for autonomous control
+        NavStatus nav;
+        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+            nav.autonomousMode = navStatus.autonomousMode;
+            nav.isPaused = navStatus.isPaused;
+            nav.targetPace = navStatus.targetPace;
+            xSemaphoreGive(navDataMutex);
+        }
+        
+        // If we're in autonomous mode and not paused, apply navigation control
+        if (nav.autonomousMode && !nav.isPaused) {
+            // Get current GNSS data
+            if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+                currentLat = gnssData.latitude;
+                currentLon = gnssData.longitude;
+                currentSpeed = gnssData.speed;
+                xSemaphoreGive(gnssMutex);
+                // Make a direct call to get fresh heading
+                currentHeading = myGPS.getHeading() / 100000.0; // Convert to degrees
+            }
+            
+            // Get target data
+            if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+                targetLat = targetData.targetLat;
+                targetLon = targetData.targetLon;
+                followingWaypoints = targetData.followingWaypoints;
+                xSemaphoreGive(waypointMutex);
+            }
+            
+            // Calculate steering angle based on current and target positions
+            int steeringAngle = calculateSteeringAngle(currentLat, currentLon, targetLat, targetLon, currentHeading);
+            
+            // Calculate throttle value based on pace control
+            int throttleValue = calculateThrottle(currentSpeed, nav.targetPace);
+            
+            // Apply control commands
+            if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+                steeringServo.write(steeringAngle);
+                escServo.write(throttleValue);
+                xSemaphoreGive(servoMutex);
+            }
+            
+            // Update command timestamp
+            lastCommandTime = currentTime;
+        }
+        else if (nav.autonomousMode && nav.isPaused) {
+            // If paused, set motor to neutral but maintain steering
+            if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+                escServo.write(ESC_NEUTRAL);
+                xSemaphoreGive(servoMutex);
             }
         }
         
-        // Safety timeouts - if no commands for a while, stop the car
-        unsigned long currentTime = millis();
+        // Safety timeout - stop if no recent commands
         if (currentTime - lastCommandTime > COMMAND_TIMEOUT_MS) {
-            if (xSemaphoreTake(servoMutex, portMAX_DELAY) == pdTRUE) {
-                LOG_ERROR("Command timeout - stopping vehicle");
+            if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
                 escServo.write(ESC_NEUTRAL);
                 steeringServo.write(STEERING_CENTER);
                 xSemaphoreGive(servoMutex);
-            } else {
-                LOG_ERROR("Failed to acquire servo mutex for timeout handling");
             }
         }
         
-        // Update driving state - exit driving state after grace period
-        if (drivingState && (currentTime - lastNonNeutralCommand > DRIVING_GRACE_PERIOD)) {
-            LOG_DEBUG("Exiting driving state due to inactivity");
-            drivingState = false;
-        }
-        
-        // Small delay
-        vTaskDelay(pdMS_TO_TICKS(20)); // 50Hz update rate
+        // Use vTaskDelayUntil to ensure consistent timing
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
+}
+
+// Calculate steering angle based on current position, target, and heading
+int calculateSteeringAngle(float currentLat, float currentLon, float targetLat, float targetLon, float currentHeading) {
+    // Calculate bearing to target
+    float bearing = calculateBearing(currentLat, currentLon, targetLat, targetLon);
+    
+    // Calculate heading error (difference between bearing and current heading)
+    float headingError = bearing - currentHeading;
+    
+    // Normalize heading error to -180 to 180 range
+    if (headingError > 180) headingError -= 360;
+    if (headingError < -180) headingError += 360;
+    
+    // Determine correction factor based on GNSS quality
+    float correctionFactor = 0.35; // Default value
+    
+    // For large errors (> 45°), use full steering capability
+    if (abs(headingError) > 45.0) {
+        // Apply maximum steering in the appropriate direction
+        return (headingError > 0) ? 
+                STEERING_CENTER + STEERING_MAX : 
+                STEERING_CENTER - STEERING_MAX;
+    } 
+    // For moderate to small errors, use proportional control
+    else {
+        // Linear scaling for smooth transition to maximum steering
+        float scaleFactor = correctionFactor * (45.0 / STEERING_MAX);
+        int steeringAngle = STEERING_CENTER + (headingError * scaleFactor);
+        
+        // Apply steering limits
+        return constrain(steeringAngle, 
+                         STEERING_CENTER - STEERING_MAX, 
+                         STEERING_CENTER + STEERING_MAX);
+    }
+}
+
+// Calculate throttle value based on current speed and target pace
+int calculateThrottle(float currentSpeed, float targetPace) {
+    // Only adjust speed if we have a target pace
+    if (targetPace <= 0) {
+        return ESC_NEUTRAL; // Stop if no target pace
+    }
+    
+    // Static variables for PI control
+    static float cumulativeError = 0;
+    static int lastEscCommand = ESC_MIN_FWD;
+    
+    // Calculate pace error
+    float paceError = targetPace - currentSpeed;
+    int adjustmentValue = 0;
+    
+    // Vehicle is stopped or moving very slowly (GPS noise)
+    if (currentSpeed < 0.5) {
+        // Initial push to overcome inertia
+        lastEscCommand = ESC_MIN_FWD + 15;
+        cumulativeError = 0; // Reset integral term
+    }
+    // Normal PI control operation when vehicle is moving
+    else {
+        // Proportional component
+        float pComponent = paceError * 1.5;
+        
+        // Integral component with slower accumulation
+        cumulativeError = constrain(cumulativeError + paceError * 0.03, -3.0, 5.0);
+        
+        // Integral gain
+        float iComponent = cumulativeError * 1.0;
+        
+        // Combined adjustment
+        adjustmentValue = (int)(pComponent + iComponent);
+        
+        // Constrain adjustment to prevent lurching
+        adjustmentValue = constrain(adjustmentValue, -1, 1);
+        
+        // Calculate new ESC value
+        lastEscCommand = lastEscCommand + adjustmentValue;
+    }
+    
+    // Minimum throttle floor based on target pace
+    float minPowerLevel = ESC_MIN_FWD + (targetPace * 10.0);
+    
+    if (currentSpeed > 0.5 && lastEscCommand < minPowerLevel) {
+        lastEscCommand = (int)minPowerLevel;
+    }
+    
+    // Constrain final value
+    return constrain(lastEscCommand, ESC_MIN_FWD, ESC_MAX_FWD);
 }

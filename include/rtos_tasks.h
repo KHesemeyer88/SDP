@@ -12,7 +12,7 @@
 
 // Task priorities (1-24, higher number = higher priority)
 #define CONTROL_TASK_PRIORITY       10
-#define WEBSOCKET_TASK_PRIORITY     10
+#define WEBSOCKET_TASK_PRIORITY     7
 #define BLINK_TASK_PRIORITY         1
 
 // Task stack sizes

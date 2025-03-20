@@ -4,6 +4,7 @@
 #include "http_server.h"
 #include <WiFi.h>
 #include "logging.h"
+#include "navigation.h"
 
 // Definition for ntripClient (declared as extern in config.h)
 WiFiClient ntripClient;
@@ -41,10 +42,17 @@ void setup() {
         LOG_ERROR("Failed to connect to WiFi. Will retry in RTOS tasks");
     }
     
+    // In your setup() function
+    if (!initNavigation()) {
+        LOG_ERROR("Failed to initialize navigation system");
+    } else {
+        LOG_DEBUG("Navigation system initialized successfully");
+    }
+    
     // Initialize RTOS components
     LOG_DEBUG("Initializing RTOS components");
     initRTOS();
-    
+
     // Nothing else should run here - all code is now in tasks
     LOG_DEBUG("Setup complete. RTOS scheduler taking over");
 }

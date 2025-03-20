@@ -9,7 +9,7 @@
 #include "freertos/semphr.h"
 
 // Task priorities and stack sizes
-#define GNSS_TASK_PRIORITY       9  // Lower than control but higher than websocket
+#define GNSS_TASK_PRIORITY       9  // Lower than control but higher than websocket?
 #define GNSS_TASK_STACK_SIZE     8192
 
 // GNSS task handle
@@ -26,6 +26,7 @@ struct GNSSData {
     float latitude;
     float longitude;
     float speed;
+    float heading; 
     uint8_t fixType;
     int carrSoln;
     double hAcc;

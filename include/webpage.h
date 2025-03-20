@@ -153,9 +153,9 @@ const char webPage[] PROGMEM = R"rawliteral(
                         <label for="target-distance">Distance (m):</label>
                         <input type="number" id="target-distance" class="coordinate-input" value="0" min="0" style="width: 80px;">
                     </div>
-                    <button class="submit-btn" onclick="startAutonomousMode()">Start</button>
-                    <button class="submit-btn" style="background-color: #dc3545;" onclick="stopAutonomousMode()">Stop</button>
-                    <button class="submit-btn" style="background-color: #ffc107;" onclick="resetTracking()">Reset Tracking</button>
+                    <button id="start-pause-btn" class="submit-btn" onclick="toggleStartPause()">Start</button>
+                    <button id="stop-btn" class="submit-btn" style="background-color: #dc3545;" onclick="stopAutonomousMode()">Stop</button>
+                    <button id="reset-tracking-btn" class="submit-btn" style="background-color: #ffc107;" onclick="resetTracking()">Reset Tracking</button>
                 </div>
                 <div style="flex: 1; min-width: 250px; max-width: 350px;">
                     <div style="background: #f0f0f0; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
@@ -201,6 +201,10 @@ const char webPage[] PROGMEM = R"rawliteral(
     let isDragging = false;
     let updateInterval = null;
 
+    // Global variable to track navigation state
+    let navigationActive = false;
+    let navigationPaused = false;
+
     // Canvas drawing function
     function drawJoystick() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -228,6 +232,20 @@ const char webPage[] PROGMEM = R"rawliteral(
             document.getElementById('manual-btn').className = 'inactive';
             document.getElementById('auto-btn').className = 'active';
             document.getElementById('manual-gps-data').style.display = 'none';
+        }
+    }
+
+    // Toggle between start and pause
+    function toggleStartPause() {
+        if (!navigationActive) {
+            // Start navigation
+            startAutonomousMode();
+        } else if (navigationPaused) {
+            // Resume navigation
+            resumeNavigation();
+        } else {
+            // Pause navigation
+            pauseNavigation();
         }
     }
 
@@ -263,6 +281,12 @@ const char webPage[] PROGMEM = R"rawliteral(
         // Send command via WebSocket
         ws.send(JSON.stringify(command));
         
+        // Update UI state
+        navigationActive = true;
+        navigationPaused = false;
+        document.getElementById('start-pause-btn').textContent = 'Pause';
+        document.getElementById('start-pause-btn').style.backgroundColor = '#ffc107';
+        
         // Reset UI elements
         document.getElementById('total-distance').textContent = '0.0';
         document.getElementById('current-pace').textContent = '0.0';
@@ -270,13 +294,46 @@ const char webPage[] PROGMEM = R"rawliteral(
         document.getElementById('elapsed-time').textContent = '00:00:00';
     }
 
+    // Pause navigation
+    function pauseNavigation() {
+        if (!wsConnected) {
+            showAlert("WebSocket disconnected. Cannot pause navigation.");
+            return;
+        }
+        
+        ws.send(JSON.stringify({ autonomous: "pause" }));
+        navigationPaused = true;
+        document.getElementById('start-pause-btn').textContent = 'Resume';
+        document.getElementById('start-pause-btn').style.backgroundColor = '#28a745';
+    }
+
+    // Resume navigation
+    function resumeNavigation() {
+        if (!wsConnected) {
+            showAlert("WebSocket disconnected. Cannot resume navigation.");
+            return;
+        }
+        
+        ws.send(JSON.stringify({ autonomous: "resume" }));
+        navigationPaused = false;
+        document.getElementById('start-pause-btn').textContent = 'Pause';
+        document.getElementById('start-pause-btn').style.backgroundColor = '#ffc107';
+    }
+        
     // Stop autonomous navigation
     function stopAutonomousMode() {
-        if (wsConnected) {
-            ws.send(JSON.stringify({ autonomous: "stop" }));
-        } else {
+        if (!wsConnected) {
             showAlert("WebSocket disconnected. Cannot stop autonomous mode.");
+            return;
         }
+        
+        ws.send(JSON.stringify({ autonomous: "stop" }));
+        
+        // Update UI state
+        navigationActive = false;
+        navigationPaused = false;
+        document.getElementById('start-pause-btn').textContent = 'Start';
+        document.getElementById('start-pause-btn').style.backgroundColor = '#28a745';
     }
 
     // Reset tracking data

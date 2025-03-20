@@ -33,6 +33,7 @@ void pvtCallback(UBX_NAV_PVT_data_t *pvtData) {
         gnssData.longitude = pvtData->lon / 10000000.0;
         gnssData.speed = pvtData->gSpeed / 1000.0;  // Convert from mm/s to m/s
         gnssData.fixType = pvtData->fixType;
+        gnssData.heading = pvtData->headMot / 100000.0;
         gnssData.carrSoln = pvtData->flags.bits.carrSoln;
         gnssData.hAcc = pvtData->hAcc / 10.0; // cm
 

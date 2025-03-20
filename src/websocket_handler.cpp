@@ -3,6 +3,7 @@
 #include "gnss.h"
 #include <WebSocketsServer.h>
 #include "logging.h"
+#include "navigation.h"
 
 // WebSocket server instance
 WebSocketsServer webSocket(81);
@@ -70,6 +71,7 @@ void webSocketEventRTOS(uint8_t num, WStype_t type, uint8_t * payload, size_t le
                     // Send to command queue with timeout
                     if (commandQueue != NULL) {
                         if (xQueueSendToBack(commandQueue, &cmd, 0) != pdPASS) {
+                            // Queue is full, could add error handling here
                         }
                     }
                     
@@ -77,8 +79,117 @@ void webSocketEventRTOS(uint8_t num, WStype_t type, uint8_t * payload, size_t le
                     return;
                 }
                 
-                // Other command types will be implemented later
-                // For now, we're just focusing on manual driving
+                // Handle autonomous navigation commands
+                if (doc.containsKey("autonomous")) {
+                    String command = doc["autonomous"].as<String>();
+                    LOG_DEBUG("Received autonomous command: %s", command.c_str());
+                    
+                    if (command == "start") {
+                        // Start autonomous navigation
+                        float targetPace = 1.0f;  // Default values
+                        float targetDistance = 0.0f;
+                        float latitude = 0.0f;
+                        float longitude = 0.0f;
+                        
+                        // Get target pace if provided
+                        if (doc.containsKey("pace")) {
+                            targetPace = doc["pace"].as<float>();
+                        }
+                        
+                        // Get target distance if provided
+                        if (doc.containsKey("distance")) {
+                            targetDistance = doc["distance"].as<float>();
+                        }
+                        
+                        // Check if coordinates were provided
+                        bool hasCoordinates = false;
+                        if (doc.containsKey("lat") && doc.containsKey("lng")) {
+                            latitude = doc["lat"].as<float>();
+                            longitude = doc["lng"].as<float>();
+                            hasCoordinates = true;
+                        }
+                        
+                        if (hasCoordinates) {
+                            // Start navigation to specific coordinates
+                            startNavigation(targetPace, targetDistance, latitude, longitude);
+                        } else if (getWaypointCount() > 0) {
+                            // Start navigation using waypoints
+                            startWaypointNavigation(targetPace, targetDistance);
+                        } else {
+                            // No coordinates or waypoints - send error
+                            sendErrorMessage("No destination specified. Please enter coordinates or record waypoints.");
+                        }
+                    } 
+                    else if (command == "stop") {
+                        // Stop autonomous navigation
+                        stopNavigation();
+                        sendStatusMessage("Navigation stopped");
+                    }
+                    else if (command == "pause") {
+                        // Pause navigation
+                        pauseNavigation();
+                        sendStatusMessage("Navigation paused");
+                    }
+                    else if (command == "resume") {
+                        // Resume navigation
+                        resumeNavigation();
+                        sendStatusMessage("Navigation resumed");
+                    }
+                }
+                
+                // Handle waypoint commands
+                if (doc.containsKey("waypoint")) {
+                    String command = doc["waypoint"].as<String>();
+                    LOG_DEBUG("Received waypoint command: %s", command.c_str());
+                    
+                    if (command == "record") {
+                        // Get current position and record as waypoint
+                        if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                            float lat = gnssData.latitude;
+                            float lon = gnssData.longitude;
+                            xSemaphoreGive(gnssMutex);
+                            
+                            // Add waypoint using current position
+                            if (addWaypoint(lat, lon)) {
+                                // Send confirmation with waypoint info
+                                DynamicJsonDocument response(256);
+                                response["type"] = "waypoint";
+                                response["count"] = getWaypointCount();
+                                response["lat"] = lat;
+                                response["lng"] = lon;
+                                
+                                String responseStr;
+                                serializeJson(response, responseStr);
+                                webSocket.sendTXT(num, responseStr);
+                            } else {
+                                sendErrorMessage("Failed to record waypoint (limit reached)");
+                            }
+                        } else {
+                            sendErrorMessage("Cannot record waypoint: GPS data unavailable");
+                        }
+                    }
+                    else if (command == "clear") {
+                        // Clear all waypoints
+                        clearWaypoints();
+                        
+                        // Send confirmation
+                        DynamicJsonDocument response(128);
+                        response["type"] = "waypoint";
+                        response["count"] = 0;
+                        
+                        String responseStr;
+                        serializeJson(response, responseStr);
+                        webSocket.sendTXT(num, responseStr);
+                        
+                        sendStatusMessage("All waypoints cleared");
+                    }
+                }
+                
+                // Handle tracking reset command
+                if (doc.containsKey("tracking") && doc["tracking"].as<String>() == "reset") {
+                    resetNavigationStats();
+                    sendStatusMessage("Tracking statistics reset");
+                }
             }
             break;
 
