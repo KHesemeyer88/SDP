@@ -16,6 +16,7 @@
 #include <ESP32Servo.h>
 #include <WiFi.h>
 #include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
 #include <SparkFun_u-blox_GNSS_v3.h>
 #include "base64.h" //Built-in ESP32 library
 #include <WiFiClient.h>

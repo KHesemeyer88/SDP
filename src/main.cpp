@@ -5,6 +5,7 @@
 #include <WiFi.h>
 #include "logging.h"
 #include "navigation.h"
+#include "websocket_handler.h"
 
 // Definition for ntripClient (declared as extern in config.h)
 WiFiClient ntripClient;
@@ -42,7 +43,8 @@ void setup() {
         LOG_ERROR("Failed to connect to WiFi. Will retry in RTOS tasks");
     }
     
-    // In your setup() function
+    initWebSocket();
+
     if (!initNavigation()) {
         LOG_ERROR("Failed to initialize navigation system");
     } else {

@@ -76,6 +76,7 @@ extern Servo escServo;
 
 // Task functions
 void ControlTask(void *pvParameters);
+// WebSocket task now only handles periodic updates, not the WebSocket loop()
 void WebSocketTask(void *pvParameters);
 void BlinkTask(void *pvParameters);
 

@@ -7,7 +7,7 @@
 // HTTP server instance
 extern AsyncWebServer server;
 
-// Initialize HTTP server
+// Initialize HTTP server and WebSocket handlers
 void initHttpServer();
 
 // HTTP server task function
