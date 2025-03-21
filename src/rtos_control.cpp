@@ -12,6 +12,12 @@ bool drivingState = false;
 unsigned long lastNonNeutralCommand = 0;
 const unsigned long DRIVING_GRACE_PERIOD = 1500; // 1.5 seconds grace period
 
+// For reverse handling
+bool inReverseMode = false;
+bool reverseSequenceActive = false;
+unsigned long reverseSequenceStartTime = 0;
+int reverseSequenceStep = 0;
+
 // For PI control
 static float cumulativeError = 0;
 static int lastEscCommand = ESC_MIN_FWD;
@@ -19,15 +25,6 @@ static int lastEscCommand = ESC_MIN_FWD;
 // Servo objects
 extern Servo steeringServo;
 extern Servo escServo;
-
-// In rtos_control.cpp
-
-#include "rtos_tasks.h"
-#include "rtos_control.h"
-#include "navigation.h"
-#include "gnss.h"
-#include "logging.h"
-#include "config.h"
 
 // Control task function
 void ControlTask(void *pvParameters) {
@@ -51,10 +48,11 @@ void ControlTask(void *pvParameters) {
         
         // Check for manual control commands
         if (xQueueReceive(commandQueue, &currentCmd, 0) == pdTRUE) {
+            //LOG_DEBUG("Received command queue");
             // Process the command based on type
             if (currentCmd.type == CMD_MANUAL_CONTROL) {
                 // Manual control command received
-                
+                //LOG_DEBUG("Manual control command received");
                 // Update driving state and timestamp
                 drivingState = currentCmd.manual.isDriving;
                 if (drivingState) {
@@ -64,12 +62,15 @@ void ControlTask(void *pvParameters) {
                 // Apply manual control if we're not in autonomous mode
                 if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
                     // Check if we're in autonomous mode
+                    //LOG_DEBUG("Checking if we're in autonomous mode");
                     autonomousActive = navStatus.autonomousMode;
                     xSemaphoreGive(navDataMutex);
                     
                     if (!autonomousActive) {
+                        //LOG_DEBUG("Entering manual control in controlTask");
                         // Apply manual control commands to servos
                         if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+                            //LOG_DEBUG("Received servoMutex");
                             // Map joystick to servo values
                             int steeringValue = STEERING_CENTER + (currentCmd.manual.steering * STEERING_MAX);
                             
@@ -78,22 +79,89 @@ void ControlTask(void *pvParameters) {
                                               STEERING_CENTER - STEERING_MAX, 
                                               STEERING_CENTER + STEERING_MAX);
                             
-                            // Apply throttle based on joystick position
+                           // Apply throttle based on joystick position
                             int throttleValue;
                             if (currentCmd.manual.throttle > 0) {
+                                //LOG_DEBUG("Forward throttle value set");
                                 // Forward
+                                inReverseMode = false; // Exit reverse mode if forward requested
                                 throttleValue = ESC_NEUTRAL + (currentCmd.manual.throttle * (ESC_MAX_FWD - ESC_NEUTRAL));
                             } else if (currentCmd.manual.throttle < 0) {
-                                // Reverse
-                                throttleValue = ESC_NEUTRAL + (currentCmd.manual.throttle * (ESC_NEUTRAL - ESC_MIN_REV));
+                                //LOG_DEBUG("Neg. throttle detected");
+                                // Reverse - check if we need to start sequence
+                                if (!inReverseMode && !reverseSequenceActive) {
+                                    //LOG_DEBUG("Setting rev. sequence params");
+                                    reverseSequenceActive = true;
+                                    reverseSequenceStep = 0;
+                                    reverseSequenceStartTime = currentTime;
+                                    throttleValue = ESC_NEUTRAL; // Start with neutral
+                                } else if (inReverseMode) {
+                                    // Already in reverse mode, can apply reverse directly
+                                    throttleValue = ESC_NEUTRAL + (currentCmd.manual.throttle * (ESC_NEUTRAL - ESC_MAX_REV));
+                                    //LOG_DEBUG("Reverse mode active: throttle=%.2f, output=%d", currentCmd.manual.throttle, throttleValue);
+                                } else {
+                                    //LOG_DEBUG("Let sequence handler control throttle");
+                                    // In middle of sequence, let sequence handler control throttle
+                                    throttleValue = ESC_NEUTRAL;
+                                }
                             } else {
+                                //LOG_DEBUG("Neutral");
                                 // Neutral
                                 throttleValue = ESC_NEUTRAL;
                             }
-                            
-                            // Apply servo commands
+
+                            // Apply servo commands (ESC only if not in reverse sequence)
                             steeringServo.write(steeringValue);
-                            escServo.write(throttleValue);
+                            if (!reverseSequenceActive) {
+                                //LOG_DEBUG("Throttle applied: %d", throttleValue);
+                                escServo.write(throttleValue);
+                            }
+
+                            // Process reverse sequence if active
+                            if (reverseSequenceActive) {
+                                //LOG_DEBUG("Entering reverse sequence, case: %d", reverseSequenceStep);
+                                unsigned long elapsedTime = currentTime - reverseSequenceStartTime;
+                                
+                                switch (reverseSequenceStep) {
+                                    case 0: // First neutral (these intervals are based on test code experiments)
+                                    // it's possible shorter intervals may work as well
+                                        escServo.write(ESC_NEUTRAL);
+                                        if (elapsedTime >= 50) {
+                                            //LOG_DEBUG("Reverse seq: First neutral complete");
+                                            reverseSequenceStep = 1;
+                                            reverseSequenceStartTime = currentTime;
+                                        }
+                                        break;
+                                        
+                                    case 1: // First reverse tap
+                                        escServo.write(0); //experimenting showed that 0 works most robustly
+                                        if (elapsedTime >= 50) {
+                                            //LOG_DEBUG("Reverse seq: First tap complete");
+                                            reverseSequenceStep = 2;
+                                            reverseSequenceStartTime = currentTime;
+                                        }
+                                        break;
+                                        
+                                    case 2: // Second neutral
+                                        escServo.write(ESC_NEUTRAL);
+                                        if (elapsedTime >= 50) {
+                                            //LOG_DEBUG("Reverse seq: Second neutral complete");
+                                            reverseSequenceStep = 3;
+                                            reverseSequenceStartTime = currentTime;
+                                        }
+                                        break;
+                                        
+                                    case 3: // Complete sequence
+                                        //LOG_DEBUG("Reverse sequence complete - now in reverse mode");
+                                        inReverseMode = true;
+                                        reverseSequenceActive = false;
+                                        // Apply the reverse throttle immediately
+                                        // Start with moderate reverse
+                                        escServo.write(70);
+                                        vTaskDelay(5);
+                                        break;
+                                }
+                            }
                             
                             // Update command timestamp
                             lastCommandTime = currentTime;
