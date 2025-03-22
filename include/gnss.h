@@ -47,6 +47,6 @@ void pvtCallback(UBX_NAV_PVT_data_t *pvtData);
 void pushGPGGA(NMEA_GGA_data_t *nmeaData);
 bool processGNSSConnection();
 bool connectToNTRIP();
-String getFusionStatus();
+char* getFusionStatus(char* buffer, size_t bufferSize);
 
 #endif // GNSS_H

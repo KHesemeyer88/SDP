@@ -11,9 +11,9 @@
 const size_t JSON_CAPACITY = 512;  // Adjust based on your data needs
 
 // WebSocket update intervals (keep the same as before)
-const unsigned long WS_SENSOR_UPDATE_INTERVAL = 100;   // 100ms for sensor data
+const unsigned long WS_SENSOR_UPDATE_INTERVAL = 500;   // 100ms for sensor data
 const unsigned long WS_GPS_UPDATE_INTERVAL = 500;      // 200ms for GPS data
-const unsigned long WS_RTK_UPDATE_INTERVAL = 1000;     // 1000ms for RTK status
+const unsigned long WS_RTK_UPDATE_INTERVAL = 2000;     // 1000ms for RTK status
 const unsigned long WS_STATS_UPDATE_INTERVAL = 500;    // 500ms for navigation stats
 
 // Timing variables for updates

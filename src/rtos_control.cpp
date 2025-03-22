@@ -181,6 +181,24 @@ void ControlTask(void *pvParameters) {
             nav.isPaused = navStatus.isPaused;
             nav.targetPace = navStatus.targetPace;
             xSemaphoreGive(navDataMutex);
+
+            // Add state transition tracking
+            static bool lastAutoMode = false;
+            static bool lastPaused = false;
+            if (nav.autonomousMode != lastAutoMode || nav.isPaused != lastPaused) {
+                LOG_NAV("Control task detected navigation state change: auto=%d, paused=%d", 
+                        nav.autonomousMode, nav.isPaused);
+                lastAutoMode = nav.autonomousMode;
+                lastPaused = nav.isPaused;
+            }
+        }
+
+        // Add periodic logging of control values in autonomous mode
+        static unsigned long lastControlLog = 0;
+        if (nav.autonomousMode && !nav.isPaused && millis() - lastControlLog > 500) {
+            lastControlLog = millis();
+            LOG_NAV("Control values: speed=%.2f, targetSpeed=%.2f, heading=%.2f°", 
+                    currentSpeed, nav.targetPace, currentHeading);
         }
         
         // If we're in autonomous mode and not paused, apply navigation control
@@ -190,9 +208,10 @@ void ControlTask(void *pvParameters) {
                 currentLat = gnssData.latitude;
                 currentLon = gnssData.longitude;
                 currentSpeed = gnssData.speed;
+                currentHeading = gnssData.heading;
                 xSemaphoreGive(gnssMutex);
-                // Make a direct call to get fresh heading
-                currentHeading = myGPS.getHeading() / 100000.0; // Convert to degrees
+                // Make a direct call to get fresh heading: THIS WAS MAYBE CAUSING PROBLEMS
+                //currentHeading = myGPS.getHeading() / 100000.0; // Convert to degrees
             }
             
             // Get target data

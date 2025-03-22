@@ -17,13 +17,15 @@ void setup() {
     Serial.begin(115200);
     delay(1000);
     Serial.println("\n\nRC Car starting up with FreeRTOS...");
-
+    
     // Initialize logging system
     if (initLogging()) {
         LOG_DEBUG("Logging system initialized successfully");
     } else {
         Serial.println("Failed to initialize logging system");
     }
+
+    LOG_ERROR("SYSTEM RESTART DETECTED - this message should appear only once after power-up");
     
     // Connect to WiFi
     LOG_DEBUG("Connecting to WiFi network: %s", ssid);

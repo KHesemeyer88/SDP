@@ -108,10 +108,14 @@ bool initializeGNSS() {
     return true;
 }
 // Get fusion status from IMU
-String getFusionStatus() {
+// Change the return type and implementation:
+char* getFusionStatus(char* buffer, size_t bufferSize) {
     // Temporarily set nav frequency to 1Hz for status check
     myGPS.setNavigationFrequency(1);
-    String fusionStatus = "Failed to get fusion data";
+    const char* defaultStatus = "Failed to get fusion data";
+    
+    // Initialize buffer with default message
+    snprintf(buffer, bufferSize, "%s", defaultStatus);
 
     // Try to get ESF info with timeout
     unsigned long startTime = millis();
@@ -122,10 +126,10 @@ String getFusionStatus() {
             if (myGPS.getEsfInfo()) {
                 uint8_t fusionMode = myGPS.packetUBXESFSTATUS->data.fusionMode;
                 switch(fusionMode) {
-                    case 0: fusionStatus = "Initializing"; break;
-                    case 1: fusionStatus = "Calibrated"; break;
-                    case 2: fusionStatus = "Suspended"; break;
-                    case 3: fusionStatus = "Disabled"; break;
+                    case 0: snprintf(buffer, bufferSize, "Initializing"); break;
+                    case 1: snprintf(buffer, bufferSize, "Calibrated"); break;
+                    case 2: snprintf(buffer, bufferSize, "Suspended"); break;
+                    case 3: snprintf(buffer, bufferSize, "Disabled"); break;
                 }
                 break;
             }
@@ -134,7 +138,7 @@ String getFusionStatus() {
 
     // Restore original navigation frequency
     myGPS.setNavigationFrequency(NAV_FREQ);
-    return fusionStatus;
+    return buffer;
 }
 
 // Process RTK connection
@@ -185,13 +189,13 @@ bool processGNSSConnection() {
             LOG_DEBUG("Released ntripClient mutex (no data) (held for %lu ms)", mutexHeldTime);
         }
     } else {
-        LOG_ERROR("Failed to acquire ntripClient mutex");
+        LOG_DEBUG("Failed to acquire ntripClient mutex");
     }
     
     // Check for timeout, but don't block - just report status
     if ((millis() - lastReceivedRTCM_ms) > maxTimeBeforeHangup_ms) {
         correctionAge = millis() - lastReceivedRTCM_ms;
-        LOG_ERROR("RTCM corrections timed out (%lu ms)", correctionAge);
+        LOG_DEBUG("RTCM corrections timed out (%lu ms)", correctionAge);
         return false;
     }
 
@@ -217,6 +221,61 @@ bool processGNSSConnection() {
     return clientConnected;
 }
 
+// Add this function to gnss.cpp or in a utility header file
+
+// Simple base64 encoding function that works with fixed buffers
+void base64Encode(const char* input, char* output, size_t outputSize) {
+    static const char base64Chars[] = 
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    
+    size_t inputLen = strlen(input);
+    size_t i = 0;
+    size_t j = 0;
+    uint8_t char_array_3[3];
+    uint8_t char_array_4[4];
+    
+    while (inputLen--) {
+        char_array_3[i++] = *(input++);
+        if (i == 3) {
+            char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+            char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+            char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+            char_array_4[3] = char_array_3[2] & 0x3f;
+            
+            for (i = 0; i < 4; i++) {
+                if (j < outputSize - 1) { // Leave room for null terminator
+                    output[j++] = base64Chars[char_array_4[i]];
+                }
+            }
+            i = 0;
+        }
+    }
+    
+    if (i) {
+        for (size_t k = i; k < 3; k++) {
+            char_array_3[k] = '\0';
+        }
+        
+        char_array_4[0] = (char_array_3[0] & 0xfc) >> 2;
+        char_array_4[1] = ((char_array_3[0] & 0x03) << 4) + ((char_array_3[1] & 0xf0) >> 4);
+        char_array_4[2] = ((char_array_3[1] & 0x0f) << 2) + ((char_array_3[2] & 0xc0) >> 6);
+        
+        for (size_t k = 0; k < i + 1; k++) {
+            if (j < outputSize - 1) { // Leave room for null terminator
+                output[j++] = base64Chars[char_array_4[k]];
+            }
+        }
+        
+        while (i++ < 3) {
+            if (j < outputSize - 1) { // Leave room for null terminator
+                output[j++] = '=';
+            }
+        }
+    }
+    
+    output[j] = '\0'; // Null terminate the output string
+}
+
 // Connect to NTRIP caster
 bool connectToNTRIP() {
     bool isConnected = false;
@@ -233,6 +292,16 @@ bool connectToNTRIP() {
                 xSemaphoreGive(ntripClientMutex);
                 return false;
             }
+        
+            // Prepare auth string and encode it
+            char authString[128]; // Buffer for username:password
+            char encodedAuth[200]; // Buffer for base64 encoded auth string
+            
+            // Safely combine username and password
+            snprintf(authString, sizeof(authString), "%s:%s", casterUser, casterUserPW);
+            
+            // Use our fixed-buffer base64 encoding function
+            base64Encode(authString, encodedAuth, sizeof(encodedAuth));
             
             // Formulate the NTRIP request
             char serverRequest[512];
@@ -243,7 +312,7 @@ bool connectToNTRIP() {
                    "Connection: close\r\n"
                    "Authorization: Basic %s\r\n"
                    "\r\n",
-                   mountPoint, base64::encode(String(casterUser) + ":" + String(casterUserPW)).c_str());
+                   mountPoint, encodedAuth);
             
             ntripClient.write(serverRequest, strlen(serverRequest));
             
@@ -389,7 +458,7 @@ void GNSSTask(void *pvParameters) {
             xSemaphoreGive(gnssMutex);
             LOG_DEBUG("GNSS task released GNSS mutex (held for %lu ms)", mutexHeldTime);
         } else {
-            LOG_ERROR("GNSS task failed to acquire GNSS mutex within timeout");
+            LOG_DEBUG("GNSS task failed to acquire GNSS mutex within timeout");
         }
         
         // Log total loop time if significant

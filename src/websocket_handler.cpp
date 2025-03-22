@@ -14,6 +14,7 @@ unsigned long lastWSSensorUpdate = 0;
 unsigned long lastWSGPSUpdate = 0;
 unsigned long lastWSRTKUpdate = 0;
 unsigned long lastWSStatsUpdate = 0;
+static bool wasDisconnected = false;
 
 void initWebSocket() {
     // Set event handler
@@ -104,35 +105,28 @@ void webSocketEventRTOS(AsyncWebSocket *server, AsyncWebSocketClient *client,
                     // Handle autonomous navigation commands
                     else if (doc.containsKey("autonomous")) {
                         String command = doc["autonomous"].as<String>();
-                        LOG_DEBUG("Received autonomous command: %s", command.c_str());
+                        LOG_NAV("WebSocket received autonomous command: %s", command.c_str());
                         
                         if (command == "start") {
-                            // Start autonomous navigation
-                            float targetPace = 1.0f;  // Default values
-                            float targetDistance = 0.0f;
+                            // Start autonomous navigation                            
+                            // Get parameters
+                            bool hasCoordinates = false;
+                            
+                            float targetPace = doc.containsKey("pace") ? doc["pace"].as<float>() : 1.0f;
+                            float targetDistance = doc.containsKey("distance") ? doc["distance"].as<float>() : 0.0f;
+                            hasCoordinates = doc.containsKey("lat") && doc.containsKey("lng");
+                            
+                            // ADD THESE LINES for retrieving coordinates:
                             float latitude = 0.0f;
                             float longitude = 0.0f;
                             
-                            // Get target pace if provided
-                            if (doc.containsKey("pace")) {
-                                targetPace = doc["pace"].as<float>();
-                            }
-                            
-                            // Get target distance if provided
-                            if (doc.containsKey("distance")) {
-                                targetDistance = doc["distance"].as<float>();
-                            }
-                            
-                            // Check if coordinates were provided
-                            bool hasCoordinates = false;
-                            if (doc.containsKey("lat") && doc.containsKey("lng")) {
-                                latitude = doc["lat"].as<float>();
-                                longitude = doc["lng"].as<float>();
-                                hasCoordinates = true;
-                            }
-                            
+                            LOG_NAV("Start command details: pace=%.2f, dist=%.2f, hasCoords=%d, waypointCount=%d", 
+                                targetPace, targetDistance, hasCoordinates, getWaypointCount());
+
                             if (hasCoordinates) {
                                 // Start navigation to specific coordinates
+                                latitude = doc["lat"].as<float>();
+                                longitude = doc["lng"].as<float>();
                                 startNavigation(targetPace, targetDistance, latitude, longitude);
                             } else if (getWaypointCount() > 0) {
                                 // Start navigation using waypoints
@@ -144,16 +138,19 @@ void webSocketEventRTOS(AsyncWebSocket *server, AsyncWebSocketClient *client,
                         } 
                         else if (command == "stop") {
                             // Stop autonomous navigation
+                            LOG_NAV("Stop command received");
                             stopNavigation();
                             sendStatusMessage("Navigation stopped");
                         }
                         else if (command == "pause") {
                             // Pause navigation
+                            LOG_NAV("Pause command received");
                             pauseNavigation();
                             sendStatusMessage("Navigation paused");
                         }
                         else if (command == "resume") {
                             // Resume navigation
+                            LOG_NAV("Resume command received");
                             resumeNavigation();
                             sendStatusMessage("Navigation resumed");
                         }
@@ -166,27 +163,48 @@ void webSocketEventRTOS(AsyncWebSocket *server, AsyncWebSocketClient *client,
                         
                         if (command == "record") {
                             // Get current position and record as waypoint
+
+                            LOG_NAV("WebSocket received record waypoint command");
                             if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
                                 float lat = gnssData.latitude;
                                 float lon = gnssData.longitude;
                                 xSemaphoreGive(gnssMutex);
+                        
+                                LOG_NAV("About to call addWaypoint() with lat=%.7f, lon=%.7f", lat, lon);
                                 
                                 // Add waypoint using current position
                                 if (addWaypoint(lat, lon)) {
+                                    vTaskDelay(pdMS_TO_TICKS(50));
+                                    
+                                    // Get waypoint count with proper protection
+                                    int count = getWaypointCount();
+                                    LOG_NAV("addWaypoint() succeeded, getWaypointCount() returned %d", count);
+                                    
+                                    // Get current waypoint index with proper mutex protection
+                                    int currentWaypointIndex = 0;
+                                    if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                                        currentWaypointIndex = navStatus.currentWaypoint;
+                                        xSemaphoreGive(navDataMutex);
+                                    }
+                                    
                                     // Send confirmation with waypoint info
                                     DynamicJsonDocument response(256);
                                     response["type"] = "waypoint";
-                                    response["count"] = getWaypointCount();
+                                    response["count"] = count;
+                                    response["currentIndex"] = currentWaypointIndex + 1;  // convert 0-index to 1-index
                                     response["lat"] = lat;
                                     response["lng"] = lon;
                                     
                                     String responseStr;
                                     serializeJson(response, responseStr);
+                                    LOG_NAV("Sending waypoint response to client: %s", responseStr.c_str());
                                     client->text(responseStr);
                                 } else {
+                                    LOG_ERROR("addWaypoint() failed");
                                     sendErrorMessage("Failed to record waypoint (limit reached)");
                                 }
                             } else {
+                                LOG_ERROR("Failed to take gnssMutex when recording waypoint");
                                 sendErrorMessage("Cannot record waypoint: GPS data unavailable");
                             }
                         }
@@ -194,10 +212,21 @@ void webSocketEventRTOS(AsyncWebSocket *server, AsyncWebSocketClient *client,
                             // Clear all waypoints
                             clearWaypoints();
                             
+                            // Verify count is actually zero with proper protection
+                            int count = getWaypointCount();
+                            
                             // Send confirmation
                             DynamicJsonDocument response(128);
                             response["type"] = "waypoint";
-                            response["count"] = 0;
+                            response["count"] = count;
+                            
+                            // Reset current waypoint index in UI
+                            if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                                response["currentIndex"] = navStatus.currentWaypoint + 1;
+                                xSemaphoreGive(navDataMutex);
+                            } else {
+                                response["currentIndex"] = 1; // Default to 1 if mutex can't be taken
+                            }
                             
                             String responseStr;
                             serializeJson(response, responseStr);
@@ -256,7 +285,6 @@ void sendErrorMessage(const String& message) {
 void WebSocketTask(void *pvParameters) {
     // Initialize task
     LOG_DEBUG("WebSocket task started - handling periodic updates");
-    
     unsigned long lastStatusLog = 0;
     unsigned long lastSystemStatsLog = 0;
     
@@ -269,11 +297,38 @@ void WebSocketTask(void *pvParameters) {
         if (currentTime - lastStatusLog >= 5000) {
             lastStatusLog = currentTime;
             LOG_DEBUG("WebSocket clients connected: %d", ws.count());
+
+            // Add this reconnection detection code here
+            if (wasDisconnected && ws.count() > 0) {
+                LOG_NAV("WebSocket reconnected after disconnection. Sending status refresh.");
+                wasDisconnected = false;
+                // Refresh client data
+                sendGPSData();
+                sendRTKStatus();
+                sendNavigationStats();
+            }
+            
+            // Add this disconnection detection code here
+            if (ws.count() == 0 && !wasDisconnected) {
+                LOG_NAV("WebSocket disconnected. Will attempt to maintain navigation state.");
+                wasDisconnected = true;
+            }
         }
         
         // Log system stats periodically (every 30 seconds)
         if (currentTime - lastSystemStatsLog >= 30000) {
             lastSystemStatsLog = currentTime;
+
+            // Add the memory monitoring here - simplified version
+            uint32_t freeHeap = ESP.getFreeHeap();
+            LOG_NAV("System stats: Free heap: %u bytes", freeHeap);
+            LOG_NAV("WebSocket task stack high water mark: %u", uxTaskGetStackHighWaterMark(websocketTaskHandle));
+            
+            // Critical memory warning
+            if (freeHeap < 10000) {
+                LOG_ERROR("CRITICAL: Low memory condition (%u bytes free)", freeHeap);
+            }
+
             LOG_DEBUG("System stats: Free heap: %u bytes", ESP.getFreeHeap());
             LOG_DEBUG("WebSocket task stack high water mark: %u", uxTaskGetStackHighWaterMark(websocketTaskHandle));
             LOG_DEBUG("GNSS task stack high water mark: %u", uxTaskGetStackHighWaterMark(gnssTaskHandle));

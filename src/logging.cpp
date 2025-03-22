@@ -10,12 +10,12 @@
 #define LOG_FLUSH_INTERVAL 5000  // 5 seconds
 
 // Global variables
-LogLevel currentLogLevel = LOG_DEBUG; // Default to debug level
+LogLevel currentLogLevel = LOG_NAV_STATE; // Default to debug level
 QueueHandle_t logQueue = NULL;
 TaskHandle_t logTaskHandle = NULL;
 static File logFile;
 static SemaphoreHandle_t logFileMutex = NULL;
-static const char* logLevelNames[] = {"NONE", "ERROR", "DEBUG", "PERF"};
+static const char* logLevelNames[] = {"NONE", "ERROR", "NAV", "DEBUG", "PERF"};
 
 // Initialize the logging system
 bool initLogging() {

@@ -46,7 +46,7 @@ typedef struct {
     float targetDistance;     // Target distance in meters
     int currentWaypoint;      // Current waypoint index
     int totalWaypoints;       // Total number of waypoints
-    String statusMessage;     // Status/alert message
+    char statusMessage[64];   // Status/alert message with fixed buffer size
     bool destinationReached;  // Whether destination was reached
 } NavStatus;
 
@@ -129,6 +129,6 @@ int calculateThrottle(float currentSpeed, float targetPace);
 
 // Optional helper functions that might be useful to expose
 //void handleWaypointReached();
-void setNavStatusMessage(const String& message);
+void setNavStatusMessage(const char* message);
 
 #endif // NAVIGATION_H

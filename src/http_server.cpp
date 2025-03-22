@@ -3,6 +3,7 @@
 #include "rtos_tasks.h"
 #include "logging.h"
 #include "websocket_handler.h"
+#include "gnss.h"
 
 // HTTP server instance on port 80
 AsyncWebServer server(80);
@@ -17,10 +18,20 @@ void initHttpServer() {
     
     // Fusion status endpoint
     server.on("/fusionStatus", HTTP_GET, [](AsyncWebServerRequest *request) {
-        String response = "{\"status\":\"ESF disabled\"}";
-        request->send(200, "application/json", response);
+        char fusionStatus[64]; // Buffer for status
+        char responseBuffer[256]; // Buffer for JSON response
+        
+        // Get actual fusion status using our buffer-based function
+        getFusionStatus(fusionStatus, sizeof(fusionStatus));
+        
+        // Format the JSON response
+        snprintf(responseBuffer, sizeof(responseBuffer), 
+                 "{\"status\":\"%s\"}", fusionStatus);
+        
+        // Send response
+        request->send(200, "application/json", responseBuffer);
     });
-    
+
     // Start the server
     server.begin();
     LOG_DEBUG("HTTP server initialized and ready");
