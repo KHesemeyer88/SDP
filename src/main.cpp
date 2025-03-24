@@ -20,9 +20,9 @@ void setup() {
     
     // Initialize logging system
     if (initLogging()) {
-        LOG_DEBUG("Logging system initialized successfully");
+        LOG_DEBUG("logging init");
     } else {
-        Serial.println("Failed to initialize logging system");
+        Serial.println("logging init fail");
     }
 
     LOG_ERROR("SYSTEM RESTART DETECTED - this message should appear only once after power-up");
@@ -62,7 +62,4 @@ void setup() {
 }
 
 void loop() {
-    // The loop function is not used with FreeRTOS
-    // All code should be in task functions
-    vTaskDelay(pdMS_TO_TICKS(1000));
 }

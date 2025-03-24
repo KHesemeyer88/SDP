@@ -31,6 +31,7 @@ struct LogMessage {
 extern bool loggingEnabled;
 extern QueueHandle_t logQueue;
 extern TaskHandle_t logTaskHandle;
+extern SemaphoreHandle_t logFileMutex;
 
 // Function declarations
 bool initLogging();

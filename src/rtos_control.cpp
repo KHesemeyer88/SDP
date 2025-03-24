@@ -28,6 +28,7 @@ extern Servo escServo;
 
 // Control task function
 void ControlTask(void *pvParameters) {
+    LOG_DEBUG("ControlTask");
     ControlCommand currentCmd;
     TickType_t xLastWakeTime;
     const TickType_t xFrequency = pdMS_TO_TICKS(1000 / CONTROL_UPDATE_FREQUENCY);
@@ -36,8 +37,6 @@ void ControlTask(void *pvParameters) {
     float currentLat, currentLon, currentSpeed, currentHeading;
     float targetLat, targetLon;
     bool autonomousActive, isPaused, followingWaypoints;
-    
-    LOG_DEBUG("Control task started");
     
     // Initialize time for consistent frequency
     xLastWakeTime = xTaskGetTickCount();
@@ -186,19 +185,11 @@ void ControlTask(void *pvParameters) {
             static bool lastAutoMode = false;
             static bool lastPaused = false;
             if (nav.autonomousMode != lastAutoMode || nav.isPaused != lastPaused) {
-                LOG_NAV("Control task detected navigation state change: auto=%d, paused=%d", 
+                LOG_NAV("ControlTask state chg, %d, %d", 
                         nav.autonomousMode, nav.isPaused);
                 lastAutoMode = nav.autonomousMode;
                 lastPaused = nav.isPaused;
             }
-        }
-
-        // Add periodic logging of control values in autonomous mode
-        static unsigned long lastControlLog = 0;
-        if (nav.autonomousMode && !nav.isPaused && millis() - lastControlLog > 500) {
-            lastControlLog = millis();
-            LOG_NAV("Control values: speed=%.2f, targetSpeed=%.2f, heading=%.2f°", 
-                    currentSpeed, nav.targetPace, currentHeading);
         }
         
         // If we're in autonomous mode and not paused, apply navigation control
@@ -209,6 +200,13 @@ void ControlTask(void *pvParameters) {
                 currentLon = gnssData.longitude;
                 currentSpeed = gnssData.speed;
                 currentHeading = gnssData.heading;
+                // Add periodic logging of control values in autonomous mode
+                static unsigned long lastLocLog = 0;
+                if (millis() - lastLocLog > 500) {
+                    lastLocLog = millis();
+                    LOG_NAV("ControlTask data, %.7f, %.7f, %.2f, %.1f", 
+                        currentLat, currentLon, currentSpeed, currentHeading);
+                }
                 xSemaphoreGive(gnssMutex);
                 // Make a direct call to get fresh heading: THIS WAS MAYBE CAUSING PROBLEMS
                 //currentHeading = myGPS.getHeading() / 100000.0; // Convert to degrees
@@ -262,6 +260,7 @@ void ControlTask(void *pvParameters) {
 
 // Calculate steering angle based on current position, target, and heading
 int calculateSteeringAngle(float currentLat, float currentLon, float targetLat, float targetLon, float currentHeading) {
+    LOG_DEBUG("calculateSteeringAngle");
     // Calculate bearing to target
     float bearing = calculateBearing(currentLat, currentLon, targetLat, targetLon);
     
@@ -297,6 +296,7 @@ int calculateSteeringAngle(float currentLat, float currentLon, float targetLat, 
 
 // Calculate throttle value based on current speed and target pace
 int calculateThrottle(float currentSpeed, float targetPace) {
+    LOG_DEBUG("calculateThrottle");
     // Only adjust speed if we have a target pace
     if (targetPace <= 0) {
         return ESC_NEUTRAL; // Stop if no target pace

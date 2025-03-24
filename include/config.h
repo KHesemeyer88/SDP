@@ -1,3 +1,13 @@
+#include <Arduino.h>
+#include <ESP32Servo.h>
+#include <WiFi.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <SparkFun_u-blox_GNSS_v3.h>
+#include "base64.h" //Built-in ESP32 library
+#include <WiFiClient.h>
+
+
 // config.h
 #ifndef CONFIG_H
 #define CONFIG_H
@@ -12,14 +22,20 @@
 #define SD_CD_PIN 25
 #define SD_FREQUENCY 20000000  // 20 MHz SPI frequency for SD card
 
-#include <Arduino.h>
-#include <ESP32Servo.h>
-#include <WiFi.h>
-#include <AsyncTCP.h>
-#include <ESPAsyncWebServer.h>
-#include <SparkFun_u-blox_GNSS_v3.h>
-#include "base64.h" //Built-in ESP32 library
-#include <WiFiClient.h>
+// Timing constants
+#define COMMAND_TIMEOUT_MS          500
+#define SONAR_UPDATE_INTERVAL       100
+#define AVOIDANCE_MESSAGE_TIMEOUT   1000
+#define DESTINATION_MESSAGE_TIMEOUT 5000
+#define CONTROL_UPDATE_FREQUENCY    20 
+#define NAV_UPDATE_FREQUENCY        10
+
+
+// WebSocket update intervals
+const unsigned long WS_SENSOR_UPDATE_INTERVAL = 500;
+const unsigned long WS_GPS_UPDATE_INTERVAL = 500;
+const unsigned long WS_RTK_UPDATE_INTERVAL = 2000;
+const unsigned long WS_STATS_UPDATE_INTERVAL = 500;
 
 // Pin Definitions
 const int STEERING_PIN = 5;   // GPIO5 for steering servo
@@ -47,10 +63,6 @@ const int STEERING_MAX = 65;     // Maximum steering angle deviation
 const int TURN_ANGLE = 20;       // Angle to turn 
 const int TRIM_ANGLE = 2; //car lists left
 
-#ifndef LED_BUILTIN
-#define LED_BUILTIN 2  // GPIO2 is typically the onboard LED on ESP32 DevKitC
-#endif
-
 // WiFi settings
 // const char* ssid = "RC_Car_Control";
 // const char* password = "12345678";
@@ -68,12 +80,6 @@ const char casterUserPW[] = "kN7?6jtG9YiNMgD@";
 const uint16_t casterPort = 32000;
 //const char mountPoint[] = "RTCM3MSM_MAGS"; // RTCM 3.2 MSM_MAXX(GNSS) MAGS (Amherst, but maybe change to MABT?)
 const char mountPoint[] = "RTCM3MSM_MABN"; // Colrain
-
-// Timing constants
-const unsigned long COMMAND_TIMEOUT_MS = 500;
-const unsigned long SONAR_UPDATE_INTERVAL = 100; // 100ms between full sonar updates
-const unsigned long AVOIDANCE_MESSAGE_TIMEOUT = 1000; // Clear message after 1 second
-const unsigned long DESTINATION_MESSAGE_TIMEOUT = 5000;  // 5 seconds
 
 // Navigation constants
 const float WAYPOINT_REACHED_RADIUS = 2.0; //meters
@@ -98,6 +104,10 @@ enum CorrectionStatus {
   CORR_STALE,
   CORR_FRESH
 };
+
+// Function to handle system errors
+void handleSystemError(const char* errorMsg, bool restartSystem);
+void cleanupResources(bool cleanupMutexes, bool cleanupQueues, bool cleanupTasks);
 
 extern WiFiClient ntripClient;
 

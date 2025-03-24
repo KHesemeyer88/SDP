@@ -5,7 +5,6 @@
 #include "navigation.h"
 
 // WebSocket instance (defined in http_server.cpp)
-// At the top of websocket_handler.cpp
 AsyncWebServer webSocketServer(81);
 AsyncWebSocket ws("/");
 
@@ -32,6 +31,7 @@ void initWebSocket() {
 // WebSocket event handler for RTOS
 void webSocketEventRTOS(AsyncWebSocket *server, AsyncWebSocketClient *client, 
     AwsEventType type, void *arg, uint8_t *data, size_t len) {
+    LOG_DEBUG("webSocketEventRTOS");
     switch (type) {
         case WS_EVT_CONNECT:
             {
@@ -58,14 +58,14 @@ void webSocketEventRTOS(AsyncWebSocket *server, AsyncWebSocketClient *client,
                     // Null-terminate the data
                     data[len] = 0;
                     
-                    LOG_DEBUG("WebSocket received text from client #%u: length=%d", client->id(), len);
+                    LOG_DEBUG("WebSocket received text from client, %u, %d", client->id(), len);
                     
                     // Parse the JSON command
                     DynamicJsonDocument doc(JSON_CAPACITY);
                     DeserializationError error = deserializeJson(doc, (char*)data);
                     
                     if (error) {
-                        LOG_ERROR("JSON parsing failed: %s", error.c_str());
+                        LOG_ERROR("JSON parsing failed, %s", error.c_str());
                         return;
                     }
                     
@@ -105,7 +105,7 @@ void webSocketEventRTOS(AsyncWebSocket *server, AsyncWebSocketClient *client,
                     // Handle autonomous navigation commands
                     else if (doc.containsKey("autonomous")) {
                         String command = doc["autonomous"].as<String>();
-                        LOG_NAV("WebSocket received autonomous command: %s", command.c_str());
+                        LOG_NAV("WebSocket received autonomous command, %s", command.c_str());
                         
                         if (command == "start") {
                             // Start autonomous navigation                            
@@ -120,7 +120,7 @@ void webSocketEventRTOS(AsyncWebSocket *server, AsyncWebSocketClient *client,
                             float latitude = 0.0f;
                             float longitude = 0.0f;
                             
-                            LOG_NAV("Start command details: pace=%.2f, dist=%.2f, hasCoords=%d, waypointCount=%d", 
+                            LOG_NAV("webSocketEventRTOS data, %.2f, %.2f, %d, %d", 
                                 targetPace, targetDistance, hasCoordinates, getWaypointCount());
 
                             if (hasCoordinates) {
@@ -159,18 +159,18 @@ void webSocketEventRTOS(AsyncWebSocket *server, AsyncWebSocketClient *client,
                     // Handle waypoint commands
                     else if (doc.containsKey("waypoint")) {
                         String command = doc["waypoint"].as<String>();
-                        LOG_DEBUG("Received waypoint command: %s", command.c_str());
+                        LOG_DEBUG("webSocketEventRTOS command, %s", command.c_str());
                         
                         if (command == "record") {
                             // Get current position and record as waypoint
 
-                            LOG_NAV("WebSocket received record waypoint command");
+                            LOG_NAV("command = record");
                             if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
                                 float lat = gnssData.latitude;
                                 float lon = gnssData.longitude;
                                 xSemaphoreGive(gnssMutex);
                         
-                                LOG_NAV("About to call addWaypoint() with lat=%.7f, lon=%.7f", lat, lon);
+                                //LOG_NAV("About to call addWaypoint() with lat=%.7f, lon=%.7f", lat, lon);
                                 
                                 // Add waypoint using current position
                                 if (addWaypoint(lat, lon)) {
@@ -178,7 +178,7 @@ void webSocketEventRTOS(AsyncWebSocket *server, AsyncWebSocketClient *client,
                                     
                                     // Get waypoint count with proper protection
                                     int count = getWaypointCount();
-                                    LOG_NAV("addWaypoint() succeeded, getWaypointCount() returned %d", count);
+                                    //LOG_NAV("addWaypoint() succeeded, getWaypointCount() returned %d", count);
                                     
                                     // Get current waypoint index with proper mutex protection
                                     int currentWaypointIndex = 0;
@@ -197,18 +197,19 @@ void webSocketEventRTOS(AsyncWebSocket *server, AsyncWebSocketClient *client,
                                     
                                     String responseStr;
                                     serializeJson(response, responseStr);
-                                    LOG_NAV("Sending waypoint response to client: %s", responseStr.c_str());
+                                    //LOG_NAV("Sending waypoint response to client: %s", responseStr.c_str());
                                     client->text(responseStr);
                                 } else {
                                     LOG_ERROR("addWaypoint() failed");
                                     sendErrorMessage("Failed to record waypoint (limit reached)");
                                 }
                             } else {
-                                LOG_ERROR("Failed to take gnssMutex when recording waypoint");
+                                LOG_ERROR("gnssMutex fail in webSocketEventRTOS");
                                 sendErrorMessage("Cannot record waypoint: GPS data unavailable");
                             }
                         }
                         else if (command == "clear") {
+                            LOG_DEBUG("command = clear");
                             // Clear all waypoints
                             clearWaypoints();
                             
@@ -238,6 +239,7 @@ void webSocketEventRTOS(AsyncWebSocket *server, AsyncWebSocketClient *client,
                     
                     // Handle tracking reset command
                     else if (doc.containsKey("tracking") && doc["tracking"].as<String>() == "reset") {
+                        LOG_DEBUG("command = tracking reset");
                         resetNavigationStats();
                         sendStatusMessage("Tracking statistics reset");
                     }
@@ -256,11 +258,13 @@ void webSocketEventRTOS(AsyncWebSocket *server, AsyncWebSocketClient *client,
 
 // Clean up disconnected clients
 void cleanupWebSockets() {
+    LOG_DEBUG("cleanupWebSockets");
     ws.cleanupClients();
 }
 
 // Send a status message
 void sendStatusMessage(const String& message) {
+    LOG_DEBUG("sendStatusMessage");
     DynamicJsonDocument doc(128);
     doc["type"] = "status";
     doc["message"] = message;
@@ -272,6 +276,7 @@ void sendStatusMessage(const String& message) {
 
 // Send an error message
 void sendErrorMessage(const String& message) {
+    LOG_DEBUG("sendErrorMessage");
     DynamicJsonDocument doc(128);
     doc["type"] = "error";
     doc["message"] = message;
@@ -284,7 +289,7 @@ void sendErrorMessage(const String& message) {
 // WebSocket task implementation
 void WebSocketTask(void *pvParameters) {
     // Initialize task
-    LOG_DEBUG("WebSocket task started - handling periodic updates");
+    LOG_DEBUG("WebSocketTask");
     unsigned long lastStatusLog = 0;
     unsigned long lastSystemStatsLog = 0;
     
@@ -296,7 +301,7 @@ void WebSocketTask(void *pvParameters) {
         // Log connection status periodically (every 5 seconds)
         if (currentTime - lastStatusLog >= 5000) {
             lastStatusLog = currentTime;
-            LOG_DEBUG("WebSocket clients connected: %d", ws.count());
+            LOG_DEBUG("WebSocket clients connected, %d", ws.count());
 
             // Add this reconnection detection code here
             if (wasDisconnected && ws.count() > 0) {
@@ -319,20 +324,17 @@ void WebSocketTask(void *pvParameters) {
         if (currentTime - lastSystemStatsLog >= 30000) {
             lastSystemStatsLog = currentTime;
 
-            // Add the memory monitoring here - simplified version
+            // memory monitoring 
             uint32_t freeHeap = ESP.getFreeHeap();
-            LOG_NAV("System stats: Free heap: %u bytes", freeHeap);
-            LOG_NAV("WebSocket task stack high water mark: %u", uxTaskGetStackHighWaterMark(websocketTaskHandle));
-            
             // Critical memory warning
             if (freeHeap < 10000) {
                 LOG_ERROR("CRITICAL: Low memory condition (%u bytes free)", freeHeap);
             }
 
-            LOG_DEBUG("System stats: Free heap: %u bytes", ESP.getFreeHeap());
-            LOG_DEBUG("WebSocket task stack high water mark: %u", uxTaskGetStackHighWaterMark(websocketTaskHandle));
-            LOG_DEBUG("GNSS task stack high water mark: %u", uxTaskGetStackHighWaterMark(gnssTaskHandle));
-            LOG_DEBUG("Control task stack high water mark: %u", uxTaskGetStackHighWaterMark(controlTaskHandle));
+            LOG_DEBUG("free heap, %u bytes", ESP.getFreeHeap());
+            LOG_DEBUG("WebSocketTask high water mark, %u", uxTaskGetStackHighWaterMark(websocketTaskHandle));
+            LOG_DEBUG("GNSSTask high water mark, %u", uxTaskGetStackHighWaterMark(gnssTaskHandle));
+            LOG_DEBUG("ControlTask high water mark, %u", uxTaskGetStackHighWaterMark(controlTaskHandle));
         }
         
         // Clean up disconnected clients periodically
@@ -351,33 +353,30 @@ void WebSocketTask(void *pvParameters) {
         
         if (currentTime - lastWSGPSUpdate >= WS_GPS_UPDATE_INTERVAL) {
             unsigned long gpsStartTime = millis();
-            LOG_DEBUG("Sending GPS data update");
             sendGPSData();
             unsigned long gpsUpdateTime = millis() - gpsStartTime;
             if (gpsUpdateTime > 20) {  // Only log if it took significant time
-                LOG_DEBUG("GPS data update took %lu ms", gpsUpdateTime);
+                LOG_DEBUG("gpsUpdateTime, %lu", gpsUpdateTime);
             }
             lastWSGPSUpdate = currentTime;
         }
         
         if (currentTime - lastWSRTKUpdate >= WS_RTK_UPDATE_INTERVAL) {
             unsigned long rtkStartTime = millis();
-            LOG_DEBUG("Sending RTK status update");
             sendRTKStatus();
             unsigned long rtkUpdateTime = millis() - rtkStartTime;
             if (rtkUpdateTime > 20) {  // Only log if it took significant time
-                LOG_DEBUG("RTK status update took %lu ms", rtkUpdateTime);
+                LOG_DEBUG("rtkUpdateTime, %lu", rtkUpdateTime);
             }
             lastWSRTKUpdate = currentTime;
         }
         
         if (currentTime - lastWSStatsUpdate >= WS_STATS_UPDATE_INTERVAL) {
             unsigned long statsStartTime = millis();
-            LOG_DEBUG("Sending navigation stats update");
             sendNavigationStats();
             unsigned long statsUpdateTime = millis() - statsStartTime;
             if (statsUpdateTime > 20) {  // Only log if it took significant time
-                LOG_DEBUG("Navigation stats update took %lu ms", statsUpdateTime);
+                LOG_DEBUG("statsUpdateTime, %lu", statsUpdateTime);
             }
             lastWSStatsUpdate = currentTime;
         }
@@ -385,7 +384,7 @@ void WebSocketTask(void *pvParameters) {
         // Calculate and log the total loop time if significant
         unsigned long loopTime = millis() - loopStartTime;
         if (loopTime > 50) {  // Only log if the loop took a significant amount of time
-            LOG_DEBUG("WebSocket task loop iteration took %lu ms", loopTime);
+            LOG_DEBUG("WebSocketTask time, %lu", loopTime);
         }
         
         // Use a short delay to prevent task starvation
@@ -395,6 +394,7 @@ void WebSocketTask(void *pvParameters) {
 
 // Send GPS data to one client or all clients
 void sendGPSData(AsyncWebSocketClient *client) {
+    LOG_DEBUG("sendGPSData");
     unsigned long startTime = millis();
     // Create JSON document for GPS data
     DynamicJsonDocument doc(256);
@@ -403,12 +403,12 @@ void sendGPSData(AsyncWebSocketClient *client) {
     // Take mutex to safely access GNSS data
     if (xSemaphoreTake(gnssMutex, portMAX_DELAY) == pdTRUE) {
         unsigned long mutexAcquiredTime = millis();
-        LOG_DEBUG("WebSocket: GNSS mutex acquired after %lu ms", mutexAcquiredTime - startTime);
+        LOG_DEBUG("Websocket gnssMutex acq time, %lu", mutexAcquiredTime - startTime);
         
         // Add GPS information
         if (gnssData.fixType > 0) {
-            LOG_DEBUG("GPS data: fix=%d, lat=%.7f, lng=%.7f", 
-                gnssData.fixType, gnssData.latitude, gnssData.longitude);
+            //LOG_DEBUG("GPS data: fix=%d, lat=%.7f, lng=%.7f", 
+            //    gnssData.fixType, gnssData.latitude, gnssData.longitude);
             
             // Add fix type description
             String fixDesc;
@@ -424,7 +424,7 @@ void sendGPSData(AsyncWebSocketClient *client) {
             
             // Add coordinates with precision based on fix type
             if (gnssData.fixType >= 2) {
-                doc["lat"] = String(gnssData.latitude, 7); // 7 decimal places for high precision
+                doc["lat"] = String(gnssData.latitude, 7); //
                 doc["lng"] = String(gnssData.longitude, 7);
             }
         } else {
@@ -435,10 +435,10 @@ void sendGPSData(AsyncWebSocketClient *client) {
         // Release mutex
         unsigned long beforeReleaseTime = millis();
         xSemaphoreGive(gnssMutex);
-        LOG_DEBUG("GNSS mutex released after GPS data update (held for %lu ms)", 
+        LOG_DEBUG("Websocket gnssMutex hold time, %lu", 
                  millis() - beforeReleaseTime);
     } else {
-        LOG_ERROR("Failed to acquire GNSS mutex for GPS data update");
+        LOG_ERROR("gnssMutex fail in sendGPSData");
         // If we couldn't get the mutex, send minimal data
         doc["fix"] = "Data Unavailable";
     }
@@ -458,11 +458,12 @@ void sendGPSData(AsyncWebSocketClient *client) {
         LOG_DEBUG("Broadcast GPS data to all clients");
     }
     
-    LOG_DEBUG("Total GPS data update process took %lu ms", millis() - startTime);
+    LOG_DEBUG("sendGPSData time, %lu", millis() - startTime);
 }
 
 // Send RTK status to one client or all clients
 void sendRTKStatus(AsyncWebSocketClient *client) {
+    LOG_DEBUG("sendRTKStatus");
     // Create JSON document for RTK data
     DynamicJsonDocument doc(256);
     doc["type"] = "rtk";
@@ -520,6 +521,7 @@ void sendRTKStatus(AsyncWebSocketClient *client) {
 
 // Send navigation stats to one client or all clients
 void sendNavigationStats(AsyncWebSocketClient *client) {
+    LOG_DEBUG("sendNavigationStats");
     // Get current navigation status
     NavStatus status = getNavStatus();
     
@@ -547,6 +549,7 @@ void sendNavigationStats(AsyncWebSocketClient *client) {
 
 // Send sensor data to one client or all clients
 void sendSensorData(AsyncWebSocketClient *client) {
+    LOG_DEBUG("sendSensorData");
     // Create JSON document for sensor data
     // This is placeholder code - you'll need to implement actual sensor reading
     DynamicJsonDocument doc(256);

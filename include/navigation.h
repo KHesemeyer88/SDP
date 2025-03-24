@@ -12,14 +12,6 @@
 #include "logging.h"
 #include "rtos_tasks.h"
 
-// Navigation task configuration
-#define NAV_TASK_PRIORITY       9  // Below GNSS but above WebSocket?
-#define NAV_TASK_STACK_SIZE     4096
-#define NAV_UPDATE_FREQUENCY    10 // 10Hz for navigation updates
-
-// Control task configuration (for motion control)
-#define CONTROL_UPDATE_FREQUENCY 20 // 20Hz for smoother control
-
 // Task handles
 extern TaskHandle_t navTaskHandle;
 

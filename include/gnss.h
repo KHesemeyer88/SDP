@@ -8,10 +8,6 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 
-// Task priorities and stack sizes
-#define GNSS_TASK_PRIORITY       9  // Lower than control but higher than websocket?
-#define GNSS_TASK_STACK_SIZE     8192
-
 // GNSS task handle
 extern TaskHandle_t gnssTaskHandle;
 

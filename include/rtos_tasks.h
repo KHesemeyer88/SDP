@@ -12,16 +12,19 @@
 
 // Task priorities (1-24, higher number = higher priority)
 #define CONTROL_TASK_PRIORITY       10
+#define NAV_TASK_PRIORITY           9
+#define GNSS_TASK_PRIORITY          8
 #define WEBSOCKET_TASK_PRIORITY     7
-#define BLINK_TASK_PRIORITY         1
+#define HTTP_SERVER_TASK_PRIORITY   6
+#define LOG_TASK_PRIORITY           2
 
 // Task stack sizes
 #define CONTROL_TASK_STACK_SIZE     4096
 #define WEBSOCKET_TASK_STACK_SIZE   20480
-#define BLINK_TASK_STACK_SIZE       2048
-// HTTP server task priority and stack size
-#define HTTP_SERVER_TASK_PRIORITY     7
-#define HTTP_SERVER_TASK_STACK_SIZE   8192
+#define NAV_TASK_STACK_SIZE         4096
+#define HTTP_SERVER_TASK_STACK_SIZE 8192
+#define LOG_TASK_STACK_SIZE         4096
+#define GNSS_TASK_STACK_SIZE        8192
 
 // HTTP server task handle
 extern TaskHandle_t httpServerTaskHandle;
@@ -62,7 +65,6 @@ struct ControlCommand {
 // Task handles
 extern TaskHandle_t controlTaskHandle;
 extern TaskHandle_t websocketTaskHandle;
-extern TaskHandle_t blinkTaskHandle;
 
 // Mutex for accessing shared resources
 extern SemaphoreHandle_t servoMutex;
@@ -78,7 +80,6 @@ extern Servo escServo;
 void ControlTask(void *pvParameters);
 // WebSocket task now only handles periodic updates, not the WebSocket loop()
 void WebSocketTask(void *pvParameters);
-void BlinkTask(void *pvParameters);
 
 // Initialize all RTOS components
 void initRTOS();

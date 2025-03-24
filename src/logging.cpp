@@ -5,21 +5,19 @@
 // Log file definitions
 #define LOG_FILE_PATH "/log.txt"
 #define LOG_QUEUE_SIZE 50
-#define LOG_TASK_STACK_SIZE 4096
-#define LOG_TASK_PRIORITY 2
 #define LOG_FLUSH_INTERVAL 5000  // 5 seconds
 
 // Global variables
-LogLevel currentLogLevel = LOG_NAV_STATE; // Default to debug level
+LogLevel currentLogLevel = LOG_PERF; // Default to debug level
 QueueHandle_t logQueue = NULL;
 TaskHandle_t logTaskHandle = NULL;
 static File logFile;
-static SemaphoreHandle_t logFileMutex = NULL;
+SemaphoreHandle_t logFileMutex = NULL;
 static const char* logLevelNames[] = {"NONE", "ERROR", "NAV", "DEBUG", "PERF"};
 
 // Initialize the logging system
 bool initLogging() {
-    if (currentLogLevel == LOG_NONE) return true; // Logging "disabled"
+    if (currentLogLevel == LOG_NONE) return true; // Logging disabled
 
     // Configure SPI for SD card
     SPI.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
@@ -42,22 +40,6 @@ bool initLogging() {
     // Create log message queue
     logQueue = xQueueCreate(LOG_QUEUE_SIZE, sizeof(LogMessage));
     if (logQueue == NULL) {
-        currentLogLevel = LOG_NONE;
-        return false;
-    }
-    
-    // Create the logging task
-    BaseType_t xReturned = xTaskCreatePinnedToCore(
-        logTask,
-        "LogTask",
-        LOG_TASK_STACK_SIZE,
-        NULL,
-        LOG_TASK_PRIORITY,
-        &logTaskHandle,
-        0 // Run on core 0
-    );
-    
-    if (xReturned != pdPASS) {
         currentLogLevel = LOG_NONE;
         return false;
     }
