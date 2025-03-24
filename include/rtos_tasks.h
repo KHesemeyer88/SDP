@@ -12,7 +12,7 @@
 
 // Task priorities (1-24, higher number = higher priority)
 #define CONTROL_TASK_PRIORITY       10
-#define WEBSOCKET_TASK_PRIORITY     11
+#define WEBSOCKET_TASK_PRIORITY     7
 #define BLINK_TASK_PRIORITY         1
 
 // Task stack sizes
@@ -20,7 +20,7 @@
 #define WEBSOCKET_TASK_STACK_SIZE   20480
 #define BLINK_TASK_STACK_SIZE       2048
 // HTTP server task priority and stack size
-#define HTTP_SERVER_TASK_PRIORITY     8
+#define HTTP_SERVER_TASK_PRIORITY     7
 #define HTTP_SERVER_TASK_STACK_SIZE   8192
 
 // HTTP server task handle
