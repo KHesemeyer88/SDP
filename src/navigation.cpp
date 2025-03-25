@@ -145,7 +145,7 @@ bool startWaypointNavigation(float targetPace, float targetDistance) {
     // Set waypoint navigation flags BEFORE sending command
     if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
         targetData.followingWaypoints = true;
-        LOG_NAV("followingWaypoints to T, %d", waypointCount);
+        LOG_NAV("followingWaypoints to true, %d", waypointCount);
         xSemaphoreGive(waypointMutex);
     }
     

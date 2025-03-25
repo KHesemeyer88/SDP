@@ -20,7 +20,7 @@ void initHttpServer() {
     server.on("/fusionStatus", HTTP_GET, [](AsyncWebServerRequest *request) {
         char fusionStatus[64]; // Buffer for status
         char responseBuffer[256]; // Buffer for JSON response
-        
+        LOG_DEBUG("about to call getFusionStatus");
         // Get actual fusion status using our buffer-based function
         getFusionStatus(fusionStatus, sizeof(fusionStatus));
         

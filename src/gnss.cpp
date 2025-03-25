@@ -110,6 +110,7 @@ bool initializeGNSS() {
 // Get fusion status from IMU
 // Change the return type and implementation:
 char* getFusionStatus(char* buffer, size_t bufferSize) {
+    LOG_DEBUG("getFusionStatus");
     // Temporarily set nav frequency to 1Hz for status check
     myGPS.setNavigationFrequency(1);
     const char* defaultStatus = "Failed to get fusion data";
@@ -119,8 +120,7 @@ char* getFusionStatus(char* buffer, size_t bufferSize) {
 
     // Try to get ESF info with timeout
     unsigned long startTime = millis();
-    const unsigned long ESF_TIMEOUT = 1000; // 1 second timeout
-
+    const unsigned long ESF_TIMEOUT = 2000; 
     if (!myGPS.getEsfInfo()) {
         while (millis() - startTime < ESF_TIMEOUT) {
             LOG_DEBUG("getEsfInfo");
@@ -152,7 +152,7 @@ bool processGNSSConnection() {
     
     // Take mutex before checking connection status
     if (xSemaphoreTake(ntripClientMutex, portMAX_DELAY) == pdTRUE) {
-        LOG_DEBUG("ntrip mutex acq, %lu", millis() - startTime);
+        LOG_DEBUG("ntrip mutex acq time, %lu", millis() - startTime);
         clientConnected = ntripClient.connected();
         LOG_DEBUG("ntrip client conn., %d", clientConnected);
         
@@ -167,12 +167,13 @@ bool processGNSSConnection() {
                 rtcmBuffer[rtcmCount++] = ntripClient.read();
             }
             
-            LOG_DEBUG("RTCM data bytes, %d, time, %lu", rtcmCount, millis() - readStartTime);
+            LOG_DEBUG("ntripClient.read time, %lu", millis() - readStartTime);
+            LOG_DEBUG("RTCM data bytes, %d", rtcmCount);
             
             // Release mutex before lengthy processing
             unsigned long mutexHeldTime = millis() - startTime;
             xSemaphoreGive(ntripClientMutex);
-            LOG_DEBUG("released ntrip mutex, %lu", mutexHeldTime);
+            LOG_DEBUG("ntripClientMutex hold time, %lu", mutexHeldTime);
             
             if (rtcmCount > 0) {
                 // Update the timestamp for when we last received any correction data
@@ -185,7 +186,7 @@ bool processGNSSConnection() {
             // Release mutex if not connected or no data available
             unsigned long mutexHeldTime = millis() - startTime;
             xSemaphoreGive(ntripClientMutex);
-            LOG_DEBUG("released ntrip mutex no data, %lu", mutexHeldTime);
+            LOG_DEBUG("ntripClientMutex hold (no data) time, %lu", mutexHeldTime);
         }
     } else {
         LOG_DEBUG("ntrip mutex fail");
@@ -200,7 +201,7 @@ bool processGNSSConnection() {
 
     // Update correction status based on age
     correctionAge = millis() - lastReceivedRTCM_ms;
-    LOG_DEBUG("RTCM age, %lu", correctionAge);
+    LOG_DEBUG("RTCM age time, %lu", correctionAge);
     
     CorrectionStatus oldStatus = rtcmCorrectionStatus;
     
@@ -434,16 +435,15 @@ void GNSSTask(void *pvParameters) {
                 
                 unsigned long connectStartTime = millis();
                 bool connected = connectToNTRIP();
-                LOG_DEBUG("ntrip conn., %s, %lu", 
-                          connected ? "successful" : "failed", 
-                          millis() - connectStartTime);
+                LOG_DEBUG("connectToNTRIP time, %lu", millis() - connectStartTime);
+                LOG_DEBUG("connectToNTRIP status, %s", connected ? "successful" : "failed");
             }
         }
         
         // Send GNSS data to WebSocket clients if new data is available
         unsigned long dataStartTime = millis();
         if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(100)) == pdTRUE) {  // 100ms timeout
-            LOG_DEBUG("GNSSTask take gnssMutex, %lu", millis() - dataStartTime);
+            LOG_DEBUG("gnssMutex take time, %lu", millis() - dataStartTime);
             
             if (gnssData.newDataAvailable) {
                 // Let WebSocket task handle data sending to avoid potential issues
@@ -453,7 +453,7 @@ void GNSSTask(void *pvParameters) {
             
             unsigned long mutexHeldTime = millis() - dataStartTime;
             xSemaphoreGive(gnssMutex);
-            LOG_DEBUG("GNSSTask release gnssMutex, %lu", mutexHeldTime);
+            LOG_DEBUG("gnssMutex hold time, %lu", mutexHeldTime);
         } else {
             LOG_DEBUG("GNSS task mutex fail");
         }

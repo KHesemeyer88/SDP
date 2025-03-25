@@ -331,7 +331,7 @@ void WebSocketTask(void *pvParameters) {
                 LOG_ERROR("CRITICAL: Low memory condition (%u bytes free)", freeHeap);
             }
 
-            LOG_DEBUG("free heap, %u bytes", ESP.getFreeHeap());
+            LOG_DEBUG("free heap bytes, %u", ESP.getFreeHeap());
             LOG_DEBUG("WebSocketTask high water mark, %u", uxTaskGetStackHighWaterMark(websocketTaskHandle));
             LOG_DEBUG("GNSSTask high water mark, %u", uxTaskGetStackHighWaterMark(gnssTaskHandle));
             LOG_DEBUG("ControlTask high water mark, %u", uxTaskGetStackHighWaterMark(controlTaskHandle));
@@ -346,7 +346,7 @@ void WebSocketTask(void *pvParameters) {
             sendSensorData();
             unsigned long updateTime = millis() - updateStartTime;
             if (updateTime > 20) {  // Only log if it took significant time
-                LOG_DEBUG("Sensor data update took %lu ms", updateTime);
+                LOG_DEBUG("sendSensorData time, %lu", updateTime);
             }
             lastWSSensorUpdate = currentTime;
         }
@@ -356,7 +356,7 @@ void WebSocketTask(void *pvParameters) {
             sendGPSData();
             unsigned long gpsUpdateTime = millis() - gpsStartTime;
             if (gpsUpdateTime > 20) {  // Only log if it took significant time
-                LOG_DEBUG("gpsUpdateTime, %lu", gpsUpdateTime);
+                LOG_DEBUG("sendGPSData time, %lu", gpsUpdateTime);
             }
             lastWSGPSUpdate = currentTime;
         }
@@ -366,7 +366,7 @@ void WebSocketTask(void *pvParameters) {
             sendRTKStatus();
             unsigned long rtkUpdateTime = millis() - rtkStartTime;
             if (rtkUpdateTime > 20) {  // Only log if it took significant time
-                LOG_DEBUG("rtkUpdateTime, %lu", rtkUpdateTime);
+                LOG_DEBUG("SendRTKStatus time, %lu", rtkUpdateTime);
             }
             lastWSRTKUpdate = currentTime;
         }
@@ -376,7 +376,7 @@ void WebSocketTask(void *pvParameters) {
             sendNavigationStats();
             unsigned long statsUpdateTime = millis() - statsStartTime;
             if (statsUpdateTime > 20) {  // Only log if it took significant time
-                LOG_DEBUG("statsUpdateTime, %lu", statsUpdateTime);
+                LOG_DEBUG("sendNavigationStats time, %lu", statsUpdateTime);
             }
             lastWSStatsUpdate = currentTime;
         }
