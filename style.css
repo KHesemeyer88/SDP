@@ -1,0 +1,41 @@
+/* *********************************************** */
+/* Main-section */
+.main-text {
+    margin-top: 8rem;
+  }
+  .text-heading {
+    font-size: 3rem;
+    color: #56c8e1;
+  }
+  .text-inner {
+    font-size: 1.6rem;
+  }
+  .contact-list:last-child {
+    color: #56c8e1;
+  }
+  .chinhsachbaomat {
+    text-decoration: none;
+    color: #56c8e1;
+    font-weight: 500;
+  }
+  @media (max-width: 120em) {
+    html {
+      font-size: 63.5%;
+    }
+    .main-text {
+      margin-top: 10rem;
+      padding: 2rem 0 5rem;
+    }
+    .text-heading {
+      margin: 3rem 0;
+    }
+    .text-inner {
+      margin-bottom: 1rem;
+      text-align: justify;
+    }
+  }
+  @media (min-width: 120em) {
+    .main-text {
+      margin: 13rem 0 5rem;
+    }
+  }

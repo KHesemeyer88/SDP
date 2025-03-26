@@ -1,0 +1,311 @@
+/* Navbar-section */
+.navbar-section {
+    /* position: fixed; */
+    margin: 0 auto;
+    top: 0;
+    width: 100%;
+    background-color: #fff;
+  }
+  .nav {
+    justify-items: end;
+    height: 8rem;
+  }
+  .nav-logo-link {
+    flex: 1;
+    display: flex;
+    align-items: center;
+  }
+  .nav-logo {
+    width: 30%;
+  }
+  .nav-list {
+    display: flex;
+    list-style: none;
+    justify-content: center;
+    align-items: center;
+    -webkit-gap: 5rem;
+    gap: 5rem;
+  }
+  .list-item a {
+    text-decoration: none;
+  }
+  .nav-list .list-item a {
+    font-size: 2.1rem;
+    color: #333;
+    font-weight: 500;
+    transition: all ease-in 0.1s;
+    transform: translateY(-15%);
+  }
+  .nav-list .list-item:hover a {
+    color: #56c8e1;
+  }
+  .icon-mobile-nav {
+    z-index: 999;
+  }
+  /* *********************************************** */
+  /* Mobile Navigation */
+  .btn-mobile-nav {
+    border: none;
+    background: none;
+    cursor: pointer;
+    display: none;
+  }
+  .icon-mobile-nav {
+    width: 4.8rem;
+    height: 4.8rem;
+    color: #333;
+  }
+  .icon-mobile-nav[name="close-outline"] {
+    display: none;
+  }
+  /* *********************************************** */
+  /* Hero section */
+  .hero-section {
+    margin-top: 8rem;
+    padding: 5rem 0 10rem 0;
+    position: relative;
+    overflow: hidden;
+    background-image: url("../GOFAimages/Facebook\ cover.png");
+    background-repeat: no-repeat;
+    background-size: cover;
+  }
+  .hero {
+    justify-content: center;
+    align-items: center;
+    gap: 10rem;
+    padding: 8rem 0;
+  }
+  .hero-text-box {
+    padding: 4rem 2rem;
+  }
+  .heading-text {
+    font-size: 5.5rem;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: -1px;
+    line-height: 1.2;
+    text-align: left;
+  }
+  .apple-btn {
+    margin-top: 4rem;
+  }
+  .qrcode-link {
+    width: 55%;
+  }
+  .get-app {
+    font-size: 2.5rem;
+    font-weight: 600;
+    display: block;
+    margin-top: 3rem;
+  }
+  .apple-store-btn {
+    width: 80%;
+    margin-top: 2rem;
+  }
+  .hero-img-appui {
+    width: 100%;
+  }
+  .appUI {
+    width: 18.8rem;
+    height: 37rem;
+  }
+  .carplay {
+    width: 37rem;
+    height: 23rem;
+  }
+  /* *********************************************** */
+  /* Slides */
+  .slideshow-section {
+    height: 13rem;
+  }
+  .mySlides {
+    display: none;
+    text-align: center;
+  }
+  .mySlides q {
+    font-size: 3.5rem;
+    color: #333;
+  }
+  .mySlides p {
+    font-size: 2rem;
+    font-weight: 500;
+    color: #333;
+  }
+  .author {
+    text-align: center;
+    font-size: 3rem;
+    color: #56c8e1;
+    padding-bottom: 3rem;
+    font-weight: 600;
+  }
+  /* The dot/bullet/indicator container */
+  .dot-container {
+    text-align: center;
+    padding: 2rem;
+  }
+  /* The dots/bullets/indicators */
+  .dot {
+    cursor: pointer;
+    height: 1.5rem;
+    width: 1.5rem;
+    margin: 0 0.2rem;
+    background-color: #bbb;
+    border-radius: 50%;
+    display: inline-block;
+    transition: background-color 0.6s ease;
+  }
+  
+  /* Add a background color to the active dot/circle */
+  .active,
+  .dot:hover {
+    background-color: #717171;
+  }
+  
+  /* Add an italic font style to all quotes */
+  q {
+    font-style: italic;
+  }
+  
+  /* */
+  
+  /* *********************************************** */
+  
+  /* *********************************************** */
+  /* Feature Section */
+  .feature-section {
+    padding-bottom: 10rem;
+  }
+  .feature-heading {
+    text-align: center;
+    font-size: 5rem;
+    font-weight: 500;
+    color: #333;
+    letter-spacing: -1px;
+    line-height: 1.2;
+    margin: 8rem 0;
+  }
+  .feature-grid {
+    align-items: start;
+  }
+  .step-number {
+    font-size: 8.6rem;
+    font-weight: 700;
+    color: var(--primary-color);
+    margin-bottom: 0.2rem;
+  }
+  .feature-header {
+    font-size: 5.6rem;
+    line-height: 1.2;
+    margin-bottom: 1.5rem;
+    font-weight: 700;
+    color: var(--text-color);
+    letter-spacing: -0.1rem;
+  }
+  .feature-detail {
+    font-size: 2rem;
+    text-align: justify;
+    text-justify: inter-word;
+  }
+  .feature-app-img {
+    justify-self: center;
+    align-self: center;
+  }
+  .feature-text-box-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+  .feature-image-ip {
+    width: 30%;
+  }
+  .feature-image-carplay {
+    width: 65%;
+  }
+  .step-img-box {
+    position: relative;
+  }
+  .step-img-box::before,
+  .step-img-box::after {
+    content: "";
+    display: block;
+    border-radius: 50%;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+  
+  .step-img-box::before {
+    width: 60%;
+    padding-bottom: 60%;
+    background-color: #56c8e1;
+    z-index: -2;
+  }
+  
+  .step-img-box::after {
+    width: 45%;
+    padding-bottom: 45%;
+    background-color: #56c8e1;
+    z-index: -1;
+  }
+  
+  .step-img {
+    width: 35%;
+  }
+  /* *********************************************** */
+  
+  /* *********************************************** */
+  /* Testimonial */
+  .testimonial-section {
+    padding: 10rem 0;
+    background-color: var(--background-color);
+  }
+  .testimonial-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10rem;
+    align-items: center;
+    justify-items: center;
+  }
+  .testimonial-heading {
+    text-align: left;
+    font-size: 7rem;
+    font-weight: 620;
+  }
+  /* *********************************************** */
+  
+  /* *********************************************** */
+  /* Footer */
+  .footer-section {
+    border-top: 1px solid #303030;
+    background-color: #333;
+  }
+  .contact {
+    display: flex;
+    justify-content: space-between;
+    padding: 5rem 0;
+  }
+  .contact-list,
+  .list-item {
+    font-size: 2rem;
+  }
+  .contact-list {
+    line-height: 1.5;
+  }
+  p.contact-list a {
+    text-decoration: none;
+    color: #56c8e1;
+  }
+  .list-item {
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+  }
+  .list-item,
+  .contact-list {
+    color: var(--white-color);
+  }
+  .list-item:first-child p a {
+    color: #56c8e1;
+  }
+  /* *********************************************** */

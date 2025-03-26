@@ -1,0 +1,649 @@
+/* Media Queries */
+@media (min-width: 120em) {
+    html {
+      font-size: 63.5%;
+    }
+    .container {
+      max-width: 170rem;
+    }
+    .nav {
+      height: 10rem;
+    }
+    .nav-logo {
+      width: 25%;
+    }
+    .nav-list .list-item a {
+      font-size: 3rem;
+    }
+    .hero {
+      gap: 0rem;
+      align-items: end;
+      padding: 5rem 0;
+    }
+    .hero-section {
+      grid-template-columns: 1fr 1fr;
+      margin-top: 10rem;
+      padding: 5rem 0;
+    }
+    .hero-img {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .hero-img-appui-1 {
+      width: 38%;
+      padding-right: 5rem;
+    }
+    .hero-img-appui-2 {
+      width: 72%;
+    }
+    .hero-text-box {
+      padding: 0rem 5rem 0rem 0rem;
+    }
+    .slideshow-section-container {
+      padding-top: 4rem;
+    }
+    .heading-text {
+      font-size: 7rem;
+    }
+    .feature-heading {
+      margin: 10rem 0rem 15rem 0rem;
+      font-size: 7rem;
+    }
+    .feature-grid {
+      row-gap: 25rem;
+    }
+    .feature-img-appui {
+      width: 100%;
+    }
+    .feature-detail {
+      font-size: 3rem;
+    }
+    .feature-detail-5,
+    .feature-detail-3 {
+      padding-right: 23rem;
+    }
+    .feature-detail-6,
+    .feature-detail-4 {
+      padding-left: 20rem;
+    }
+    .feature-header.feature-header-07 {
+      padding-right: 3rem;
+    }
+    .apple-btn {
+      width: 70%;
+      grid-template-columns: 1fr 1fr;
+      justify-items: center;
+      align-items: center;
+      margin-top: 5rem;
+    }
+    .apple-store-btn {
+      margin-top: 1rem;
+    }
+    .get-app-apple {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .get-app-apple a {
+      margin-top: 1rem;
+    }
+    .gofa-qrcode {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .qrcode-link {
+      width: 60%;
+    }
+    .get-app {
+      text-align: center;
+      padding-right: 0rem;
+      margin: 0rem;
+    }
+    .get-app-apple .apple-store-btn {
+      margin: 0;
+      width: 100%;
+    }
+    .blockquote-author {
+      font-size: 3.5rem;
+    }
+    .contact-list,
+    .list-item {
+      font-size: 2.5rem;
+    }
+  }
+  /* ************************************* */
+  @media (max-width: 120em) {
+    html {
+      font-size: 63.5%;
+    }
+    .container {
+      max-width: 170rem;
+    }
+    .nav {
+      height: 10rem;
+    }
+    .nav-logo {
+      width: 25%;
+    }
+    .nav-list .list-item a {
+      font-size: 3rem;
+    }
+    .hero-section {
+      grid-template-columns: 1fr 1fr;
+      margin-top: 10rem;
+      padding: 5rem 0;
+    }
+    .hero {
+      gap: 0rem;
+      align-items: end;
+      padding: 5rem 0;
+    }
+    .hero-text-box {
+      padding: 4rem 0rem 0rem 0rem;
+    }
+    .hero-img {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .hero-img-appui-1 {
+      width: 28%;
+      padding-right: 1rem;
+    }
+    .hero-img-appui-2 {
+      width: 66%;
+    }
+    .slideshow-section-container {
+      padding-top: 4rem;
+    }
+    .heading-text {
+      font-size: 6.6rem;
+      padding-right: 7rem;
+    }
+    .feature-heading {
+      margin: 10rem 0rem 15rem 0;
+      font-size: 7rem;
+    }
+    .feature-grid {
+      row-gap: 25rem;
+    }
+    .feature-img-appui {
+      width: 100%;
+    }
+    .feature-detail {
+      font-size: 3rem;
+    }
+    .feature-detail-5,
+    .feature-detail-3 {
+      padding-right: 23rem;
+    }
+    .feature-detail-6,
+    .feature-detail-4 {
+      padding-left: 20rem;
+    }
+    .feature-header.feature-header-07 {
+      padding-right: 3rem;
+    }
+    .apple-btn {
+      width: 70%;
+      grid-template-columns: 1fr 1fr;
+      justify-items: center;
+      align-items: end;
+      margin-top: 5rem;
+    }
+    .apple-store-btn {
+      margin-top: 1rem;
+    }
+    .get-app-apple {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .get-app-apple a {
+      margin-top: 1rem;
+    }
+    .gofa-qrcode {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .qrcode-link {
+      width: 60%;
+    }
+    .get-app {
+      text-align: center;
+      padding-right: 0rem;
+      margin: 0rem;
+    }
+    .get-app-apple .apple-store-btn {
+      margin: 0;
+      width: 100%;
+    }
+    .testimonial-video {
+      justify-self: end;
+    }
+    .contact-list,
+    .list-item {
+      font-size: 2.5rem;
+    }
+  }
+  @media (max-width: 117.5em) {
+    html {
+      font-size: 60.5%;
+    }
+  }
+  @media (max-width: 109.75em) {
+    html {
+      font-size: 55.25%;
+    }
+  }
+  @media (max-width: 101.25em) {
+    html {
+      font-size: 52.25%;
+    }
+  }
+  @media (max-width: 95.5em) {
+    html {
+      font-size: 49.25%;
+    }
+  }
+  @media (max-width: 92.5em) {
+    html {
+      font-size: 47.25%;
+    }
+  }
+  @media (max-width: 88.75em) {
+    html {
+      font-size: 45.25%;
+    }
+  }
+  @media (max-width: 85.375em) {
+    html {
+      font-size: 42.25%;
+    }
+  }
+  @media (max-width: 78.5em) {
+    html {
+      font-size: 39.25%;
+    }
+  }
+  @media (max-width: 76em) {
+    html {
+      font-size: 38.25%;
+    }
+  }
+  @media (max-width: 73.625em) {
+    html {
+      font-size: 37.25%;
+    }
+  }
+  @media (max-width: 70.5em) {
+    html {
+      font-size: 36.25%;
+    }
+  }
+  @media (max-width: 67.5em) {
+    html {
+      font-size: 34.25%;
+    }
+  }
+  @media (max-width: 64.625em) {
+    html {
+      font-size: 32.25%;
+    }
+    .testimonial-section {
+      padding: 5rem 0;
+    }
+    .testimonial-container {
+      grid-template-columns: 1fr;
+      gap: 5rem;
+    }
+    .testimonial-heading {
+      text-align: justify;
+      font-size: 5.5rem;
+    }
+    .testimonial-video {
+      justify-self: center;
+    }
+    .testimonial-video iframe {
+      width: 80rem;
+      height: 46.5rem;
+    }
+  }
+  @media (max-width: 58.125em) {
+    html {
+      font-size: 29.25%;
+    }
+    .testimonial-heading {
+      text-align: center;
+      font-size: 5rem;
+    }
+  }
+  @media (max-width: 53.875em) {
+    html {
+      font-size: 28.25%;
+    }
+  }
+  /* ************************************* */
+  @media (max-width: 50.75em) {
+    html {
+      font-size: 90%;
+    }
+    .container {
+      max-width: 160rem;
+    }
+    .btn-mobile-nav {
+      display: block;
+    }
+    .icon-mobile-nav {
+      width: 5.8rem;
+      height: 5.8rem;
+    }
+    .nav-list {
+      background-color: rgba(256, 256, 256, 0.97);
+      position: absolute;
+      top: 0rem;
+      left: 0rem;
+      bottom: 0rem;
+      right: 0rem;
+      width: 100%;
+      height: 100vh;
+      flex-direction: column;
+      transform: translateX(100%);
+      gap: 8rem;
+      opacity: 0;
+      transition: all 0.5s ease-in;
+      pointer-events: none;
+      visibility: hidden;
+    }
+    .nav-list .list-item a {
+      font-size: 5rem;
+    }
+    .nav-open .nav-list {
+      opacity: 1;
+      pointer-events: auto;
+      visibility: visible;
+      transform: translateX(0);
+    }
+    .nav-open .icon-mobile-nav[name="close-outline"] {
+      display: block;
+    }
+    .nav-open .icon-mobile-nav[name="menu-outline"] {
+      display: none;
+    }
+    .nav-logo {
+      width: 80%;
+    }
+    .hero-section {
+      margin-top: 9.6rem;
+    }
+    .heading-text {
+      text-align: center;
+      font-size: 7.3rem;
+      font-weight: 500;
+      padding-right: 0;
+    }
+    .hero-section {
+      padding-top: 0rem;
+    }
+    .hero {
+      grid-template-columns: 1fr;
+      padding: 3rem 0 7rem 0;
+      gap: 0;
+    }
+    .hero-img {
+      margin-top: 5rem;
+    }
+    .hero-img-appui {
+      width: 100%;
+    }
+    .hero-img-appui-1 {
+      width: 36%;
+      padding-right: 4rem;
+    }
+    .hero-img-appui-2 {
+      width: 65%;
+    }
+    .apple-btn {
+      width: 100%;
+      grid-template-columns: 1fr 1fr;
+      justify-items: center;
+      align-items: end;
+      margin-top: 10rem;
+      gap: 4rem;
+    }
+    .get-app-apple {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .gofa-qrcode {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .qrcode-link {
+      width: 77%;
+    }
+    .get-app {
+      text-align: center;
+      padding-right: 0rem;
+      margin: 0rem;
+    }
+    .apple-store-btn {
+      margin: 0;
+      width: 100%;
+    }
+    .slideshow-section {
+      height: 25rem;
+    }
+    .slideshow-container {
+      position: relative;
+    }
+    .mySlides {
+      display: none;
+      text-align: center;
+    }
+    .mySlides q {
+      font-size: 3rem;
+      color: #333;
+      letter-spacing: 0.1rem;
+      line-height: 1.6;
+    }
+    .mySlides p {
+      font-size: 2rem;
+      letter-spacing: 1.1;
+      line-height: 1.8;
+      font-weight: 500;
+      color: #333;
+    }
+    a.prev {
+      right: 89%;
+    }
+    .prev,
+    .next {
+      font-size: 4rem;
+    }
+    .feature-heading {
+      margin: 8rem;
+    }
+    .feature-grid {
+      grid-template-columns: 1fr;
+      justify-items: center;
+      align-items: center;
+      row-gap: 10rem;
+    }
+    .feature-text-box {
+      text-align: center;
+    }
+    .feature-text-box-right {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .feature-detail {
+      font-size: 2.3rem;
+      font-weight: 300;
+      text-align: center;
+    }
+    .feature-detail-5,
+    .feature-detail-3 {
+      padding-right: 0rem;
+    }
+    .feature-detail-6,
+    .feature-detail-4 {
+      padding-left: 0rem;
+    }
+    .feature-header.feature-header-07 {
+      padding-right: 0rem;
+    }
+    .step-number {
+      font-size: 7.6rem;
+      font-weight: 600;
+    }
+    .feature-header {
+      font-size: 5.6rem;
+      font-weight: 500;
+    }
+    .feature-text-box-right .feature-detail {
+      text-align: center;
+      font-size: 2.3rem;
+    }
+    .step-img-box-1 {
+      grid-row: 2;
+    }
+    .step-img-box-2 {
+      grid-row: 4;
+    }
+    .step-img-box-3 {
+      grid-row: 6;
+    }
+    .step-img-box-4 {
+      grid-row: 8;
+    }
+    .step-img-box-5 {
+      grid-row: 10;
+    }
+    .step-img-box-6 {
+      grid-row: 12;
+    }
+    .step-img-box-1,
+    .step-img-box-2,
+    .step-img-box-3,
+    .step-img-box-4,
+    .step-img-box-5,
+    .step-img-box-6,
+    .step-img-box-7 {
+      width: 100%;
+    }
+    /* .testimonial-section {
+      padding: 5rem 0;
+    }
+    .testimonial-container {
+      grid-template-columns: 1fr;
+      gap: 5rem;
+    }
+    .testimonial-heading {
+      text-align: center;
+      font-size: 3.5rem;
+    }
+    .testimonial-video {
+      justify-self: center;
+    }
+    .testimonial-video iframe {
+      width: 40rem;
+      height: 21.3rem;
+    } */
+    .blockquote-detail {
+      font-size: 4rem;
+    }
+    .contact {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      justify-items: center;
+      padding: 1rem 0;
+    }
+    .contact-list:first-child {
+      grid-column: 1 / -1;
+      grid-row: 1;
+      justify-self: self-start;
+    }
+    .contact-list:last-child,
+    .contact-list:nth-child(2) {
+      justify-self: self-start;
+    }
+    .contact-list:last-child {
+      grid-column: 2;
+      grid-row: 2;
+    }
+    .contact-list > .list-item {
+      font-size: 2rem;
+    }
+    .contact-list {
+      font-size: 2rem;
+    }
+    /* ************************************* */
+    @media (max-width: 49.625em) {
+      html {
+        font-size: 61%;
+      }
+    }
+    @media (max-width: 42.125em) {
+      html {
+        font-size: 60%;
+      }
+    }
+    @media (max-width: 35.5em) {
+      html {
+        font-size: 50%;
+      }
+    }
+    @media (max-width: 29.1875em) {
+      html {
+        font-size: 43%;
+      }
+    }
+    @media (max-width: 25.0625em) {
+      html {
+        font-size: 37%;
+      }
+      .testimonial-heading {
+        text-align: center;
+        font-size: 3rem;
+      }
+      .testimonial-video iframe {
+        width: 34rem;
+        height: 21.3rem;
+      }
+    }
+    @media (max-width: 21.4375em) {
+      html {
+        font-size: 35%;
+      }
+    }
+    @media (max-width: 20em) {
+      html {
+        font-size: 34%;
+      }
+    }
+    @media (max-width: 18.625em) {
+      html {
+        font-size: 32%;
+      }
+    }
+    @media (max-width: 18.625em) {
+      html {
+        font-size: 29%;
+      }
+    }
+    @media (max-width: 16.375em) {
+      html {
+        font-size: 27%;
+      }
+    }
+  }
