@@ -12,13 +12,19 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 // LIDAR pins
-#define LIDAR_SDA_PIN 16  // Using previous ECHO_PIN_FRONT
-#define LIDAR_SCL_PIN 17  // Using previous TRIGGER_PIN_FRONT
+//#define LIDAR_SDA_PIN 16  // Using previous ECHO_PIN_FRONT
+//#define LIDAR_SCL_PIN 17  // Using previous TRIGGER_PIN_FRONT
+#define LIDAR_SDA_PIN 27
+#define LIDAR_SCL_PIN 28
 // SD Card pins
-#define SD_CS_PIN 12
-#define SD_MISO_PIN 14
-#define SD_SCK_PIN 27
-#define SD_MOSI_PIN 26
+//#define SD_CS_PIN 12
+#define SD_CS_PIN 18
+//#define SD_MISO_PIN 14
+#define SD_MISO_PIN 19
+//#define SD_SCK_PIN 27
+#define SD_SCK_PIN 21
+//#define SD_MOSI_PIN 26
+#define SD_MOSI_PIN 22
 #define SD_CD_PIN 25
 #define SD_FREQUENCY 20000000  // 20 MHz SPI frequency for SD card
 
@@ -40,13 +46,13 @@ const unsigned long WS_STATS_UPDATE_INTERVAL = 500;
 // Pin Definitions
 const int STEERING_PIN = 5;   // GPIO5 for steering servo
 const int ESC_PIN = 23;       // GPIO23 for ESC control
-// Sonar pins
-const int TRIGGER_PIN_FRONT = 17;
-const int ECHO_PIN_FRONT = 16;
-const int TRIGGER_PIN_LEFT = 22;
-const int ECHO_PIN_LEFT = 18;
-const int TRIGGER_PIN_RIGHT = 19;
-const int ECHO_PIN_RIGHT = 21;
+// // Sonar pins
+// const int TRIGGER_PIN_FRONT = 17;
+// const int ECHO_PIN_FRONT = 16;
+// const int TRIGGER_PIN_LEFT = 22;
+// const int ECHO_PIN_LEFT = 18;
+// const int TRIGGER_PIN_RIGHT = 19;
+// const int ECHO_PIN_RIGHT = 21;
 
 // Sonar thresholds (cm)
 const int FRONT_STOP_THRESHOLD = 150; // zero to suppress obst. avoidance
