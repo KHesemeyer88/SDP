@@ -396,23 +396,44 @@ void WebSocketTask(void *pvParameters) {
 void sendGPSData(AsyncWebSocketClient *client) {
     LOG_DEBUG("sendGPSData");
     unsigned long startTime = millis();
-    // Create JSON document for GPS data
-    DynamicJsonDocument doc(256);
-    doc["type"] = "gps";
     
-    // Take mutex to safely access GNSS data
+    // Variables to store the data we need from gnssData
+    uint8_t fixType = 0;
+    float latitude = 0, longitude = 0;
+    bool validData = false;
+    
+    // Take mutex ONLY to copy the values we need
     if (xSemaphoreTake(gnssMutex, portMAX_DELAY) == pdTRUE) {
         unsigned long mutexAcquiredTime = millis();
         LOG_DEBUG("Websocket gnssMutex acq time, %lu", mutexAcquiredTime - startTime);
         
-        // Add GPS information
-        if (gnssData.fixType > 0) {
-            //LOG_DEBUG("GPS data: fix=%d, lat=%.7f, lng=%.7f", 
-            //    gnssData.fixType, gnssData.latitude, gnssData.longitude);
-            
+        // Copy only what we need from gnssData
+        fixType = gnssData.fixType;
+        if (fixType >= 2) {
+            latitude = gnssData.latitude;
+            longitude = gnssData.longitude;
+        }
+        validData = true;
+        
+        // Release mutex immediately after copying data
+        unsigned long beforeReleaseTime = millis();
+        xSemaphoreGive(gnssMutex);
+        LOG_DEBUG("Websocket gnssMutex hold time, %lu", millis() - beforeReleaseTime);
+    } else {
+        LOG_ERROR("gnssMutex fail in sendGPSData");
+        validData = false;
+    }
+    
+    // Create JSON document for GPS data - AFTER releasing the mutex
+    DynamicJsonDocument doc(256);
+    doc["type"] = "gps";
+    
+    // Process the data we copied - all of this happens WITHOUT holding the mutex
+    if (validData) {
+        if (fixType > 0) {
             // Add fix type description
             String fixDesc;
-            switch (gnssData.fixType) {
+            switch (fixType) {
                 case 1: fixDesc = "1 (Dead Reckoning)"; break;
                 case 2: fixDesc = "2 (2D)"; break;
                 case 3: fixDesc = "3 (3D)"; break;
@@ -423,22 +444,15 @@ void sendGPSData(AsyncWebSocketClient *client) {
             doc["fix"] = fixDesc;
             
             // Add coordinates with precision based on fix type
-            if (gnssData.fixType >= 2) {
-                doc["lat"] = String(gnssData.latitude, 7); //
-                doc["lng"] = String(gnssData.longitude, 7);
+            if (fixType >= 2) {
+                doc["lat"] = String(latitude, 7);
+                doc["lng"] = String(longitude, 7);
             }
         } else {
             LOG_DEBUG("GPS data: No fix available");
             doc["fix"] = "No Fix";
         }
-        
-        // Release mutex
-        unsigned long beforeReleaseTime = millis();
-        xSemaphoreGive(gnssMutex);
-        LOG_DEBUG("Websocket gnssMutex hold time, %lu", 
-                 millis() - beforeReleaseTime);
     } else {
-        LOG_ERROR("gnssMutex fail in sendGPSData");
         // If we couldn't get the mutex, send minimal data
         doc["fix"] = "Data Unavailable";
     }
