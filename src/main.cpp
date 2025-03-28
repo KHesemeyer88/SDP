@@ -20,7 +20,7 @@ void setup() {
     
     // Initialize logging system
     if (initLogging()) {
-        LOG_DEBUG("logging init");
+        //LOG_DEBUG("logging init");
     } else {
         Serial.println("logging init fail");
     }
@@ -28,7 +28,7 @@ void setup() {
     LOG_ERROR("SYSTEM RESTART DETECTED - this message should appear only once after power-up");
     
     // Connect to WiFi
-    LOG_DEBUG("Connecting to WiFi network: %s", ssid);
+    //LOG_DEBUG("Connecting to WiFi network: %s", ssid);
     WiFi.begin(ssid, password);
     
     // Wait for connection with timeout
@@ -40,7 +40,7 @@ void setup() {
     }
     
     if (WiFi.status() == WL_CONNECTED) {
-        LOG_DEBUG("Connected to WiFi: %s, IP: %s", ssid, WiFi.localIP().toString().c_str());
+        //LOG_DEBUG("Connected to WiFi: %s, IP: %s", ssid, WiFi.localIP().toString().c_str());
     } else {
         LOG_ERROR("Failed to connect to WiFi. Will retry in RTOS tasks");
     }
@@ -50,15 +50,15 @@ void setup() {
     if (!initNavigation()) {
         LOG_ERROR("Failed to initialize navigation system");
     } else {
-        LOG_DEBUG("Navigation system initialized successfully");
+        //LOG_DEBUG("Navigation system initialized successfully");
     }
     
     // Initialize RTOS components
-    LOG_DEBUG("Initializing RTOS components");
+    //LOG_DEBUG("Initializing RTOS components");
     initRTOS();
 
     // Nothing else should run here - all code is now in tasks
-    LOG_DEBUG("Setup complete. RTOS scheduler taking over");
+    //LOG_DEBUG("Setup complete. RTOS scheduler taking over");
 }
 
 void loop() {

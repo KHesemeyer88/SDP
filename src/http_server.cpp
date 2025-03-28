@@ -20,7 +20,7 @@ void initHttpServer() {
     server.on("/fusionStatus", HTTP_GET, [](AsyncWebServerRequest *request) {
         char fusionStatus[64]; // Buffer for status
         char responseBuffer[256]; // Buffer for JSON response
-        LOG_DEBUG("about to call getFusionStatus");
+        //LOG_DEBUG("about to call getFusionStatus");
         // Get actual fusion status using our buffer-based function
         getFusionStatus(fusionStatus, sizeof(fusionStatus));
         
@@ -34,13 +34,13 @@ void initHttpServer() {
 
     // Start the server
     server.begin();
-    LOG_DEBUG("HTTP server init");
+    //LOG_DEBUG("HTTP server init");
 }
 
 // HTTP server task function
 void HttpServerTask(void *pvParameters) {
     // Initialize task
-    LOG_DEBUG("HTTP task start");
+    //LOG_DEBUG("HTTP task start");
     
     // Initialize server routes and start the server
     initHttpServer();
