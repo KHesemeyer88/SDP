@@ -15,7 +15,7 @@ extern TaskHandle_t gnssTaskHandle;
 extern SemaphoreHandle_t gnssMutex;
 
 // GNSS object
-extern SFE_UBLOX_GNSS myGPS;
+extern SFE_UBLOX_GNSS_SPI myGPS;
 
 // GNSS data structure to be shared between tasks
 struct GNSSData {

@@ -12,8 +12,8 @@ TaskHandle_t gnssTaskHandle = NULL;
 // Mutex for accessing GNSS data
 SemaphoreHandle_t gnssMutex = NULL;
 
-// GNSS object (declared in config.h)
-SFE_UBLOX_GNSS myGPS;
+// GNSS object (declared in gnss.h)
+SFE_UBLOX_GNSS_SPI myGPS;
 
 // GNSS data structure
 volatile GNSSData gnssData = {0};
@@ -79,21 +79,34 @@ void pushGPGGA(NMEA_GGA_data_t *nmeaData) {
 
 // Initialize GNSS module
 bool initializeGNSS() {
-    Wire.begin(32, 33); // Using default I2C pins
+    // for separate SPI bus
+    SPIClass mySPI(HSPI); // Create a new SPI instance using HSPI peripheral
+    mySPI.begin(NAV_SCK_PIN, NAV_MISO_PIN, NAV_MOSI_PIN);
     
-    if (!myGPS.begin()) {
-        LOG_ERROR("u-blox GNSS not detected. Check wiring.");
+    // Configure INT and RST pins
+    pinMode(NAV_INT_PIN, INPUT);
+    pinMode(NAV_RST_PIN, OUTPUT);
+    digitalWrite(NAV_RST_PIN, HIGH); // Default to not resetting
+    
+    // Use SPI to begin communication with GPS module
+    if (!myGPS.begin(SPI, NAV_CS_PIN, NAV_SPI_FREQUENCY)) {
+        LOG_ERROR("u-blox GNSS not detected over SPI. Check wiring.");
         return false;
     }
     
-    LOG_DEBUG("GNSS module found!");
+    LOG_DEBUG("GNSS module found over SPI!");
     
     myGPS.setNavigationFrequency(NAV_FREQ);
-    myGPS.setI2CInput(COM_TYPE_UBX | COM_TYPE_NMEA | COM_TYPE_RTCM3);
+    
+    // Configure protocol settings for SPI output
+    myGPS.setSPIOutput(COM_TYPE_UBX | COM_TYPE_NMEA | COM_TYPE_RTCM3);
+    
     myGPS.setDGNSSConfiguration(SFE_UBLOX_DGNSS_MODE_FIXED);
     myGPS.setMainTalkerID(SFE_UBLOX_MAIN_TALKER_ID_GP);
     myGPS.setNMEAGPGGAcallbackPtr(&pushGPGGA);
-    myGPS.setVal8(UBLOX_CFG_MSGOUT_NMEA_ID_GGA_I2C, 20);
+    
+    // Use SPI-specific message configuration
+    myGPS.setVal8(UBLOX_CFG_MSGOUT_NMEA_ID_GGA_SPI, 20);
     
     // Enable the callback for PVT messages
     myGPS.setAutoPVTcallbackPtr(&pvtCallback);
@@ -107,6 +120,7 @@ bool initializeGNSS() {
     
     return true;
 }
+
 // Get fusion status from IMU
 // Change the return type and implementation:
 char* getFusionStatus(char* buffer, size_t bufferSize) {
