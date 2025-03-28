@@ -12,21 +12,23 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 // LIDAR pins
-//#define LIDAR_SDA_PIN 16  // Using previous ECHO_PIN_FRONT
-//#define LIDAR_SCL_PIN 17  // Using previous TRIGGER_PIN_FRONT
-#define LIDAR_SDA_PIN 27
-#define LIDAR_SCL_PIN 28
-// SD Card pins
-//#define SD_CS_PIN 12
+#define LIDAR_SDA_PIN 16
+#define LIDAR_SCL_PIN 17
+// SD Card SPI pins
 #define SD_CS_PIN 18
-//#define SD_MISO_PIN 14
 #define SD_MISO_PIN 19
-//#define SD_SCK_PIN 27
 #define SD_SCK_PIN 21
-//#define SD_MOSI_PIN 26
 #define SD_MOSI_PIN 22
 #define SD_CD_PIN 25
 #define SD_FREQUENCY 20000000  // 20 MHz SPI frequency for SD card
+// Navigation board SPI pins
+#define NAV_CS_PIN 12     // Chip Select (active low)
+#define NAV_MOSI_PIN 13   // COPI (Controller Out, Peripheral In)
+#define NAV_MISO_PIN 14   // CIPO (Controller In, Peripheral Out)
+#define NAV_SCK_PIN 15    // SCLK (Serial Clock)
+#define NAV_INT_PIN 26    // Interrupt pin
+#define NAV_RST_PIN 27    // Reset pin
+#define NAV_SPI_FREQUENCY 20000000  // 20 MHz SPI frequency - drop down if unstable
 
 // Timing constants
 #define COMMAND_TIMEOUT_MS          500
