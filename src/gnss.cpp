@@ -79,28 +79,37 @@ void pushGPGGA(NMEA_GGA_data_t *nmeaData) {
 
 // Initialize GNSS module
 bool initializeGNSS() {
-    // for separate SPI bus
-    SPIClass mySPI(HSPI); // Create a new SPI instance using HSPI peripheral
-    mySPI.begin(NAV_SCK_PIN, NAV_MISO_PIN, NAV_MOSI_PIN);
+    LOG_DEBUG("initializeGNSS");
     
-    // Configure INT and RST pins
+    // Configure CS, INT and RST pins
+    pinMode(NAV_CS_PIN, OUTPUT);
+    digitalWrite(NAV_CS_PIN, HIGH);  // Default CS to high/inactive
     pinMode(NAV_INT_PIN, INPUT);
     pinMode(NAV_RST_PIN, OUTPUT);
     digitalWrite(NAV_RST_PIN, HIGH); // Default to not resetting
     
-    // Use SPI to begin communication with GPS module
-    if (!myGPS.begin(SPI, NAV_CS_PIN, NAV_SPI_FREQUENCY)) {
+    // Initialize the SPI bus with your defined pins
+    SPI.begin(NAV_SCK_PIN, NAV_MISO_PIN, NAV_MOSI_PIN, NAV_CS_PIN);
+    delay(100);
+    
+    // Do a fake transaction to initialize the SPI pins (critical step from your test code)
+    SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
+    SPI.transfer(0xFF);
+    SPI.endTransaction();
+    delay(100);
+    
+    // Use SPI to begin communication with GPS module - note reduced frequency for stability
+    if (!myGPS.begin(SPI, NAV_CS_PIN, 4000000)) {  // 4MHz instead of 20MHz
         LOG_ERROR("u-blox GNSS not detected over SPI. Check wiring.");
         return false;
     }
     
     LOG_DEBUG("GNSS module found over SPI!");
     
-    myGPS.setNavigationFrequency(NAV_FREQ);
-    
-    // Configure protocol settings for SPI output
+    // Configure SPI port to output UBX (critical)
     myGPS.setSPIOutput(COM_TYPE_UBX | COM_TYPE_NMEA | COM_TYPE_RTCM3);
     
+    myGPS.setNavigationFrequency(NAV_FREQ);
     myGPS.setDGNSSConfiguration(SFE_UBLOX_DGNSS_MODE_FIXED);
     myGPS.setMainTalkerID(SFE_UBLOX_MAIN_TALKER_ID_GP);
     myGPS.setNMEAGPGGAcallbackPtr(&pushGPGGA);

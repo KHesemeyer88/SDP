@@ -24,11 +24,11 @@
 // Navigation board SPI pins
 #define NAV_CS_PIN    15     // Chip Select (active low)
 #define NAV_MOSI_PIN  13   // COPI (Controller Out, Peripheral In)
-#define NAV_MISO_PIN  112   // CIPO (Controller In, Peripheral Out)
-#define NAV_SCK_PIN   114    // SCLK (Serial Clock)
+#define NAV_MISO_PIN  12   // CIPO (Controller In, Peripheral Out)
+#define NAV_SCK_PIN   14    // SCLK (Serial Clock)
 #define NAV_INT_PIN   26    // Interrupt pin
 #define NAV_RST_PIN   27    // Reset pin
-#define NAV_SPI_FREQUENCY 20000000  // 20 MHz SPI frequency - drop down if unstable
+#define NAV_SPI_FREQUENCY 4000000  // 20 MHz SPI frequency - drop down if unstable
 
 // Timing constants
 #define COMMAND_TIMEOUT_MS          500
