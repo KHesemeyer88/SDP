@@ -22,12 +22,12 @@
 #define SD_CD_PIN 25
 #define SD_FREQUENCY 20000000  // 20 MHz SPI frequency for SD card
 // Navigation board SPI pins
-#define NAV_CS_PIN 12     // Chip Select (active low)
-#define NAV_MOSI_PIN 13   // COPI (Controller Out, Peripheral In)
-#define NAV_MISO_PIN 14   // CIPO (Controller In, Peripheral Out)
-#define NAV_SCK_PIN 15    // SCLK (Serial Clock)
-#define NAV_INT_PIN 26    // Interrupt pin
-#define NAV_RST_PIN 27    // Reset pin
+#define NAV_CS_PIN    15     // Chip Select (active low)
+#define NAV_MOSI_PIN  13   // COPI (Controller Out, Peripheral In)
+#define NAV_MISO_PIN  112   // CIPO (Controller In, Peripheral Out)
+#define NAV_SCK_PIN   114    // SCLK (Serial Clock)
+#define NAV_INT_PIN   26    // Interrupt pin
+#define NAV_RST_PIN   27    // Reset pin
 #define NAV_SPI_FREQUENCY 20000000  // 20 MHz SPI frequency - drop down if unstable
 
 // Timing constants
