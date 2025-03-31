@@ -89,17 +89,18 @@ bool initializeGNSS() {
     digitalWrite(NAV_RST_PIN, HIGH); // Default to not resetting
     
     // Initialize the SPI bus with your defined pins
-    SPI.begin(NAV_SCK_PIN, NAV_MISO_PIN, NAV_MOSI_PIN, NAV_CS_PIN);
+    static SPIClass GNSSSPI(HSPI);
+    GNSSSPI.begin(NAV_SCK_PIN, NAV_MISO_PIN, NAV_MOSI_PIN, NAV_CS_PIN);
     delay(100);
 
     // Dummy SPI sync
-    SPI.beginTransaction(SPISettings(NAV_SPI_FREQUENCY, MSBFIRST, SPI_MODE0));
-    SPI.transfer(0xFF);
-    SPI.endTransaction();
+    GNSSSPI.beginTransaction(SPISettings(NAV_SPI_FREQUENCY, MSBFIRST, SPI_MODE0));
+    GNSSSPI.transfer(0xFF);
+    GNSSSPI.endTransaction();
     delay(100);
     
     // Use SPI to begin communication with GPS module - note reduced frequency for stability
-    if (!myGPS.begin(SPI, NAV_CS_PIN, 4000000)) {  // 4MHz instead of 20MHz
+    if (!myGPS.begin(GNSSSPI, NAV_CS_PIN, NAV_SPI_FREQUENCY)) {  // 4MHz instead of 20MHz
         LOG_ERROR("u-blox GNSS not detected over SPI. Check wiring.");
         return false;
     }

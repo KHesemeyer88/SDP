@@ -32,10 +32,11 @@ bool initLogging() {
         return true; // Logging disabled
     } 
     // Configure SPI for SD card
-    SPI.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
-    
+    static SPIClass sdSPI(VSPI);
+    sdSPI.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
+
     // Initialize SD card
-    if (!SD.begin(SD_CS_PIN, SPI, SD_FREQUENCY)) {
+    if (!SD.begin(SD_CS_PIN, sdSPI, SD_FREQUENCY)) {
         // Can't use logging here, but we still need some indication
         // Just return false - the calling function can decide what to do
         Serial.printf("SD fail - currentLogLevel being set to NONE");

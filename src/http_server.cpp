@@ -17,24 +17,24 @@ void initHttpServer() {
     });
     
     // Fusion status endpoint
-    server.on("/fusionStatus", HTTP_GET, [](AsyncWebServerRequest *request) {
-        char fusionStatus[64]; // Buffer for status
-        char responseBuffer[256]; // Buffer for JSON response
-        LOG_DEBUG("about to call getFusionStatus");
-        // Get actual fusion status using our buffer-based function
-        getFusionStatus(fusionStatus, sizeof(fusionStatus));
+    // server.on("/fusionStatus", HTTP_GET, [](AsyncWebServerRequest *request) {
+    //     char fusionStatus[64]; // Buffer for status
+    //     char responseBuffer[256]; // Buffer for JSON response
+    //     LOG_DEBUG("about to call getFusionStatus");
+    //     // Get actual fusion status using our buffer-based function
+    //     getFusionStatus(fusionStatus, sizeof(fusionStatus));
         
-        // Format the JSON response
-        snprintf(responseBuffer, sizeof(responseBuffer), 
-                 "{\"status\":\"%s\"}", fusionStatus);
+    //     // Format the JSON response
+    //     snprintf(responseBuffer, sizeof(responseBuffer), 
+    //              "{\"status\":\"%s\"}", fusionStatus);
         
-        // Send response
-        request->send(200, "application/json", responseBuffer);
-    });
+    //     // Send response
+    //     request->send(200, "application/json", responseBuffer);
+    // });
 
     // Start the server
     server.begin();
-    LOG_DEBUG("HTTP server init");
+    LOG_DEBUG("initHttpServer COMPLETE");
 }
 
 // HTTP server task function
