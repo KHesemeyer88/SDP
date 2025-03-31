@@ -45,4 +45,6 @@ void closeLogging();
 #define LOG_PERF(fmt, ...) logMessage(LOG_PERF, fmt, ##__VA_ARGS__)
 #define LOG_NAV(fmt, ...) logMessage(LOG_NAV_STATE, fmt, ##__VA_ARGS__)
 
+const char* logLevelToString(LogLevel level);
+
 #endif // LOGGING_H

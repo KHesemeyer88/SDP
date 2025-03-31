@@ -79,7 +79,7 @@ void pushGPGGA(NMEA_GGA_data_t *nmeaData) {
 
 // Initialize GNSS module
 bool initializeGNSS() {
-    LOG_DEBUG("initializeGNSS");
+    LOG_DEBUG("STARTING initializeGNSS");
     
     // Configure CS, INT and RST pins
     pinMode(NAV_CS_PIN, OUTPUT);
@@ -91,9 +91,9 @@ bool initializeGNSS() {
     // Initialize the SPI bus with your defined pins
     SPI.begin(NAV_SCK_PIN, NAV_MISO_PIN, NAV_MOSI_PIN, NAV_CS_PIN);
     delay(100);
-    
-    // Do a fake transaction to initialize the SPI pins (critical step from your test code)
-    SPI.beginTransaction(SPISettings(4000000, MSBFIRST, SPI_MODE0));
+
+    // Dummy SPI sync
+    SPI.beginTransaction(SPISettings(NAV_SPI_FREQUENCY, MSBFIRST, SPI_MODE0));
     SPI.transfer(0xFF);
     SPI.endTransaction();
     delay(100);
@@ -108,6 +108,8 @@ bool initializeGNSS() {
     
     // Configure SPI port to output UBX (critical)
     myGPS.setSPIOutput(COM_TYPE_UBX | COM_TYPE_NMEA | COM_TYPE_RTCM3);
+    myGPS.setSPIInput(COM_TYPE_UBX | COM_TYPE_RTCM3);
+
     
     myGPS.setNavigationFrequency(NAV_FREQ);
     myGPS.setDGNSSConfiguration(SFE_UBLOX_DGNSS_MODE_FIXED);

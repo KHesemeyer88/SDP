@@ -28,7 +28,7 @@ void ControlTask(void *pvParameters);
 
 // Initialize all RTOS components
 void initRTOS() {
-    LOG_DEBUG("Initializing RTOS components...");
+    LOG_DEBUG("STARTING initRTOS");
     
     // Create mutex for servo access
     servoMutex = xSemaphoreCreateMutex();
@@ -157,7 +157,9 @@ void initRTOS() {
         return;
     }
 
-    // Create the logging task
+    //Create the logging task
+    Serial.printf("logQueue address: %p\n", logQueue);
+    Serial.printf("\n");
     BaseType_t xReturnedLog = xTaskCreatePinnedToCore(
         logTask,
         "LogTask",
@@ -173,7 +175,8 @@ void initRTOS() {
         return;
     }
 
-    Serial.println("RTOS tasks created");
+    Serial.printf("RTOS tasks created");
+    Serial.printf("\n");
     LOG_DEBUG("RTOS tasks created");
 }
 
