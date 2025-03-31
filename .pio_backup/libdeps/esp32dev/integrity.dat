@@ -1,0 +1,10 @@
+madhephaestus/ESP32Servo @ ^0.13.0
+https://github.com/sparkfun/SparkFun_LIDARLitev4_Arduino_Library.git
+links2004/WebSockets @ ^2.4.1
+https://github.com/espressif/arduino-esp32.git#2.0.5
+https://github.com/sparkfun/SparkFun_u-blox_GNSS_v3.git
+https://github.com/me-no-dev/AsyncTCP.git
+https://github.com/me-no-dev/ESPAsyncWebServer.git
+SPI
+SD
+bblanchon/ArduinoJson @ ^6.21.3
