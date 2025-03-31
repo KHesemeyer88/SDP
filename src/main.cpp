@@ -25,7 +25,7 @@ void setup() {
     
     // Initialize logging system
     if (initLogging()) {
-        LOG_DEBUG("logging init");
+        //LOG_DEBUG("logging init");
     } else {
         Serial.printf("logging init fail");
         Serial.printf("\n");

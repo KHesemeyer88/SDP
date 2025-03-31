@@ -28,7 +28,7 @@ extern Servo escServo;
 
 // Control task function
 void ControlTask(void *pvParameters) {
-    LOG_DEBUG("ControlTask");
+    //LOG_DEBUG("ControlTask");
     ControlCommand currentCmd;
     TickType_t xLastWakeTime;
     const TickType_t xFrequency = pdMS_TO_TICKS(1000 / CONTROL_UPDATE_FREQUENCY);
@@ -260,7 +260,7 @@ void ControlTask(void *pvParameters) {
 
 // Calculate steering angle based on current position, target, and heading
 int calculateSteeringAngle(float currentLat, float currentLon, float targetLat, float targetLon, float currentHeading) {
-    LOG_DEBUG("calculateSteeringAngle");
+    //LOG_DEBUG("calculateSteeringAngle");
     // Calculate bearing to target
     float bearing = calculateBearing(currentLat, currentLon, targetLat, targetLon);
     
@@ -296,7 +296,7 @@ int calculateSteeringAngle(float currentLat, float currentLon, float targetLat, 
 
 // Calculate throttle value based on current speed and target pace
 int calculateThrottle(float currentSpeed, float targetPace) {
-    LOG_DEBUG("calculateThrottle");
+    //LOG_DEBUG("calculateThrottle");
     // Only adjust speed if we have a target pace
     if (targetPace <= 0) {
         return ESC_NEUTRAL; // Stop if no target pace

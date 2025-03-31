@@ -34,13 +34,13 @@ void initHttpServer() {
 
     // Start the server
     server.begin();
-    LOG_DEBUG("initHttpServer COMPLETE");
+    //LOG_DEBUG("initHttpServer COMPLETE");
 }
 
 // HTTP server task function
 void HttpServerTask(void *pvParameters) {
     // Initialize task
-    LOG_DEBUG("HTTP task start");
+    //LOG_DEBUG("HTTP task start");
     
     // Initialize server routes and start the server
     initHttpServer();

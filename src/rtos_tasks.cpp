@@ -249,9 +249,9 @@ void cleanupResources(bool cleanupMutexes, bool cleanupQueues, bool cleanupTasks
         }
         
         if (logQueue != NULL) {
+            LOG_DEBUG("Log queue deleted");
             vQueueDelete(logQueue);
             logQueue = NULL;
-            LOG_DEBUG("Log queue deleted");
         }
     }
     
