@@ -32,8 +32,8 @@ const int TRIGGER_PIN_RIGHT = 19;
 const int ECHO_PIN_RIGHT = 21;
 
 // Sonar thresholds (cm)
-const int FRONT_STOP_THRESHOLD = 150; // zero to suppress obst. avoidance
-const int SIDE_AVOID_THRESHOLD = 50;
+const int FRONT_STOP_THRESHOLD = 200; // zero to suppress obst. avoidance
+const int SIDE_AVOID_THRESHOLD = 500; // disabled
 
 // Traxxas XL-2.5 ESC & servo values. Note ESC takes angles like a servo, but converts them to speed
 const int ESC_NEUTRAL = 90;     // Neutral position (1.5ms pulse)
@@ -42,14 +42,9 @@ const int ESC_MAX_REV = 50;     // Max reverse allowed (~1.1ms pulse)
 const int ESC_MIN_FWD = 95;     // Minimum forward throttle
 const int ESC_MIN_REV = 85;     // Minimum reverse throttle
 const int STEERING_CENTER = 90;  // Center steering
-<<<<<<< HEAD:traxxas_v2/config.h
-const int STEERING_MAX = 55;     // Maximum steering angle deviation
-const int TURN_ANGLE = 20;       // Angle to turn 
-=======
 const int STEERING_MAX = 65;     // Maximum steering angle deviation
-const int TURN_ANGLE = 20;       // Angle to turn 
-const int TRIM_ANGLE = 2; //car lists left
->>>>>>> 97908baf5f8d227e0ed6564cd291ad59b1099009:include/config.h
+const int TURN_ANGLE = 10;       // Angle to turn 
+const int TRIM_ANGLE = 2;        // car lists left
 
 // WiFi settings
 // const char* ssid = "RC_Car_Control";
@@ -78,11 +73,7 @@ const unsigned long DESTINATION_MESSAGE_TIMEOUT = 5000;  // 5 seconds
 // Navigation constants
 const float WAYPOINT_REACHED_RADIUS = 2.0; //meters
 const int MAX_WAYPOINTS = 20;
-<<<<<<< HEAD:traxxas_v2/config.h
-const int NAV_FREQ = 30;
-=======
 const int NAV_FREQ = 10;
->>>>>>> 97908baf5f8d227e0ed6564cd291ad59b1099009:include/config.h
 
 // Sonar filtering
 const int FILTER_SAMPLES = 5;  // Number of samples to average
@@ -119,11 +110,7 @@ const float DEFAULT_TARGET_PACE = 1;  // Default target pace in m/s (0 = no pace
 const float DEFAULT_TARGET_DISTANCE = 0; // Default target distance in meters (0 = no distance limit)
 
 // Speed control values
-<<<<<<< HEAD:traxxas_v2/config.h
-const int SPEED_CORRECTION_INTERVAL = 50; // How often to adjust speed for pace (ms)
-=======
 const int SPEED_CORRECTION_INTERVAL = 200; // How often to adjust speed for pace (ms)
->>>>>>> 97908baf5f8d227e0ed6564cd291ad59b1099009:include/config.h
 const float SPEED_CORRECTION_THRESHOLD = 0.05;  // How aggressively to correct speed (0-1)
 
 // Extended extern declarations for new tracking variables
@@ -145,8 +132,6 @@ extern bool initialStraightPhase;
 extern unsigned long straightPhaseStartTime;
 extern const unsigned long STRAIGHT_PHASE_DURATION;
 
-<<<<<<< HEAD:traxxas_v2/config.h
-=======
 // RTK Correction status tracking
 enum CorrectionStatus {
   CORR_NONE,
@@ -156,5 +141,4 @@ enum CorrectionStatus {
 
 WiFiClient ntripClient;
 
->>>>>>> 97908baf5f8d227e0ed6564cd291ad59b1099009:include/config.h
 #endif // CONFIG_H

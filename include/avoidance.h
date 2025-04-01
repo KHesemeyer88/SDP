@@ -9,64 +9,79 @@ extern float lastFrontDist, lastLeftDist, lastRightDist;
 extern String lastAvoidanceMessage;
 extern Servo escServo;
 
+    
+// Define throttle values.
+// const int FULL_REVERSE_THROTTLE = ESC_MAX_REV;         // Use maximum reverse throttle.
+const int SLOW_FORWARD_THROTTLE = ESC_MIN_FWD + 15;      // A slow forward throttle above minimum.
+
 // Revised obstacle avoidance function that controls both throttle and steering.
-inline int applyObstacleAvoidance(int SteeringAngle) {
+inline int applyObstacleAvoidance(int steeringAngle) {
     unsigned long now = millis();
     // Static variables to track front obstacle avoidance state.
     static bool frontAvoidActive = false;
-    static unsigned long frontAvoidStartTime = 0;
+    static bool sideAvoidActive = false;
+    static unsigned long avoidStartTime = 0;
     
-    // Define throttle values.
-    const int FULL_REVERSE_THROTTLE = ESC_MAX_REV - 20;         // Use maximum reverse throttle.
-    const int SLOW_FORWARD_THROTTLE = ESC_MIN_FWD + 10;      // A slow forward throttle above minimum.
-
     // --- FRONT OBSTACLE LOGIC ---
     if (lastFrontDist > 0 && lastFrontDist < FRONT_STOP_THRESHOLD) {
         if (!frontAvoidActive) {
-            // Start the avoidance sequence: trigger reverse.
+            // Start avoidance 
             frontAvoidActive = true;
-            frontAvoidStartTime = now;
-            escServo.write(ESC_MAX_REV);  // Command full reverse throttle.
+            avoidStartTime = now;
+            escServo.write(SLOW_FORWARD_THROTTLE);  // Command slow fwd throttle.
+            steeringAngle = STEERING_CENTER + TURN_ANGLE; // turn right
+            steeringServo.write(steeringAngle);
             lastAvoidanceMessage = "Front obstacle";
-            return STEERING_CENTER;                // Keep steering centered during reverse.
-        } else {
             // Already in avoidance mode.
-            if (now - frontAvoidStartTime < 500) {  // 100 ms reverse period.
-                escServo.write(ESC_MAX_REV - 20);
-                lastAvoidanceMessage = "Front obstacle";
-                return STEERING_CENTER;
-            } else {
-                // After reverse period, resume forward motion at slow speed.
+            if (now - avoidStartTime < 500) {  // 
                 escServo.write(SLOW_FORWARD_THROTTLE);
-                // Adjust steering to turn away from the obstacle.
-                if (lastLeftDist > lastRightDist) {
-                    lastAvoidanceMessage = "Front obstacle: turning left";
-                    frontAvoidActive = false; // Clear avoidance state.
-                    return STEERING_CENTER - TURN_ANGLE;
-                } else {
-                    lastAvoidanceMessage = "Front obstacle: turning right";
-                    frontAvoidActive = false;
-                    return STEERING_CENTER + TURN_ANGLE;
-                }
+                steeringAngle = STEERING_CENTER + TURN_ANGLE; // turn right
+                steeringServo.write(steeringAngle);
+            } else {
+                frontAvoidActive = false;
+                lastAvoidanceMessage = "Resume navigation";
             }
         }
-    } else {
-        // No front obstacle detected: clear the avoidance state.
-        frontAvoidActive = false;
+        return steeringAngle;
     }
     
     // --- SIDE OBSTACLE LOGIC ---
+    // Avoiding left obstacle
     if (lastLeftDist > 0 && lastLeftDist < SIDE_AVOID_THRESHOLD) {
-        steeringServo.write(STEERING_CENTER + TURN_ANGLE);
-        escServo.write(SLOW_FORWARD_THROTTLE);
-        lastAvoidanceMessage = "Left obstacle: steering right";
-        return STEERING_CENTER + TURN_ANGLE;
+        if (!sideAvoidActive) {
+            sideAvoidActive = true;
+            avoidStartTime = now;
+            steeringServo.write(STEERING_CENTER + TURN_ANGLE);
+            escServo.write(SLOW_FORWARD_THROTTLE);
+            lastAvoidanceMessage = "Left obstacle: steering right";
+            if (now - avoidStartTime < 500) {
+                steeringServo.write(STEERING_CENTER + TURN_ANGLE);
+                escServo.write(SLOW_FORWARD_THROTTLE);
+            } else {
+                sideAvoidActive = false;
+                lastAvoidanceMessage = "Resume navigation";
+            }
+        }
+        return steeringAngle;
     }
+    
+    // Avoiding right obstacle
     if (lastRightDist > 0 && lastRightDist < SIDE_AVOID_THRESHOLD) {
-        steeringServo.write(STEERING_CENTER - TURN_ANGLE);
-        escServo.write(SLOW_FORWARD_THROTTLE);
-        lastAvoidanceMessage = "Right obstacle: steering left";
-        return STEERING_CENTER - TURN_ANGLE;
+        if (!sideAvoidActive) {
+            sideAvoidActive = true;
+            avoidStartTime = now;
+            steeringServo.write(STEERING_CENTER - TURN_ANGLE);
+            escServo.write(SLOW_FORWARD_THROTTLE);
+            lastAvoidanceMessage = "Right obstacle: steering left";
+            if (now - avoidStartTime < 500) {
+                steeringServo.write(STEERING_CENTER - TURN_ANGLE);
+                escServo.write(SLOW_FORWARD_THROTTLE);
+            } else {
+                sideAvoidActive = false;
+                lastAvoidanceMessage = "Resume navigation";
+            }
+        return steeringAngle;
+        }
     }
     
     // --- Normal Operation ---
@@ -75,4 +90,3 @@ inline int applyObstacleAvoidance(int SteeringAngle) {
 }
 
 #endif // AVOIDANCE_H
-
