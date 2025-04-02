@@ -36,7 +36,7 @@
 #define AVOIDANCE_MESSAGE_TIMEOUT   1000
 #define DESTINATION_MESSAGE_TIMEOUT 5000
 #define CONTROL_UPDATE_FREQUENCY    20 
-#define NAV_UPDATE_FREQUENCY        10
+#define NAV_UPDATE_FREQUENCY        20
 
 
 // WebSocket update intervals
@@ -92,7 +92,7 @@ const char mountPoint[] = "RTCM3MSM_MABN"; // Colrain
 // Navigation constants
 const float WAYPOINT_REACHED_RADIUS = 2.0; //meters
 const int MAX_WAYPOINTS = 20;
-const int NAV_FREQ = 10;
+const int NAV_FREQ = 20;
 
 // Sonar filtering
 const int FILTER_SAMPLES = 5;  // Number of samples to average

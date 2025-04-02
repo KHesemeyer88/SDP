@@ -221,7 +221,7 @@ void ControlTask(void *pvParameters) {
             }
             
             // Calculate steering angle based on current and target positions
-            int steeringAngle = calculateSteeringAngle(currentLat, currentLon, targetLat, targetLon, currentHeading);
+            int steeringAngle = calculateSteeringAngle(currentLat, currentLon, targetLat, targetLon, currentHeading, nav.targetPace);
             
             // Calculate throttle value based on pace control
             int throttleValue = calculateThrottle(currentSpeed, nav.targetPace);
@@ -258,8 +258,8 @@ void ControlTask(void *pvParameters) {
     }
 }
 
-// Calculate steering angle based on current position, target, and heading
-int calculateSteeringAngle(float currentLat, float currentLon, float targetLat, float targetLon, float currentHeading) {
+// Calculate steering angle based on current position, target, heading, target pace
+int calculateSteeringAngle(float currentLat, float currentLon, float targetLat, float targetLon, float currentHeading, float targetPace){    
     //LOG_DEBUG("calculateSteeringAngle");
     // Calculate bearing to target
     float bearing = calculateBearing(currentLat, currentLon, targetLat, targetLon);
@@ -274,6 +274,14 @@ int calculateSteeringAngle(float currentLat, float currentLon, float targetLat, 
     // Determine correction factor based on GNSS quality
     float correctionFactor = 0.35; // Default value
     
+    // Determine max steering angle based on target pace
+    int effectiveSteeringMax;
+    if (targetPace > 3.0) {  // High speed threshold (MESS WITH THIS)
+        effectiveSteeringMax = STEERING_MAX * 0.7;  // XX% of max steering at high speeds
+        } else {
+            effectiveSteeringMax = STEERING_MAX;  // Full steering at normal speeds
+        }
+
     // For large errors (> 45°), use full steering capability
     if (abs(headingError) > 45.0) {
         // Apply maximum steering in the appropriate direction
@@ -289,8 +297,8 @@ int calculateSteeringAngle(float currentLat, float currentLon, float targetLat, 
         
         // Apply steering limits
         return constrain(steeringAngle, 
-                         STEERING_CENTER - STEERING_MAX, 
-                         STEERING_CENTER + STEERING_MAX);
+                         STEERING_CENTER - effectiveSteeringMax, 
+                         STEERING_CENTER + effectiveSteeringMax);
     }
 }
 

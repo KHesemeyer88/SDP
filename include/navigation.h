@@ -116,7 +116,7 @@ float calculateBearing(float lat1, float lon1, float lat2, float lon2);
 float calculateDistance(float lat1, float lon1, float lat2, float lon2);
 
 // Steering and throttle calculation functions
-int calculateSteeringAngle(float currentLat, float currentLon, float targetLat, float targetLon, float currentHeading);
+int calculateSteeringAngle(float currentLat, float currentLon, float targetLat, float targetLon, float currentHeading, float currentPace);
 int calculateThrottle(float currentSpeed, float targetPace);
 
 // Optional helper functions that might be useful to expose
