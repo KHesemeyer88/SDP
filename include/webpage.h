@@ -696,7 +696,7 @@ const char webPage[] PROGMEM = R"rawliteral(
                         
                     case "waypoint":
                         // Update waypoint info
-                        document.getElementById('waypoint-count').textContent = `Waypoints: ${data.count || data.count}/20`;
+                        document.getElementById('waypoint-count').textContent = `Waypoints: ${data.count}/20`;
                         if (data.lat && data.lng) {
                             document.getElementById('recorded-waypoint').textContent = data.lat + ", " + data.lng;
                             document.getElementById('recorded-waypoint-display').style.display = 'block';
