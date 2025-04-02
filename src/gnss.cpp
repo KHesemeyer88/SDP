@@ -445,12 +445,12 @@ void GNSSTask(void *pvParameters) {
         // Poll the GNSS module
         myGPS.checkUblox();
         unsigned long checkUbloxTime = millis() - loopStartTime;
-        if (checkUbloxTime > 50) {  // Only log if it took significant time
+        if (checkUbloxTime > 0) {  // Only log if it took significant time
             LOG_DEBUG("GNSS checkUblox time, %lu", checkUbloxTime);
         }
         myGPS.checkCallbacks();
         unsigned long checkCallbacksTime = millis() - loopStartTime;
-        if (checkCallbacksTime > 50) {  // Only log if it took significant time
+        if (checkCallbacksTime > 0) {  // Only log if it took significant time
             LOG_DEBUG("GNSS checkCallbacks time, %lu", checkCallbacksTime);
         }
         
