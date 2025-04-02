@@ -286,12 +286,19 @@ void sendErrorMessage(const String& message) {
     ws.textAll(jsonString); // Replace broadcastTXT with textAll
 }
 
-// WebSocket task implementation
+
 void WebSocketTask(void *pvParameters) {
     // Initialize task
     //LOG_DEBUG("WebSocketTask");
     unsigned long lastStatusLog = 0;
     unsigned long lastSystemStatsLog = 0;
+    unsigned long lastWSSensorUpdate = 0;
+    unsigned long lastWSGPSUpdate = 0;
+    unsigned long lastWSRTKUpdate = 0;
+    unsigned long lastWSStatsUpdate = 0;
+    
+    // Track previous mode to detect changes
+    static bool prevAutonomousMode = false;
     
     // Task loop
     for (;;) {
@@ -305,7 +312,7 @@ void WebSocketTask(void *pvParameters) {
 
             // Add this reconnection detection code here
             if (wasDisconnected && ws.count() > 0) {
-                LOG_NAV("WebSocket reconnected after disconnection. Sending status refresh.");
+                //LOG_NAV("WebSocket reconnected after disconnection. Sending status refresh.");
                 wasDisconnected = false;
                 // Refresh client data
                 sendGPSData();
@@ -315,7 +322,7 @@ void WebSocketTask(void *pvParameters) {
             
             // Add this disconnection detection code here
             if (ws.count() == 0 && !wasDisconnected) {
-                LOG_NAV("WebSocket disconnected. Will attempt to maintain navigation state.");
+                //LOG_NAV("WebSocket disconnected. Will attempt to maintain navigation state.");
                 wasDisconnected = true;
             }
         }
@@ -340,50 +347,97 @@ void WebSocketTask(void *pvParameters) {
         // Clean up disconnected clients periodically
         ws.cleanupClients();
         
-        // Send periodic updates with timing information
-        if (currentTime - lastWSSensorUpdate >= WS_SENSOR_UPDATE_INTERVAL) {
-            unsigned long updateStartTime = millis();
-            sendSensorData();
-            unsigned long updateTime = millis() - updateStartTime;
-            if (updateTime > 20) {  // Only log if it took significant time
-                //LOG_DEBUG("sendSensorData time, %lu", updateTime);
-            }
-            lastWSSensorUpdate = currentTime;
+        // Check operation mode - autonomous or manual
+        bool isAutonomousActive = false;
+        bool isPaused = false;
+        
+        // Get current navigation mode (using minimal mutex time)
+        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            isAutonomousActive = navStatus.autonomousMode;
+            isPaused = navStatus.isPaused;
+            xSemaphoreGive(navDataMutex);
         }
         
-        if (currentTime - lastWSGPSUpdate >= WS_GPS_UPDATE_INTERVAL) {
-            unsigned long gpsStartTime = millis();
+        // Detect mode change
+        if (prevAutonomousMode != isAutonomousActive) {
+            // Mode has changed - send a complete data update
             sendGPSData();
-            unsigned long gpsUpdateTime = millis() - gpsStartTime;
-            if (gpsUpdateTime > 20) {  // Only log if it took significant time
-                //LOG_DEBUG("sendGPSData time, %lu", gpsUpdateTime);
-            }
-            lastWSGPSUpdate = currentTime;
-        }
-        
-        if (currentTime - lastWSRTKUpdate >= WS_RTK_UPDATE_INTERVAL) {
-            unsigned long rtkStartTime = millis();
             sendRTKStatus();
-            unsigned long rtkUpdateTime = millis() - rtkStartTime;
-            if (rtkUpdateTime > 20) {  // Only log if it took significant time
-                //LOG_DEBUG("SendRTKStatus time, %lu", rtkUpdateTime);
-            }
-            lastWSRTKUpdate = currentTime;
+            sendNavigationStats();
+            sendSensorData();
+            
+            // Update previous mode
+            prevAutonomousMode = isAutonomousActive;
+            
+            // Send mode change notification
+            DynamicJsonDocument modeDoc(128);
+            modeDoc["type"] = "mode";
+            modeDoc["autonomous"] = isAutonomousActive;
+            String modeJson;
+            serializeJson(modeDoc, modeJson);
+            ws.textAll(modeJson);
+            
+            //LOG_NAV("Operation mode changed to: %s", isAutonomousActive ? "autonomous" : "manual");
         }
         
-        if (currentTime - lastWSStatsUpdate >= WS_STATS_UPDATE_INTERVAL) {
-            unsigned long statsStartTime = millis();
-            sendNavigationStats();
-            unsigned long statsUpdateTime = millis() - statsStartTime;
-            if (statsUpdateTime > 20) {  // Only log if it took significant time
-                //LOG_DEBUG("sendNavigationStats time, %lu", statsUpdateTime);
+        // Send data based on current mode
+        if (isAutonomousActive && !isPaused) {
+            // AUTONOMOUS MODE: Only send nav stats during active navigation
+            if (currentTime - lastWSStatsUpdate >= WS_STATS_UPDATE_INTERVAL) {
+                unsigned long statsStartTime = millis();
+                sendNavigationStats();
+                unsigned long statsUpdateTime = millis() - statsStartTime;
+                if (statsUpdateTime > 20) {
+                    //LOG_DEBUG("sendNavigationStats time, %lu", statsUpdateTime);
+                }
+                lastWSStatsUpdate = currentTime;
             }
-            lastWSStatsUpdate = currentTime;
+        } else {
+            // MANUAL MODE: Send all data types
+            if (currentTime - lastWSSensorUpdate >= WS_SENSOR_UPDATE_INTERVAL) {
+                unsigned long updateStartTime = millis();
+                sendSensorData();
+                unsigned long updateTime = millis() - updateStartTime;
+                if (updateTime > 20) {
+                    //LOG_DEBUG("sendSensorData time, %lu", updateTime);
+                }
+                lastWSSensorUpdate = currentTime;
+            }
+            
+            if (currentTime - lastWSGPSUpdate >= WS_GPS_UPDATE_INTERVAL) {
+                unsigned long gpsStartTime = millis();
+                sendGPSData();
+                unsigned long gpsUpdateTime = millis() - gpsStartTime;
+                if (gpsUpdateTime > 20) {
+                    //LOG_DEBUG("sendGPSData time, %lu", gpsUpdateTime);
+                }
+                lastWSGPSUpdate = currentTime;
+            }
+            
+            if (currentTime - lastWSRTKUpdate >= WS_RTK_UPDATE_INTERVAL) {
+                unsigned long rtkStartTime = millis();
+                sendRTKStatus();
+                unsigned long rtkUpdateTime = millis() - rtkStartTime;
+                if (rtkUpdateTime > 20) {
+                    //LOG_DEBUG("SendRTKStatus time, %lu", rtkUpdateTime);
+                }
+                lastWSRTKUpdate = currentTime;
+            }
+            
+            if (currentTime - lastWSStatsUpdate >= WS_STATS_UPDATE_INTERVAL) {
+                unsigned long statsStartTime = millis();
+                sendNavigationStats();
+                unsigned long statsUpdateTime = millis() - statsStartTime;
+                if (statsUpdateTime > 20) {
+                    //LOG_DEBUG("sendNavigationStats time, %lu", statsUpdateTime);
+                }
+                lastWSStatsUpdate = currentTime;
+            }
         }
         
         // Calculate and log the total loop time if significant
         unsigned long loopTime = millis() - loopStartTime;
-        if (loopTime > 50) {  // Only log if the loop took a significant amount of time
+        if (loopTime > 50) {
             //LOG_DEBUG("WebSocketTask time, %lu", loopTime);
         }
         
@@ -391,6 +445,111 @@ void WebSocketTask(void *pvParameters) {
         vTaskDelay(pdMS_TO_TICKS(10)); // 10ms delay
     }
 }
+// // WebSocket task implementation
+// void WebSocketTask(void *pvParameters) {
+//     // Initialize task
+//     //LOG_DEBUG("WebSocketTask");
+//     unsigned long lastStatusLog = 0;
+//     unsigned long lastSystemStatsLog = 0;
+    
+//     // Task loop
+//     for (;;) {
+//         unsigned long loopStartTime = millis();
+//         unsigned long currentTime = millis();
+        
+//         // Log connection status periodically (every 5 seconds)
+//         if (currentTime - lastStatusLog >= 5000) {
+//             lastStatusLog = currentTime;
+//             //LOG_DEBUG("WebSocket clients connected, %d", ws.count());
+
+//             // Add this reconnection detection code here
+//             if (wasDisconnected && ws.count() > 0) {
+//                 LOG_NAV("WebSocket reconnected after disconnection. Sending status refresh.");
+//                 wasDisconnected = false;
+//                 // Refresh client data
+//                 sendGPSData();
+//                 sendRTKStatus();
+//                 sendNavigationStats();
+//             }
+            
+//             // Add this disconnection detection code here
+//             if (ws.count() == 0 && !wasDisconnected) {
+//                 LOG_NAV("WebSocket disconnected. Will attempt to maintain navigation state.");
+//                 wasDisconnected = true;
+//             }
+//         }
+        
+//         // Log system stats periodically (every 30 seconds)
+//         if (currentTime - lastSystemStatsLog >= 30000) {
+//             lastSystemStatsLog = currentTime;
+
+//             // memory monitoring 
+//             uint32_t freeHeap = ESP.getFreeHeap();
+//             // Critical memory warning
+//             if (freeHeap < 10000) {
+//                 LOG_ERROR("CRITICAL: Low memory condition (%u bytes free)", freeHeap);
+//             }
+
+//             //LOG_DEBUG("free heap bytes, %u", ESP.getFreeHeap());
+//             //LOG_DEBUG("WebSocketTask high water mark, %u", uxTaskGetStackHighWaterMark(websocketTaskHandle));
+//             //LOG_DEBUG("GNSSTask high water mark, %u", uxTaskGetStackHighWaterMark(gnssTaskHandle));
+//             //LOG_DEBUG("ControlTask high water mark, %u", uxTaskGetStackHighWaterMark(controlTaskHandle));
+//         }
+        
+//         // Clean up disconnected clients periodically
+//         ws.cleanupClients();
+        
+//         // Send periodic updates with timing information
+//         if (currentTime - lastWSSensorUpdate >= WS_SENSOR_UPDATE_INTERVAL) {
+//             unsigned long updateStartTime = millis();
+//             sendSensorData();
+//             unsigned long updateTime = millis() - updateStartTime;
+//             if (updateTime > 20) {  // Only log if it took significant time
+//                 //LOG_DEBUG("sendSensorData time, %lu", updateTime);
+//             }
+//             lastWSSensorUpdate = currentTime;
+//         }
+        
+//         if (currentTime - lastWSGPSUpdate >= WS_GPS_UPDATE_INTERVAL) {
+//             unsigned long gpsStartTime = millis();
+//             sendGPSData();
+//             unsigned long gpsUpdateTime = millis() - gpsStartTime;
+//             if (gpsUpdateTime > 20) {  // Only log if it took significant time
+//                 //LOG_DEBUG("sendGPSData time, %lu", gpsUpdateTime);
+//             }
+//             lastWSGPSUpdate = currentTime;
+//         }
+        
+//         if (currentTime - lastWSRTKUpdate >= WS_RTK_UPDATE_INTERVAL) {
+//             unsigned long rtkStartTime = millis();
+//             sendRTKStatus();
+//             unsigned long rtkUpdateTime = millis() - rtkStartTime;
+//             if (rtkUpdateTime > 20) {  // Only log if it took significant time
+//                 //LOG_DEBUG("SendRTKStatus time, %lu", rtkUpdateTime);
+//             }
+//             lastWSRTKUpdate = currentTime;
+//         }
+        
+//         if (currentTime - lastWSStatsUpdate >= WS_STATS_UPDATE_INTERVAL) {
+//             unsigned long statsStartTime = millis();
+//             sendNavigationStats();
+//             unsigned long statsUpdateTime = millis() - statsStartTime;
+//             if (statsUpdateTime > 20) {  // Only log if it took significant time
+//                 //LOG_DEBUG("sendNavigationStats time, %lu", statsUpdateTime);
+//             }
+//             lastWSStatsUpdate = currentTime;
+//         }
+        
+//         // Calculate and log the total loop time if significant
+//         unsigned long loopTime = millis() - loopStartTime;
+//         if (loopTime > 50) {  // Only log if the loop took a significant amount of time
+//             //LOG_DEBUG("WebSocketTask time, %lu", loopTime);
+//         }
+        
+//         // Use a short delay to prevent task starvation
+//         vTaskDelay(pdMS_TO_TICKS(10)); // 10ms delay
+//     }
+// }
 
 // Send GPS data to one client or all clients
 void sendGPSData(AsyncWebSocketClient *client) {
