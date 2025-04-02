@@ -170,53 +170,60 @@ char* getFusionStatus(char* buffer, size_t bufferSize) {
 }
 
 // Process RTK connection
-// Process RTK connection
-bool processGNSSConnection() {
+bool processRTKConnection() {
     //LOG_DEBUG("processGNSSConnection");
     bool clientConnected = false;
+    bool dataAvailable = false;
     unsigned long startTime = millis();
     
-    // Take mutex before checking connection status
-    if (xSemaphoreTake(ntripClientMutex, portMAX_DELAY) == pdTRUE) {
+    // Step 1: Quick mutex lock just to check status
+    if (xSemaphoreTake(ntripClientMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
         //LOG_DEBUG("ntrip mutex acq time, %lu", millis() - startTime);
         clientConnected = ntripClient.connected();
         //LOG_DEBUG("ntrip client conn., %d", clientConnected);
         
-        if (clientConnected && ntripClient.available()) {
-            // Create a buffer large enough to hold multiple RTCM messages
-            uint8_t rtcmBuffer[512*4];
-            size_t rtcmCount = 0;
-            
-            unsigned long readStartTime = millis();
-            // Collect all available RTCM data
-            while (ntripClient.available() && rtcmCount < sizeof(rtcmBuffer)) {
-                rtcmBuffer[rtcmCount++] = ntripClient.read();
-            }
-            
-            //LOG_DEBUG("ntripClient.read time, %lu", millis() - readStartTime);
-            //LOG_DEBUG("RTCM data bytes, %d", rtcmCount);
-            
-            // Release mutex before lengthy processing
-            unsigned long mutexHeldTime = millis() - startTime;
-            xSemaphoreGive(ntripClientMutex);
-            //LOG_DEBUG("ntripClientMutex hold time, %lu", mutexHeldTime);
-            
-            if (rtcmCount > 0) {
-                // Update the timestamp for when we last received any correction data
-                lastReceivedRTCM_ms = millis();
-                
-                // Push all collected data to the GPS module at once
-                myGPS.pushRawData(rtcmBuffer, rtcmCount);
-                LOG_DEBUG("pushRawData time, %lu", millis() - lastReceivedRTCM_ms);
-            }
-        } else {
-            // Release mutex if not connected or no data available
+        // Check if data is available but don't read it yet
+        dataAvailable = clientConnected && ntripClient.available();
+        
+        // If no data available, release mutex immediately
+        if (!dataAvailable) {
             unsigned long mutexHeldTime = millis() - startTime;
             xSemaphoreGive(ntripClientMutex);
             //LOG_DEBUG("ntripClientMutex hold (no data) time, %lu", mutexHeldTime);
         }
     } else {
-        LOG_DEBUG("ntrip mutex fail");
+        LOG_ERROR("ntrip mutex fail");
+        return false;
+    }
+    
+    // Step 2: Read data only if available (still holding mutex if data is available)
+    if (dataAvailable) {
+        // Create a buffer large enough to hold multiple RTCM messages
+        uint8_t rtcmBuffer[512*4];
+        size_t rtcmCount = 0;
+        
+        unsigned long readStartTime = millis();
+        // Collect all available RTCM data
+        while (ntripClient.available() && rtcmCount < sizeof(rtcmBuffer)) {
+            rtcmBuffer[rtcmCount++] = ntripClient.read();
+        }
+        
+        //LOG_DEBUG("ntripClient.read time, %lu", millis() - readStartTime);
+        //LOG_DEBUG("RTCM data bytes, %d", rtcmCount);
+        
+        // Release mutex before lengthy processing
+        unsigned long mutexHeldTime = millis() - startTime;
+        xSemaphoreGive(ntripClientMutex);
+        //LOG_DEBUG("ntripClientMutex hold time, %lu", mutexHeldTime);
+        
+        if (rtcmCount > 0) {
+            // Update the timestamp for when we last received any correction data
+            lastReceivedRTCM_ms = millis();
+            
+            // Push all collected data to the GPS module at once
+            myGPS.pushRawData(rtcmBuffer, rtcmCount);
+            LOG_DEBUG("pushRawData time, %lu", millis() - lastReceivedRTCM_ms);
+        }
     }
     
     // Check for timeout, but don't block - just report status
@@ -455,7 +462,7 @@ void GNSSTask(void *pvParameters) {
         }
         
         // Process RTK connection 
-        bool rtcmConnected = processGNSSConnection();
+        bool rtcmConnected = processRTKConnection();
         
         // Attempt to reconnect to NTRIP if needed
         if (!rtcmConnected) {

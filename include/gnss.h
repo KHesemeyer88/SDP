@@ -41,7 +41,7 @@ void GNSSTask(void *pvParameters);
 bool initializeGNSS();
 void pvtCallback(UBX_NAV_PVT_data_t *pvtData);
 void pushGPGGA(NMEA_GGA_data_t *nmeaData);
-bool processGNSSConnection();
+bool processRTKConnection();
 bool connectToNTRIP();
 char* getFusionStatus(char* buffer, size_t bufferSize);
 
