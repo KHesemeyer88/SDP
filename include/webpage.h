@@ -128,6 +128,7 @@ const char webPage[] PROGMEM = R"rawliteral(
             <canvas id="joystick" width="300" height="300"></canvas>
         </div>
 
+        <!-- Move this RTK status panel from autonomous-control to manual-gps-data section -->
         <div id="manual-gps-data" style="margin-top: 20px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
             <div style="display: flex; gap: 10px; justify-content: center;">
                 <button id="record-waypoint-btn" class="submit-btn" style="background-color: #28a745;" onclick="recordWaypoint()">Record WP</button>
@@ -138,6 +139,17 @@ const char webPage[] PROGMEM = R"rawliteral(
             <p>Longitude: <span id="manual-lng">--</span></p>
             <p id="waypoint-count" style="margin-top: 10px;">Waypoints: 0/20</p>
             <p id="recorded-waypoint-display" style="margin-top: 10px; display: none;">Latest WP: <span id="recorded-waypoint">--</span></p>
+            
+            <!-- RTK status panel moved from autonomous section -->
+            <div id="rtk-status-panel" style="margin-top: 20px; background: #f0f0f0; padding: 10px; border-radius: 8px; text-align: center;">
+                <p>Correction Status: <span id="rtk-correction-status">Unknown</span></p>
+                <p>Correction Age: <span id="rtk-correction-age">--</span> ms</p>
+                <p>RTK Connection: <span id="rtk-connected">--</span></p>
+                <p>RTK Solution: <span id="rtk-solution">--</span></p>
+                <p>Horizontal Accuracy: <span id="rtk-hacc">--</span> cm</p>
+                <p>Fix Type: <span id="rtk-fix-type">--</span></p>
+            </div>
+            
             <button id="fusion-status-btn" class="submit-btn" style="background-color: #007bff;" onclick="getFusionStatus()">Get Fusion Status</button>
             <p id="fusion-status-display" style="margin-top: 10px; display: none;">Fusion Status: <span id="fusion-status">--</span></p>
         </div>
@@ -164,14 +176,6 @@ const char webPage[] PROGMEM = R"rawliteral(
                         <p>Average Pace: <span id="average-pace">0.0</span> m/s</p>
                         <p>Time: <span id="elapsed-time">00:00:00</span></p>
                     </div>
-                </div>
-                <div id="rtk-status-panel" style="margin-top: 20px; background: white; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
-                    <p>Correction Status: <span id="rtk-correction-status">Unknown</span></p>
-                    <p>Correction Age: <span id="rtk-correction-age">--</span> ms</p>
-                    <p>RTK Connection: <span id="rtk-connected">--</span></p>
-                    <p>RTK Solution: <span id="rtk-solution">--</span></p>
-                    <p>Horizontal Accuracy: <span id="rtk-hacc">--</span> cm</p>
-                    <p>Fix Type: <span id="rtk-fix-type">--</span></p>
                 </div>
             </div>
                         
