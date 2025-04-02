@@ -315,133 +315,105 @@ bool connectToNTRIP() {
     //LOG_DEBUG("connectTONTRIP");
     bool isConnected = false;
 
-    // First, check if already connected (with minimal mutex time)
-    if (xSemaphoreTake(ntripClientMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+    // Take mutex before checking connection status
+    if (xSemaphoreTake(ntripClientMutex, portMAX_DELAY) == pdTRUE) {
         isConnected = ntripClient.connected();
         
-        // If already connected, release mutex and return
-        if (isConnected) {
-            xSemaphoreGive(ntripClientMutex);
-            return true;
-        }
-        
-        // Release mutex before attempting connection
-        xSemaphoreGive(ntripClientMutex);
-    } else {
-        LOG_ERROR("Failed to take ntripClientMutex in connectToNTRIP");
-        return false;
-    }
-    
-    // Prepare auth string and encode it (outside mutex)
-    char authString[128]; // Buffer for username:password
-    char encodedAuth[200]; // Buffer for base64 encoded auth string
-    
-    // Safely combine username and password
-    snprintf(authString, sizeof(authString), "%s:%s", casterUser, casterUserPW);
-    
-    // Use our fixed-buffer base64 encoding function
-    base64Encode(authString, encodedAuth, sizeof(encodedAuth));
-    
-    // Formulate the NTRIP request (outside mutex)
-    char serverRequest[512];
-    snprintf(serverRequest, sizeof(serverRequest),
-           "GET /%s HTTP/1.0\r\n"
-           "User-Agent: NTRIP SparkFun u-blox Client v1.0\r\n"
-           "Accept: */*\r\n"
-           "Connection: close\r\n"
-           "Authorization: Basic %s\r\n"
-           "\r\n",
-           mountPoint, encodedAuth);
-    
-    // Take mutex for connection attempt
-    if (xSemaphoreTake(ntripClientMutex, pdMS_TO_TICKS(500)) != pdTRUE) {
-        LOG_ERROR("Failed to take ntripClientMutex for connection");
-        return false;
-    }
-    
-    // Attempt connection
-    if (!ntripClient.connect(casterHost, casterPort)) {
-        LOG_ERROR("!ntripClient.connect, %s, %s", casterHost, casterPort);
-        xSemaphoreGive(ntripClientMutex);
-        return false;
-    }
-    
-    // Send request
-    ntripClient.write(serverRequest, strlen(serverRequest));
-    
-    // Wait for response, periodically releasing mutex
-    unsigned long startTime = millis();
-    bool responseReceived = false;
-    
-    while (!responseReceived) {
-        // Check for timeout
-        if (millis() > (startTime + 5000)) {
-            LOG_ERROR("caster timeout");
-            ntripClient.stop();
-            xSemaphoreGive(ntripClientMutex);
-            return false;
-        }
-        
-        // Check for available data
-        if (ntripClient.available() > 0) {
-            responseReceived = true;
-            break;
-        }
-        
-        // Check if still connected
-        if (!ntripClient.connected()) {
-            LOG_ERROR("!ntripClient.connected()");
-            xSemaphoreGive(ntripClientMutex);
-            return false;
-        }
-        
-        // Temporarily release mutex during delay
-        xSemaphoreGive(ntripClientMutex);
-        vTaskDelay(pdMS_TO_TICKS(10));
-        
-        // Take mutex again
-        if (xSemaphoreTake(ntripClientMutex, pdMS_TO_TICKS(100)) != pdTRUE) {
-            LOG_ERROR("Failed to retake mutex during wait");
-            return false;
-        }
-    }
-    
-    // Process response (with mutex held)
-    int connectionResult = 0;
-    char response[512];
-    size_t responseSpot = 0;
-    
-    while (ntripClient.available()) {
-        if (responseSpot == sizeof(response) - 1)
-            break;
+        if (!isConnected) {
             
-        response[responseSpot++] = ntripClient.read();
-        
-        if (connectionResult == 0) {
-            if (strstr(response, "200") != nullptr) {
-                connectionResult = 200;
+            if (!ntripClient.connect(casterHost, casterPort)) {
+                LOG_ERROR("!ntripClient.connect, %s, %s", casterHost, casterPort);
+                xSemaphoreGive(ntripClientMutex);
+                return false;
             }
-            if (strstr(response, "401") != nullptr) {
-                LOG_ERROR("bad user/pw");
-                connectionResult = 401;
+        
+            // Prepare auth string and encode it
+            char authString[128]; // Buffer for username:password
+            char encodedAuth[200]; // Buffer for base64 encoded auth string
+            
+            // Safely combine username and password
+            snprintf(authString, sizeof(authString), "%s:%s", casterUser, casterUserPW);
+            
+            // Use our fixed-buffer base64 encoding function
+            base64Encode(authString, encodedAuth, sizeof(encodedAuth));
+            
+            // Formulate the NTRIP request
+            char serverRequest[512];
+            snprintf(serverRequest, sizeof(serverRequest),
+                   "GET /%s HTTP/1.0\r\n"
+                   "User-Agent: NTRIP SparkFun u-blox Client v1.0\r\n"
+                   "Accept: */*\r\n"
+                   "Connection: close\r\n"
+                   "Authorization: Basic %s\r\n"
+                   "\r\n",
+                   mountPoint, encodedAuth);
+            
+            ntripClient.write(serverRequest, strlen(serverRequest));
+            
+            // Wait for response with mutex held (non-blocking with vTaskDelay)
+            unsigned long startTime = millis();
+            while (ntripClient.available() == 0) {
+                if (millis() > (startTime + 5000)) {
+                    LOG_ERROR("caster timeout");
+                    ntripClient.stop();
+                    xSemaphoreGive(ntripClientMutex);
+                    return false;
+                }
+                
+                // Temporarily release mutex during delay to prevent blocking other tasks
+                xSemaphoreGive(ntripClientMutex);
+                vTaskDelay(pdMS_TO_TICKS(10));
+                if (xSemaphoreTake(ntripClientMutex, portMAX_DELAY) != pdTRUE) {
+                    // If we can't get the mutex back, something is wrong
+                    return false;
+                }
+                
+                // Recheck if connection is still valid
+                if (!ntripClient.connected()) {
+                    LOG_ERROR("!ntripClient.connected()");
+                    xSemaphoreGive(ntripClientMutex);
+                    return false;
+                }
+            }
+            
+            // Check reply
+            int connectionResult = 0;
+            char response[512];
+            size_t responseSpot = 0;
+            
+            while (ntripClient.available()) { // Read bytes from the caster and store them
+                if (responseSpot == sizeof(response) - 1) // Exit the loop if we get too much data
+                    break;
+                    
+                response[responseSpot++] = ntripClient.read();
+                
+                if (connectionResult == 0) { // Only print success/fail once
+                    if (strstr(response, "200") != nullptr) { //Look for '200 OK'
+                        connectionResult = 200;
+                    }
+                    if (strstr(response, "401") != nullptr) { //Look for '401 Unauthorized'
+                        LOG_ERROR("bad user/pw");
+                        connectionResult = 401;
+                    }
+                }
+            }
+            
+            response[responseSpot] = '\0'; // NULL-terminate the response
+            
+            if (connectionResult != 200) {
+                LOG_ERROR("connectionResult != 200, %s", casterHost);
+                xSemaphoreGive(ntripClientMutex);
+                return false;
+            } else {
+                LOG_DEBUG("connectionResult = 200, %s", casterHost);
+                lastReceivedRTCM_ms = millis(); // Reset timeout
+                isConnected = true;
             }
         }
-    }
-    
-    response[responseSpot] = '\0';
-    
-    if (connectionResult != 200) {
-        //LOG_ERROR("connectionResult != 200, %s", casterHost);
+        
+        // Release mutex
         xSemaphoreGive(ntripClientMutex);
-        return false;
-    } else {
-        //LOG_DEBUG("connectionResult = 200, %s", casterHost);
-        lastReceivedRTCM_ms = millis();
-        isConnected = true;
     }
-    
-    // Release mutex
-    xSemaphoreGive(ntripClientMutex);
     //LOG_DEBUG("connectTONTRIP end");
     return isConnected;
 }
