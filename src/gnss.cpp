@@ -548,8 +548,18 @@ void RTCMTask(void *pvParameters) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
     const TickType_t xFrequency = pdMS_TO_TICKS(500); // 2 Hz
     uint8_t rtcmChunk[256]; // Working buffer
+    static int logCounter = 0;
 
     for (;;) {
+        
+        if (++logCounter >= 10) { // every 10 cycles (~5 sec if 2 Hz)
+            size_t depth = getRtcmBytesAvailable();
+            LOG_DEBUG("RTCM buffer depth: %u", depth);
+            logCounter = 0;
+            size_t dropped = getDroppedRtcmBytes();
+            LOG_DEBUG("dropped RTCM bytes, %d", dropped);
+        }
+
         size_t available = getRtcmBytesAvailable();
         if (available > 0) {
             size_t toRead = min(sizeof(rtcmChunk), available);
@@ -557,7 +567,10 @@ void RTCMTask(void *pvParameters) {
 
             if (read > 0) {
                 if (xSemaphoreTake(spiBusMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+                    size_t before = millis();
                     myGPS.pushRawData(rtcmChunk, read);
+                    size_t after = millis();
+                    LOG_DEBUG("pushRawData time, %lu", after - before);
                     xSemaphoreGive(spiBusMutex);
                     //LOG_DEBUG("RTCMTask: pushed %u bytes", read);
                 } else {

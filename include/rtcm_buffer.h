@@ -16,3 +16,5 @@ size_t readRtcmData(uint8_t* outBuffer, size_t maxLen);
 
 // Returns number of bytes available to read
 size_t getRtcmBytesAvailable();
+
+size_t getDroppedRtcmBytes();
