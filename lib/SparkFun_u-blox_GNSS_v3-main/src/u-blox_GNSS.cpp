@@ -1610,6 +1610,10 @@ void DevUBLOXGNSS::process(uint8_t incoming, ubxPacket *incomingUBX, uint8_t req
   // by other threads without overwriting the requested / expected Class and ID.
   volatile static uint8_t storedClass = 0;
   volatile static uint8_t storedID = 0;
+
+  if ((incoming != UBX_SYNCH_1) && (currentSentence == SFE_UBLOX_SENTENCE_TYPE_NONE))
+    return; // Ignore all non-UBX data BRENT DID THIS!!!
+
   //static size_t payloadAutoBytes; DELETED BY BRENT!!!
   if (requestedClass || requestedID) // If either is non-zero, store the requested Class and ID
   {
@@ -1633,16 +1637,16 @@ void DevUBLOXGNSS::process(uint8_t incoming, ubxPacket *incomingUBX, uint8_t req
       // Store data in packetBuf until we know if we have a stored class and ID match
       activePacketBuffer = SFE_UBLOX_PACKET_PACKETBUF;
     }
-    else if (incoming == '$')
-    {
-      nmeaByteCounter = 0; // Reset the NMEA byte counter
-      currentSentence = SFE_UBLOX_SENTENCE_TYPE_NMEA;
-    }
-    else if (incoming == 0xD3) // RTCM frames start with 0xD3
-    {
-      rtcmFrameCounter = 0;
-      currentSentence = SFE_UBLOX_SENTENCE_TYPE_RTCM;
-    }
+    // else if (incoming == '$')
+    // {
+    //   nmeaByteCounter = 0; // Reset the NMEA byte counter
+    //   currentSentence = SFE_UBLOX_SENTENCE_TYPE_NMEA;
+    // }
+    // else if (incoming == 0xD3) // RTCM frames start with 0xD3
+    // {
+    //   rtcmFrameCounter = 0;
+    //   currentSentence = SFE_UBLOX_SENTENCE_TYPE_RTCM;
+    // }COMMENTED OUT BY BRENT!!!
     else
     {
       // This character is unknown or we missed the previous start of a sentence
@@ -1893,394 +1897,394 @@ void DevUBLOXGNSS::process(uint8_t incoming, ubxPacket *incomingUBX, uint8_t req
     // Finally, increment the frame counter
     ubxFrameCounter++;
   }
-  else if (currentSentence == SFE_UBLOX_SENTENCE_TYPE_NMEA) // Process incoming NMEA mesages. Selectively log if desired.
-  {
-    if ((nmeaByteCounter == 0) && (incoming != '$'))
-    {
-      currentSentence = SFE_UBLOX_SENTENCE_TYPE_NONE; // Something went wrong. Reset. (Almost certainly redundant!)
-    }
-    else if ((nmeaByteCounter == 1) && (incoming != 'G'))
-    {
-      currentSentence = SFE_UBLOX_SENTENCE_TYPE_NONE; // Something went wrong. Reset.
-    }
-    else if ((nmeaByteCounter >= 0) && (nmeaByteCounter <= 5))
-    {
-      nmeaAddressField[nmeaByteCounter] = incoming; // Store the start character and NMEA address field
-    }
+//   else if (currentSentence == SFE_UBLOX_SENTENCE_TYPE_NMEA) // Process incoming NMEA mesages. Selectively log if desired.
+//   {
+//     if ((nmeaByteCounter == 0) && (incoming != '$'))
+//     {
+//       currentSentence = SFE_UBLOX_SENTENCE_TYPE_NONE; // Something went wrong. Reset. (Almost certainly redundant!)
+//     }
+//     else if ((nmeaByteCounter == 1) && (incoming != 'G'))
+//     {
+//       currentSentence = SFE_UBLOX_SENTENCE_TYPE_NONE; // Something went wrong. Reset.
+//     }
+//     else if ((nmeaByteCounter >= 0) && (nmeaByteCounter <= 5))
+//     {
+//       nmeaAddressField[nmeaByteCounter] = incoming; // Store the start character and NMEA address field
+//     }
 
-    if (nmeaByteCounter == 5)
-    {
-      if (!_signsOfLife) // If _signsOfLife is not already true, set _signsOfLife to true if the NMEA header is valid
-      {
-        _signsOfLife = isNMEAHeaderValid();
-      }
+//     if (nmeaByteCounter == 5)
+//     {
+//       if (!_signsOfLife) // If _signsOfLife is not already true, set _signsOfLife to true if the NMEA header is valid
+//       {
+//         _signsOfLife = isNMEAHeaderValid();
+//       }
 
-#ifndef SFE_UBLOX_DISABLE_AUTO_NMEA
-      // Check if we have automatic storage for this message
-      if (isThisNMEAauto())
-      {
-        uint8_t *lengthPtr = getNMEAWorkingLengthPtr(); // Get a pointer to the working copy length
-        uint8_t *nmeaPtr = getNMEAWorkingNMEAPtr();     // Get a pointer to the working copy NMEA data
-        uint8_t nmeaMaxLength = getNMEAMaxLength();
-        *lengthPtr = 6;                           // Set the working copy length
-        memset(nmeaPtr, 0, nmeaMaxLength);        // Clear the working copy
-        memcpy(nmeaPtr, &nmeaAddressField[0], 6); // Copy the start character and address field into the working copy
-      }
-      else
-#endif
-      {
-        // if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-        // {
-        //   _debugSerial.println(F("process: non-auto NMEA message"));
-        // }
-      }
+// #ifndef SFE_UBLOX_DISABLE_AUTO_NMEA
+//       // Check if we have automatic storage for this message
+//       if (isThisNMEAauto())
+//       {
+//         uint8_t *lengthPtr = getNMEAWorkingLengthPtr(); // Get a pointer to the working copy length
+//         uint8_t *nmeaPtr = getNMEAWorkingNMEAPtr();     // Get a pointer to the working copy NMEA data
+//         uint8_t nmeaMaxLength = getNMEAMaxLength();
+//         *lengthPtr = 6;                           // Set the working copy length
+//         memset(nmeaPtr, 0, nmeaMaxLength);        // Clear the working copy
+//         memcpy(nmeaPtr, &nmeaAddressField[0], 6); // Copy the start character and address field into the working copy
+//       }
+//       else
+// #endif
+//       {
+//         // if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
+//         // {
+//         //   _debugSerial.println(F("process: non-auto NMEA message"));
+//         // }
+//       }
 
-      // We've just received the end of the address field. Check if it is selected for logging
-      if (logThisNMEA())
-      {
-        memcpy(_storageNMEA->data, &nmeaAddressField[0], 6); // Add start character and address field to the storage
-        _storageNMEA->length = 6;
-      }
-      // Check if it should be passed to processNMEA
-      if (processThisNMEA())
-      {
-        for (uint8_t i = 0; i < 6; i++)
-        {
-          processNMEA(nmeaAddressField[i]); // Process the start character and address field
-          // If user has assigned an output port then pipe the characters there,
-          // but only if the port is different (otherwise we'll output each character twice!)
-          // if (_outputPort != _nmeaOutputPort)
-          //   _nmeaOutputPort.write(nmeaAddressField[i]); // Echo this byte to the serial port BRENT COMMENTED OUT!!
-        }
-      }
-    }
+//       // We've just received the end of the address field. Check if it is selected for logging
+//       if (logThisNMEA())
+//       {
+//         memcpy(_storageNMEA->data, &nmeaAddressField[0], 6); // Add start character and address field to the storage
+//         _storageNMEA->length = 6;
+//       }
+//       // Check if it should be passed to processNMEA
+//       if (processThisNMEA())
+//       {
+//         for (uint8_t i = 0; i < 6; i++)
+//         {
+//           processNMEA(nmeaAddressField[i]); // Process the start character and address field
+//           // If user has assigned an output port then pipe the characters there,
+//           // but only if the port is different (otherwise we'll output each character twice!)
+//           // if (_outputPort != _nmeaOutputPort)
+//           //   _nmeaOutputPort.write(nmeaAddressField[i]); // Echo this byte to the serial port BRENT COMMENTED OUT!!
+//         }
+//       }
+//     }
 
-    if ((nmeaByteCounter > 5) || (nmeaByteCounter < 0)) // Should we add incoming to the file buffer and/or pass it to processNMEA?
-    {
-#ifndef SFE_UBLOX_DISABLE_AUTO_NMEA
-      if (isThisNMEAauto())
-      {
-        uint8_t *lengthPtr = getNMEAWorkingLengthPtr(); // Get a pointer to the working copy length
-        uint8_t *nmeaPtr = getNMEAWorkingNMEAPtr();     // Get a pointer to the working copy NMEA data
-        uint8_t nmeaMaxLength = getNMEAMaxLength();
-        if (*lengthPtr < nmeaMaxLength)
-        {
-          *(nmeaPtr + *lengthPtr) = incoming; // Store the character
-          *lengthPtr = *lengthPtr + 1;        // Increment the length
-          if (*lengthPtr == nmeaMaxLength)
-          {
-            if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-            {
-              _debugSerial.println(F("process: NMEA buffer is full!"));
-            }
-          }
-        }
-      }
-#endif
-      if (logThisNMEA())
-      {
-        // This check is probably redundant.
-        // currentSentence is set to SFE_UBLOX_SENTENCE_TYPE_NONE below if nmeaByteCounter == maxNMEAByteCount
-        if (_storageNMEA->length < maxNMEAByteCount) // Check we have room for it
-        {
-          _storageNMEA->data[_storageNMEA->length] = incoming; // Store the byte
-          _storageNMEA->length = _storageNMEA->length + 1;
-        }
-      }
-      if (processThisNMEA())
-      {
-        processNMEA(incoming); // Pass incoming to processNMEA
-        // If user has assigned an output port then pipe the characters there,
-        // but only if the port is different (otherwise we'll output each character twice!)
-        // if (_outputPort != _nmeaOutputPort)
-        //   _nmeaOutputPort.write(incoming); // Echo this byte to the serial port BRENT COMMENTED OUT!!!
-      }
-    }
+//     if ((nmeaByteCounter > 5) || (nmeaByteCounter < 0)) // Should we add incoming to the file buffer and/or pass it to processNMEA?
+//     {
+// #ifndef SFE_UBLOX_DISABLE_AUTO_NMEA
+//       if (isThisNMEAauto())
+//       {
+//         uint8_t *lengthPtr = getNMEAWorkingLengthPtr(); // Get a pointer to the working copy length
+//         uint8_t *nmeaPtr = getNMEAWorkingNMEAPtr();     // Get a pointer to the working copy NMEA data
+//         uint8_t nmeaMaxLength = getNMEAMaxLength();
+//         if (*lengthPtr < nmeaMaxLength)
+//         {
+//           *(nmeaPtr + *lengthPtr) = incoming; // Store the character
+//           *lengthPtr = *lengthPtr + 1;        // Increment the length
+//           if (*lengthPtr == nmeaMaxLength)
+//           {
+//             if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
+//             {
+//               _debugSerial.println(F("process: NMEA buffer is full!"));
+//             }
+//           }
+//         }
+//       }
+// #endif
+//       if (logThisNMEA())
+//       {
+//         // This check is probably redundant.
+//         // currentSentence is set to SFE_UBLOX_SENTENCE_TYPE_NONE below if nmeaByteCounter == maxNMEAByteCount
+//         if (_storageNMEA->length < maxNMEAByteCount) // Check we have room for it
+//         {
+//           _storageNMEA->data[_storageNMEA->length] = incoming; // Store the byte
+//           _storageNMEA->length = _storageNMEA->length + 1;
+//         }
+//       }
+//       if (processThisNMEA())
+//       {
+//         processNMEA(incoming); // Pass incoming to processNMEA
+//         // If user has assigned an output port then pipe the characters there,
+//         // but only if the port is different (otherwise we'll output each character twice!)
+//         // if (_outputPort != _nmeaOutputPort)
+//         //   _nmeaOutputPort.write(incoming); // Echo this byte to the serial port BRENT COMMENTED OUT!!!
+//       }
+//     }
 
-    if (incoming == '*')
-      nmeaByteCounter = -5; // We are expecting * plus two checksum bytes plus CR and LF
+//     if (incoming == '*')
+//       nmeaByteCounter = -5; // We are expecting * plus two checksum bytes plus CR and LF
 
-    nmeaByteCounter++; // Increment the byte counter
+//     nmeaByteCounter++; // Increment the byte counter
 
-    if (nmeaByteCounter == maxNMEAByteCount)          // Check if we have processed too many bytes
-      currentSentence = SFE_UBLOX_SENTENCE_TYPE_NONE; // Something went wrong. Reset.
+//     if (nmeaByteCounter == maxNMEAByteCount)          // Check if we have processed too many bytes
+//       currentSentence = SFE_UBLOX_SENTENCE_TYPE_NONE; // Something went wrong. Reset.
 
-    if (nmeaByteCounter == 0) // Check if we are done
-    {
-#ifndef SFE_UBLOX_DISABLE_AUTO_NMEA
-      if (isThisNMEAauto())
-      {
-        uint8_t *workingLengthPtr = getNMEAWorkingLengthPtr(); // Get a pointer to the working copy length
-        uint8_t *workingNMEAPtr = getNMEAWorkingNMEAPtr();     // Get a pointer to the working copy NMEA data
-        uint8_t nmeaMaxLength = getNMEAMaxLength();
+//     if (nmeaByteCounter == 0) // Check if we are done
+//     {
+// #ifndef SFE_UBLOX_DISABLE_AUTO_NMEA
+//       if (isThisNMEAauto())
+//       {
+//         uint8_t *workingLengthPtr = getNMEAWorkingLengthPtr(); // Get a pointer to the working copy length
+//         uint8_t *workingNMEAPtr = getNMEAWorkingNMEAPtr();     // Get a pointer to the working copy NMEA data
+//         uint8_t nmeaMaxLength = getNMEAMaxLength();
 
-        // Check the checksum: the checksum is the exclusive-OR of all characters between the $ and the *
-        uint8_t nmeaChecksum = 0;
-        uint8_t charsChecked = 1; // Start after the $
-        uint8_t thisChar = '\0';
-        while ((charsChecked < (nmeaMaxLength - 1)) && (charsChecked < ((*workingLengthPtr) - 4)) && (thisChar != '*'))
-        {
-          thisChar = *(workingNMEAPtr + charsChecked); // Get a char from the working copy
-          if (thisChar != '*')                         // Ex-or the char into the checksum - but not if it is the '*'
-            nmeaChecksum ^= thisChar;
-          charsChecked++; // Increment the counter
-        }
-        if (thisChar == '*') // Make sure we found the *
-        {
-          uint8_t expectedChecksum1 = (nmeaChecksum >> 4) + '0';
-          if (expectedChecksum1 >= ':') // Handle Hex correctly
-            expectedChecksum1 += 'A' - ':';
-          uint8_t expectedChecksum2 = (nmeaChecksum & 0x0F) + '0';
-          if (expectedChecksum2 >= ':') // Handle Hex correctly
-            expectedChecksum2 += 'A' - ':';
-          if ((expectedChecksum1 == *(workingNMEAPtr + charsChecked)) && (expectedChecksum2 == *(workingNMEAPtr + charsChecked + 1)))
-          {
-            uint8_t *completeLengthPtr = getNMEACompleteLengthPtr();    // Get a pointer to the complete copy length
-            uint8_t *completeNMEAPtr = getNMEACompleteNMEAPtr();        // Get a pointer to the complete copy NMEA data
-            memset(completeNMEAPtr, 0, nmeaMaxLength);                  // Clear the previous complete copy
-            memcpy(completeNMEAPtr, workingNMEAPtr, *workingLengthPtr); // Copy the working copy into the complete copy
-            *completeLengthPtr = *workingLengthPtr;                     // Update the length
-            nmeaAutomaticFlags *flagsPtr = getNMEAFlagsPtr();           // Get a pointer to the flags
-            nmeaAutomaticFlags flagsCopy = *flagsPtr;
-            flagsCopy.flags.bits.completeCopyValid = 1; // Set the complete copy valid flag
-            flagsCopy.flags.bits.completeCopyRead = 0;  // Clear the complete copy read flag
-            *flagsPtr = flagsCopy;                      // Update the flags
-            // Callback
-            if (doesThisNMEAHaveCallback()) // Do we need to copy the data into the callback copy?
-            {
-              if (flagsCopy.flags.bits.callbackCopyValid == 0) // Has the callback copy valid flag been cleared (by checkCallbacks)
-              {
-                uint8_t *callbackLengthPtr = getNMEACallbackLengthPtr();    // Get a pointer to the callback copy length
-                uint8_t *callbackNMEAPtr = getNMEACallbackNMEAPtr();        // Get a pointer to the callback copy NMEA data
-                memset(callbackNMEAPtr, 0, nmeaMaxLength);                  // Clear the previous callback copy
-                memcpy(callbackNMEAPtr, workingNMEAPtr, *workingLengthPtr); // Copy the working copy into the callback copy
-                *callbackLengthPtr = *workingLengthPtr;                     // Update the length
-                flagsCopy.flags.bits.callbackCopyValid = 1;                 // Set the callback copy valid flag
-                *flagsPtr = flagsCopy;                                      // Update the flags
-              }
-            }
-          }
-          else
-          {
-            if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-            {
-              _debugSerial.print(F("process: NMEA checksum fail (2)! Expected "));
-              _debugSerial.write(expectedChecksum1);
-              _debugSerial.write(expectedChecksum2);
-              _debugSerial.print(F(" Got "));
-              _debugSerial.write(*(workingNMEAPtr + charsChecked));
-              _debugSerial.write(*(workingNMEAPtr + charsChecked + 1));
-              _debugSerial.println();
-            }
-          }
-        }
-        else
-        {
-          if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-          {
-            _debugSerial.println(F("process: NMEA checksum fail (1)!"));
-          }
-        }
-      }
-#endif
-      if (logThisNMEA())
-      {
-        // Check the checksum: the checksum is the exclusive-OR of all characters between the $ and the *
-        uint8_t nmeaChecksum = 0;
-        int8_t charsChecked = 1; // Start after the $
-        uint8_t thisChar = '\0';
-        while ((charsChecked < maxNMEAByteCount) && (charsChecked < (_storageNMEA->length - 4)) && (thisChar != '*'))
-        {
-          thisChar = _storageNMEA->data[charsChecked]; // Get a char from the storage
-          if (thisChar != '*')                         // Ex-or the char into the checksum - but not if it is the '*'
-            nmeaChecksum ^= thisChar;
-          charsChecked++; // Increment the counter
-        }
-        if (thisChar == '*') // Make sure we found the *
-        {
-          uint8_t expectedChecksum1 = (nmeaChecksum >> 4) + '0';
-          if (expectedChecksum1 >= ':') // Handle Hex correctly
-            expectedChecksum1 += 'A' - ':';
-          uint8_t expectedChecksum2 = (nmeaChecksum & 0x0F) + '0';
-          if (expectedChecksum2 >= ':') // Handle Hex correctly
-            expectedChecksum2 += 'A' - ':';
-          if ((expectedChecksum1 == _storageNMEA->data[charsChecked]) && (expectedChecksum2 == _storageNMEA->data[charsChecked + 1]))
-          {
-            storeFileBytes(_storageNMEA->data, _storageNMEA->length); // Add NMEA to the file buffer
-          }
-          else if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-          {
-            _debugSerial.println(F("process: _storageNMEA checksum fail!"));
-          }
-        }
-      }
-      currentSentence = SFE_UBLOX_SENTENCE_TYPE_NONE; // All done!
-    }
-  }
-  else if (currentSentence == SFE_UBLOX_SENTENCE_TYPE_RTCM)
-  {
+//         // Check the checksum: the checksum is the exclusive-OR of all characters between the $ and the *
+//         uint8_t nmeaChecksum = 0;
+//         uint8_t charsChecked = 1; // Start after the $
+//         uint8_t thisChar = '\0';
+//         while ((charsChecked < (nmeaMaxLength - 1)) && (charsChecked < ((*workingLengthPtr) - 4)) && (thisChar != '*'))
+//         {
+//           thisChar = *(workingNMEAPtr + charsChecked); // Get a char from the working copy
+//           if (thisChar != '*')                         // Ex-or the char into the checksum - but not if it is the '*'
+//             nmeaChecksum ^= thisChar;
+//           charsChecked++; // Increment the counter
+//         }
+//         if (thisChar == '*') // Make sure we found the *
+//         {
+//           uint8_t expectedChecksum1 = (nmeaChecksum >> 4) + '0';
+//           if (expectedChecksum1 >= ':') // Handle Hex correctly
+//             expectedChecksum1 += 'A' - ':';
+//           uint8_t expectedChecksum2 = (nmeaChecksum & 0x0F) + '0';
+//           if (expectedChecksum2 >= ':') // Handle Hex correctly
+//             expectedChecksum2 += 'A' - ':';
+//           if ((expectedChecksum1 == *(workingNMEAPtr + charsChecked)) && (expectedChecksum2 == *(workingNMEAPtr + charsChecked + 1)))
+//           {
+//             uint8_t *completeLengthPtr = getNMEACompleteLengthPtr();    // Get a pointer to the complete copy length
+//             uint8_t *completeNMEAPtr = getNMEACompleteNMEAPtr();        // Get a pointer to the complete copy NMEA data
+//             memset(completeNMEAPtr, 0, nmeaMaxLength);                  // Clear the previous complete copy
+//             memcpy(completeNMEAPtr, workingNMEAPtr, *workingLengthPtr); // Copy the working copy into the complete copy
+//             *completeLengthPtr = *workingLengthPtr;                     // Update the length
+//             nmeaAutomaticFlags *flagsPtr = getNMEAFlagsPtr();           // Get a pointer to the flags
+//             nmeaAutomaticFlags flagsCopy = *flagsPtr;
+//             flagsCopy.flags.bits.completeCopyValid = 1; // Set the complete copy valid flag
+//             flagsCopy.flags.bits.completeCopyRead = 0;  // Clear the complete copy read flag
+//             *flagsPtr = flagsCopy;                      // Update the flags
+//             // Callback
+//             if (doesThisNMEAHaveCallback()) // Do we need to copy the data into the callback copy?
+//             {
+//               if (flagsCopy.flags.bits.callbackCopyValid == 0) // Has the callback copy valid flag been cleared (by checkCallbacks)
+//               {
+//                 uint8_t *callbackLengthPtr = getNMEACallbackLengthPtr();    // Get a pointer to the callback copy length
+//                 uint8_t *callbackNMEAPtr = getNMEACallbackNMEAPtr();        // Get a pointer to the callback copy NMEA data
+//                 memset(callbackNMEAPtr, 0, nmeaMaxLength);                  // Clear the previous callback copy
+//                 memcpy(callbackNMEAPtr, workingNMEAPtr, *workingLengthPtr); // Copy the working copy into the callback copy
+//                 *callbackLengthPtr = *workingLengthPtr;                     // Update the length
+//                 flagsCopy.flags.bits.callbackCopyValid = 1;                 // Set the callback copy valid flag
+//                 *flagsPtr = flagsCopy;                                      // Update the flags
+//               }
+//             }
+//           }
+//           else
+//           {
+//             if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
+//             {
+//               _debugSerial.print(F("process: NMEA checksum fail (2)! Expected "));
+//               _debugSerial.write(expectedChecksum1);
+//               _debugSerial.write(expectedChecksum2);
+//               _debugSerial.print(F(" Got "));
+//               _debugSerial.write(*(workingNMEAPtr + charsChecked));
+//               _debugSerial.write(*(workingNMEAPtr + charsChecked + 1));
+//               _debugSerial.println();
+//             }
+//           }
+//         }
+//         else
+//         {
+//           if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
+//           {
+//             _debugSerial.println(F("process: NMEA checksum fail (1)!"));
+//           }
+//         }
+//       }
+// #endif
+//       if (logThisNMEA())
+//       {
+//         // Check the checksum: the checksum is the exclusive-OR of all characters between the $ and the *
+//         uint8_t nmeaChecksum = 0;
+//         int8_t charsChecked = 1; // Start after the $
+//         uint8_t thisChar = '\0';
+//         while ((charsChecked < maxNMEAByteCount) && (charsChecked < (_storageNMEA->length - 4)) && (thisChar != '*'))
+//         {
+//           thisChar = _storageNMEA->data[charsChecked]; // Get a char from the storage
+//           if (thisChar != '*')                         // Ex-or the char into the checksum - but not if it is the '*'
+//             nmeaChecksum ^= thisChar;
+//           charsChecked++; // Increment the counter
+//         }
+//         if (thisChar == '*') // Make sure we found the *
+//         {
+//           uint8_t expectedChecksum1 = (nmeaChecksum >> 4) + '0';
+//           if (expectedChecksum1 >= ':') // Handle Hex correctly
+//             expectedChecksum1 += 'A' - ':';
+//           uint8_t expectedChecksum2 = (nmeaChecksum & 0x0F) + '0';
+//           if (expectedChecksum2 >= ':') // Handle Hex correctly
+//             expectedChecksum2 += 'A' - ':';
+//           if ((expectedChecksum1 == _storageNMEA->data[charsChecked]) && (expectedChecksum2 == _storageNMEA->data[charsChecked + 1]))
+//           {
+//             storeFileBytes(_storageNMEA->data, _storageNMEA->length); // Add NMEA to the file buffer
+//           }
+//           else if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
+//           {
+//             _debugSerial.println(F("process: _storageNMEA checksum fail!"));
+//           }
+//         }
+//       }
+//       currentSentence = SFE_UBLOX_SENTENCE_TYPE_NONE; // All done!
+//     }
+//   }
+//   else if (currentSentence == SFE_UBLOX_SENTENCE_TYPE_RTCM)
+//   {
 
-    // RTCM Logging
-#ifndef SFE_UBLOX_DISABLE_RTCM_LOGGING
-    if (_storageRTCM != nullptr) // Check if RTCM logging storage exists
-    {
-      if (rtcmFrameCounter == 0)
-      {
-        _storageRTCM->dataMessage[0] = incoming;
-        _storageRTCM->rollingChecksum = 0; // Initialize the checksum. Seed is 0x000000
-      }
-      else if (rtcmFrameCounter == 1)
-      {
-        _storageRTCM->dataMessage[1] = incoming;
-        _storageRTCM->messageLength = (uint16_t)(incoming & 0x03) << 8;
-      }
-      else if (rtcmFrameCounter == 2)
-      {
-        _storageRTCM->dataMessage[2] = incoming;
-        _storageRTCM->messageLength |= incoming;
-      }
+//     // RTCM Logging
+// #ifndef SFE_UBLOX_DISABLE_RTCM_LOGGING
+//     if (_storageRTCM != nullptr) // Check if RTCM logging storage exists
+//     {
+//       if (rtcmFrameCounter == 0)
+//       {
+//         _storageRTCM->dataMessage[0] = incoming;
+//         _storageRTCM->rollingChecksum = 0; // Initialize the checksum. Seed is 0x000000
+//       }
+//       else if (rtcmFrameCounter == 1)
+//       {
+//         _storageRTCM->dataMessage[1] = incoming;
+//         _storageRTCM->messageLength = (uint16_t)(incoming & 0x03) << 8;
+//       }
+//       else if (rtcmFrameCounter == 2)
+//       {
+//         _storageRTCM->dataMessage[2] = incoming;
+//         _storageRTCM->messageLength |= incoming;
+//       }
 
-      // Store the mesage data (and CRC) - now that the message length is known
-      if ((rtcmFrameCounter >= 3) && (rtcmFrameCounter < (_storageRTCM->messageLength + 6)) && (rtcmFrameCounter < (3 + SFE_UBLOX_MAX_RTCM_MSG_LEN + 3)))
-        _storageRTCM->dataMessage[rtcmFrameCounter] = incoming;
+//       // Store the mesage data (and CRC) - now that the message length is known
+//       if ((rtcmFrameCounter >= 3) && (rtcmFrameCounter < (_storageRTCM->messageLength + 6)) && (rtcmFrameCounter < (3 + SFE_UBLOX_MAX_RTCM_MSG_LEN + 3)))
+//         _storageRTCM->dataMessage[rtcmFrameCounter] = incoming;
 
-      // Add incoming header and data bytes to the checksum
-      if ((rtcmFrameCounter < 3) || ((rtcmFrameCounter >= 3) && (rtcmFrameCounter < (_storageRTCM->messageLength + 3))))
-        crc24q(incoming, &_storageRTCM->rollingChecksum);
+//       // Add incoming header and data bytes to the checksum
+//       if ((rtcmFrameCounter < 3) || ((rtcmFrameCounter >= 3) && (rtcmFrameCounter < (_storageRTCM->messageLength + 3))))
+//         crc24q(incoming, &_storageRTCM->rollingChecksum);
 
-      // Check if all bytes have been received
-      if ((rtcmFrameCounter >= 3) && (rtcmFrameCounter == _storageRTCM->messageLength + 5))
-      {
-        uint32_t expectedChecksum = _storageRTCM->dataMessage[_storageRTCM->messageLength + 3];
-        expectedChecksum <<= 8;
-        expectedChecksum |= _storageRTCM->dataMessage[_storageRTCM->messageLength + 4];
-        expectedChecksum <<= 8;
-        expectedChecksum |= _storageRTCM->dataMessage[_storageRTCM->messageLength + 5];
+//       // Check if all bytes have been received
+//       if ((rtcmFrameCounter >= 3) && (rtcmFrameCounter == _storageRTCM->messageLength + 5))
+//       {
+//         uint32_t expectedChecksum = _storageRTCM->dataMessage[_storageRTCM->messageLength + 3];
+//         expectedChecksum <<= 8;
+//         expectedChecksum |= _storageRTCM->dataMessage[_storageRTCM->messageLength + 4];
+//         expectedChecksum <<= 8;
+//         expectedChecksum |= _storageRTCM->dataMessage[_storageRTCM->messageLength + 5];
 
-        if (expectedChecksum == _storageRTCM->rollingChecksum) // Does the checksum match?
-        {
-          // Extract the message type and check if it should be logged
+//         if (expectedChecksum == _storageRTCM->rollingChecksum) // Does the checksum match?
+//         {
+//           // Extract the message type and check if it should be logged
 
-          // Extract the message number from the first 12 bits
-          uint16_t messageType = ((uint16_t)_storageRTCM->dataMessage[3]) << 4;
-          messageType |= _storageRTCM->dataMessage[4] >> 4;
-          uint16_t messageSubType = ((uint16_t)_storageRTCM->dataMessage[4] & 0x0F) << 8;
-          messageSubType |= _storageRTCM->dataMessage[5];
-          bool logThisRTCM = false;
+//           // Extract the message number from the first 12 bits
+//           uint16_t messageType = ((uint16_t)_storageRTCM->dataMessage[3]) << 4;
+//           messageType |= _storageRTCM->dataMessage[4] >> 4;
+//           uint16_t messageSubType = ((uint16_t)_storageRTCM->dataMessage[4] & 0x0F) << 8;
+//           messageSubType |= _storageRTCM->dataMessage[5];
+//           bool logThisRTCM = false;
 
-#ifndef SFE_UBLOX_REDUCED_PROG_MEM
-          if (_printDebug == true)
-          {
-            _debugSerial.print(F("process: valid RTCM message type: "));
-            _debugSerial.print(messageType);
-            if (messageType == 4072)
-            {
-              _debugSerial.print(F("_"));
-              _debugSerial.print(messageSubType);
-            }
-            _debugSerial.println(F(""));
-          }
-#endif
+// #ifndef SFE_UBLOX_REDUCED_PROG_MEM
+//           if (_printDebug == true)
+//           {
+//             _debugSerial.print(F("process: valid RTCM message type: "));
+//             _debugSerial.print(messageType);
+//             if (messageType == 4072)
+//             {
+//               _debugSerial.print(F("_"));
+//               _debugSerial.print(messageSubType);
+//             }
+//             _debugSerial.println(F(""));
+//           }
+// #endif
 
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1001) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1001 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1002) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1002 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1003) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1003 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1004) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1004 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1005) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1005 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1006) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1006 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1007) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1007 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1009) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1009 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1010) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1010 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1011) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1011 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1012) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1012 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1033) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1033 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1074) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1074 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1075) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1075 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1077) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1077 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1084) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1084 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1085) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1085 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1087) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1087 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1094) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1094 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1095) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1095 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1097) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1097 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1124) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1124 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1125) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1125 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1127) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1127 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 1230) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1230 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 4072) && (messageSubType == 0) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE4072_0 == 1));
-          if (!logThisRTCM)
-            logThisRTCM = (messageType == 4072) && (messageSubType == 1) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE4072_1 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1001) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1001 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1002) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1002 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1003) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1003 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1004) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1004 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1005) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1005 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1006) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1006 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1007) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1007 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1009) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1009 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1010) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1010 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1011) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1011 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1012) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1012 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1033) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1033 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1074) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1074 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1075) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1075 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1077) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1077 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1084) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1084 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1085) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1085 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1087) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1087 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1094) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1094 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1095) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1095 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1097) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1097 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1124) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1124 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1125) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1125 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1127) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1127 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 1230) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE1230 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 4072) && (messageSubType == 0) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE4072_0 == 1));
+//           if (!logThisRTCM)
+//             logThisRTCM = (messageType == 4072) && (messageSubType == 1) && ((_logRTCM.bits.all == 1) || (_logRTCM.bits.UBX_RTCM_TYPE4072_1 == 1));
 
-          if (logThisRTCM) // Should we log this message?
-          {
-            storeFileBytes(_storageRTCM->dataMessage, _storageRTCM->messageLength + 6);
-          }
+//           if (logThisRTCM) // Should we log this message?
+//           {
+//             storeFileBytes(_storageRTCM->dataMessage, _storageRTCM->messageLength + 6);
+//           }
 
-          // If there is space in the RTCM buffer, store the data there too
-          if (rtcmBufferSpaceAvailable() >= _storageRTCM->messageLength + 6)
-            storeRTCMBytes(_storageRTCM->dataMessage, _storageRTCM->messageLength + 6);
+//           // If there is space in the RTCM buffer, store the data there too
+//           if (rtcmBufferSpaceAvailable() >= _storageRTCM->messageLength + 6)
+//             storeRTCMBytes(_storageRTCM->dataMessage, _storageRTCM->messageLength + 6);
 
-          // Check "Auto" RTCM
-          if ((messageType == 1005) && (_storageRTCM->messageLength == RTCM_1005_MSG_LEN_BYTES) && (storageRTCM1005 != nullptr))
-          {
-            extractRTCM1005(&storageRTCM1005->data, &_storageRTCM->dataMessage[3]);
+//           // Check "Auto" RTCM
+//           if ((messageType == 1005) && (_storageRTCM->messageLength == RTCM_1005_MSG_LEN_BYTES) && (storageRTCM1005 != nullptr))
+//           {
+//             extractRTCM1005(&storageRTCM1005->data, &_storageRTCM->dataMessage[3]);
 
-            storageRTCM1005->automaticFlags.flags.bits.dataValid = 1; // Mark the data as valid and unread
-            storageRTCM1005->automaticFlags.flags.bits.dataRead = 0;
+//             storageRTCM1005->automaticFlags.flags.bits.dataValid = 1; // Mark the data as valid and unread
+//             storageRTCM1005->automaticFlags.flags.bits.dataRead = 0;
 
-            if (storageRTCM1005->callbackData != nullptr)                              // Should we copy the data for the callback?
-              if (storageRTCM1005->callbackPointerPtr != nullptr)                      // Has the callback been defined?
-                if (storageRTCM1005->automaticFlags.flags.bits.callbackDataValid == 0) // Only overwrite the callback copy if it has been read
-                {
-                  memcpy(storageRTCM1005->callbackData, &storageRTCM1005->data, sizeof(RTCM_1005_data_t));
-                  storageRTCM1005->automaticFlags.flags.bits.callbackDataValid = 1;
-                }
-          }
-        }
-        else
-        {
-          if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-          {
-            _debugSerial.println(F("process: RTCM checksum fail!"));
-          }
-        }
-      }
-    }
-#endif
+//             if (storageRTCM1005->callbackData != nullptr)                              // Should we copy the data for the callback?
+//               if (storageRTCM1005->callbackPointerPtr != nullptr)                      // Has the callback been defined?
+//                 if (storageRTCM1005->automaticFlags.flags.bits.callbackDataValid == 0) // Only overwrite the callback copy if it has been read
+//                 {
+//                   memcpy(storageRTCM1005->callbackData, &storageRTCM1005->data, sizeof(RTCM_1005_data_t));
+//                   storageRTCM1005->automaticFlags.flags.bits.callbackDataValid = 1;
+//                 }
+//           }
+//         }
+//         else
+//         {
+//           if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
+//           {
+//             _debugSerial.println(F("process: RTCM checksum fail!"));
+//           }
+//         }
+//       }
+//     }
+// #endif
 
-    currentSentence = processRTCMframe(incoming, &rtcmFrameCounter); // Deal with RTCM bytes
+//     currentSentence = processRTCMframe(incoming, &rtcmFrameCounter); // Deal with RTCM bytes
 
-    // If user has assigned an output port then pipe the characters there,
-    // but only if the port is different (otherwise we'll output each character twice!)
-    // if (_outputPort != _rtcmOutputPort)
-    //   _rtcmOutputPort.write(incoming); // Echo this byte to the serial port BRENT COMMENTED OUT!!!
-  }
+//     // If user has assigned an output port then pipe the characters there,
+//     // but only if the port is different (otherwise we'll output each character twice!)
+//     // if (_outputPort != _rtcmOutputPort)
+//     //   _rtcmOutputPort.write(incoming); // Echo this byte to the serial port BRENT COMMENTED OUT!!!
+//   } COMMENTED OUT BY BRENT!!!
 }
 
 // PRIVATE: Return true if we should add this NMEA message to the file buffer for logging

@@ -110,7 +110,7 @@ bool initializeGNSS() {
     LOG_DEBUG("GNSS module found over SPI!");
     
     // Configure SPI port to output UBX (critical)
-    myGPS.setSPIOutput(COM_TYPE_UBX | COM_TYPE_NMEA | COM_TYPE_RTCM3);
+    myGPS.setSPIOutput(COM_TYPE_UBX);
     myGPS.setSPIInput(COM_TYPE_UBX | COM_TYPE_RTCM3);
 
     
