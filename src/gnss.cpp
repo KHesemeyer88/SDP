@@ -60,6 +60,7 @@ void pvtCallback(UBX_NAV_PVT_data_t *pvtData) {
         
         // Set flag to indicate new data is available
         gnssData.newDataAvailable = true;
+        gnssData.gnssFixTime = millis();
         
         xSemaphoreGive(gnssMutex);
     }
@@ -254,8 +255,6 @@ bool processRTKConnection() {
     //LOG_PERF("processGNSSConnection time, %lu", millis() - startTime);
     return clientConnected;
 }
-
-// Add this function to gnss.cpp or in a utility header file
 
 // Simple base64 encoding function that works with fixed buffers
 void base64Encode(const char* input, char* output, size_t outputSize) {

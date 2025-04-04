@@ -27,6 +27,7 @@ struct GNSSData {
     int carrSoln;
     double hAcc;
     bool newDataAvailable;
+    unsigned long gnssFixTime; //for debugging latency - comment out if not debugging
 };
 
 extern volatile GNSSData gnssData;

@@ -170,7 +170,7 @@ void ControlTask(void *pvParameters) {
                     }
                 }
             }
-            // Add other command types as needed
+            // Add other command types?
         }
         
         // Check navigation status for autonomous control
@@ -196,17 +196,20 @@ void ControlTask(void *pvParameters) {
         if (nav.autonomousMode && !nav.isPaused) {
             // Get current GNSS data
             if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+                unsigned long now = millis();
+                unsigned long age = now - gnssData.gnssFixTime;
+                LOG_DEBUG("GNSS fix age at control loop: %lu ms", age); //THIS IS POSITION - CONTROL LATENCY!!!!
                 currentLat = gnssData.latitude;
                 currentLon = gnssData.longitude;
                 currentSpeed = gnssData.speed;
                 currentHeading = gnssData.heading;
                 // Add periodic logging of control values in autonomous mode
-                static unsigned long lastLocLog = 0;
-                if (millis() - lastLocLog > 500) {
-                    lastLocLog = millis();
-                    LOG_NAV("ControlTask data, %.7f, %.7f, %.2f, %.1f", 
-                        currentLat, currentLon, currentSpeed, currentHeading);
-                }
+                // static unsigned long lastLocLog = 0;
+                // if (millis() - lastLocLog > 500) {
+                //     lastLocLog = millis();
+                //     LOG_NAV("ControlTask data, %.7f, %.7f, %.2f, %.1f", 
+                //         currentLat, currentLon, currentSpeed, currentHeading);
+                // }
                 xSemaphoreGive(gnssMutex);
                 // Make a direct call to get fresh heading: THIS WAS MAYBE CAUSING PROBLEMS
                 //currentHeading = myGPS.getHeading() / 100000.0; // Convert to degrees

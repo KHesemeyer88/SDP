@@ -11,9 +11,9 @@
 #include <ESP32Servo.h>
 
 // Task priorities (1-24, higher number = higher priority)
-#define CONTROL_TASK_PRIORITY       10
-#define NAV_TASK_PRIORITY           9
-#define GNSS_TASK_PRIORITY          8
+#define CONTROL_TASK_PRIORITY       9
+#define NAV_TASK_PRIORITY           8
+#define GNSS_TASK_PRIORITY          10
 #define WEBSOCKET_TASK_PRIORITY     7
 #define HTTP_SERVER_TASK_PRIORITY   6
 #define LOG_TASK_PRIORITY           2

@@ -92,49 +92,6 @@ bool initLogging() {
     return true;
 }
 
-// The logging task function
-// void logTask(void *pvParameters) {
-//     LogMessage msg;
-//     unsigned long lastFlushTime = millis();
-    
-//     for (;;) {
-//         // Check if there are messages in the queue
-//         if (xQueueReceive(logQueue, &msg, pdMS_TO_TICKS(100)) == pdPASS) {
-//             // Take mutex before writing to file
-//             if (xSemaphoreTake(logFileMutex, portMAX_DELAY) == pdTRUE) {
-//                 // Format: timestamp,level,task,message
-//                 logFile.printf("%u,%s,%s,%s\n", 
-//                     msg.timestamp,
-//                     logLevelNames[msg.level],
-//                     msg.taskName,
-//                     msg.message);
-                
-//                 // Check if it's time to flush
-//                 unsigned long currentTime = millis();
-//                 if (currentTime - lastFlushTime >= LOG_FLUSH_INTERVAL) {
-//                     logFile.flush();
-//                     lastFlushTime = currentTime;
-//                 }
-                
-//                 xSemaphoreGive(logFileMutex);
-//             }
-//         } else {
-//             // No message received, check if we should flush
-//             unsigned long currentTime = millis();
-//             if (currentTime - lastFlushTime >= LOG_FLUSH_INTERVAL) {
-//                 if (xSemaphoreTake(logFileMutex, portMAX_DELAY) == pdTRUE) {
-//                     logFile.flush();
-//                     lastFlushTime = currentTime;
-//                     xSemaphoreGive(logFileMutex);
-//                 }
-//             }
-//         }
-        
-//         // Small delay to prevent excessive CPU usage when queue is empty
-//         vTaskDelay(pdMS_TO_TICKS(10));
-//     }
-// }
-
 #define LOG_LEVEL_COUNT 5  // NONE, ERROR, NAV, DEBUG, PERF
 
 void logTask(void *pvParameters) {
@@ -221,35 +178,6 @@ bool logMessage(LogLevel level, const char* format, ...) {
 
     return true;
 }
-
-
-
-// Log a message with the given level
-// bool logMessage(LogLevel level, const char* format, ...) {
-//     // Skip if logging is disabled (LOG_NONE) or if level is not included in current setting
-//     if (currentLogLevel == LOG_NONE || level > currentLogLevel || logQueue == NULL) return false;
-    
-//     LogMessage msg;
-//     msg.level = level;
-//     msg.timestamp = millis();
-    
-//     // Get current task name
-//     TaskHandle_t currentTask = xTaskGetCurrentTaskHandle();
-//     if (currentTask != NULL) {
-//         strlcpy(msg.taskName, pcTaskGetTaskName(currentTask), sizeof(msg.taskName));
-//     } else {
-//         strlcpy(msg.taskName, "Unknown", sizeof(msg.taskName));
-//     }
-    
-//     // Format the message string
-//     va_list args;
-//     va_start(args, format);
-//     vsnprintf(msg.message, sizeof(msg.message), format, args);
-//     va_end(args);
-    
-//     // Send message to queue with timeout to prevent blocking
-//     return (xQueueSend(logQueue, &msg, pdMS_TO_TICKS(100)) == pdPASS);
-// }
 
 // Close the logging system
 void closeLogging() {

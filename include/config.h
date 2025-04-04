@@ -48,13 +48,6 @@ const unsigned long WS_STATS_UPDATE_INTERVAL = 500;
 // Pin Definitions
 const int STEERING_PIN = 5;   // GPIO5 for steering servo
 const int ESC_PIN = 23;       // GPIO23 for ESC control
-// // Sonar pins
-// const int TRIGGER_PIN_FRONT = 17;
-// const int ECHO_PIN_FRONT = 16;
-// const int TRIGGER_PIN_LEFT = 22;
-// const int ECHO_PIN_LEFT = 18;
-// const int TRIGGER_PIN_RIGHT = 19;
-// const int ECHO_PIN_RIGHT = 21;
 
 // Sonar thresholds (cm)
 const int FRONT_STOP_THRESHOLD = 150; // zero to suppress obst. avoidance
