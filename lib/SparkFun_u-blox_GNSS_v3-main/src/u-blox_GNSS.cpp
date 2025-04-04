@@ -81,11 +81,11 @@ DevUBLOXGNSS::~DevUBLOXGNSS(void)
     payloadCfg = nullptr;
   }
 
-  if (payloadAuto != nullptr)
-  {
-    delete[] payloadAuto; // Created with new[]
-    payloadAuto = nullptr;
-  }
+  // if (payloadAuto != nullptr)
+  // {
+  //   delete[] payloadAuto; // Created with new[]
+  //   payloadAuto = nullptr;
+  // } DELETED BY BRENT!!!
 
   if (spiBuffer != nullptr)
   {
@@ -1610,7 +1610,7 @@ void DevUBLOXGNSS::process(uint8_t incoming, ubxPacket *incomingUBX, uint8_t req
   // by other threads without overwriting the requested / expected Class and ID.
   volatile static uint8_t storedClass = 0;
   volatile static uint8_t storedID = 0;
-  static size_t payloadAutoBytes;
+  //static size_t payloadAutoBytes; DELETED BY BRENT!!!
   if (requestedClass || requestedID) // If either is non-zero, store the requested Class and ID
   {
     storedClass = requestedClass;
@@ -1721,63 +1721,63 @@ void DevUBLOXGNSS::process(uint8_t incoming, ubxPacket *incomingUBX, uint8_t req
 
           // Increase the payloadAuto buffer size if necessary, by removing
           // the previous buffer
-          if (payloadAuto && (payloadAutoBytes < maxPayload))
-          {
-            delete[] payloadAuto; // Created with new[] below
-            payloadAuto = nullptr;
-            payloadAutoBytes = 0;
-          }
+          // if (payloadAuto && (payloadAutoBytes < maxPayload))
+          // {
+          //   delete[] payloadAuto; // Created with new[] below
+          //   payloadAuto = nullptr;
+          //   payloadAutoBytes = 0;
+          // } COMMENTED OUT BY BRENT!!!
 
-          // Allocate the payloadAuto buffer if necessary
-          if (payloadAuto == nullptr)
-          {
-            payloadAuto = new uint8_t[maxPayload];
-            if (payloadAuto)
-              payloadAutoBytes = maxPayload;
-          }
+          // // Allocate the payloadAuto buffer if necessary
+          // if (payloadAuto == nullptr)
+          // {
+          //   payloadAuto = new uint8_t[maxPayload];
+          //   if (payloadAuto)
+          //     payloadAutoBytes = maxPayload;
+          // } COMMENTED OUT BY BRENT!!
 
-          packetAuto.payload = payloadAuto;
+          packetAuto.payload = payloadAutoStatic;
           
-          if (payloadAuto == nullptr) // Check if the alloc failed
-          {
-#ifndef SFE_UBLOX_REDUCED_PROG_MEM
-            if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
-            {
-              _debugSerial.print(F("process: memory allocation failed for \"automatic\" message: Class: 0x"));
-              _debugSerial.print(packetBuf.cls, HEX);
-              _debugSerial.print(F(" ID: 0x"));
-              _debugSerial.println(packetBuf.id, HEX);
-              _debugSerial.println(F("process: \"automatic\" message could overwrite data"));
-            }
-#endif
-            // The RAM allocation failed so fall back to using incomingUBX (usually packetCfg) even though we risk overwriting data
-            activePacketBuffer = SFE_UBLOX_PACKET_PACKETCFG;
-            incomingUBX->cls = packetBuf.cls; // Copy the class and ID into incomingUBX (usually packetCfg)
-            incomingUBX->id = packetBuf.id;
-            incomingUBX->counter = packetBuf.counter; // Copy over the .counter too
-          }
-          else
-          {
-            // The RAM allocation was successful so we start diverting data into packetAuto and process it
-            activePacketBuffer = SFE_UBLOX_PACKET_PACKETAUTO;
-            packetAuto.cls = packetBuf.cls; // Copy the class and ID into packetAuto
-            packetAuto.id = packetBuf.id;
-            packetAuto.counter = packetBuf.counter;           // Copy over the .counter too
-            packetAuto.startingSpot = packetBuf.startingSpot; // And the starting spot? (Probably redundant)
-#ifndef SFE_UBLOX_REDUCED_PROG_MEM
-            if (_printDebug == true)
-            {
-              _debugSerial.print(F("process: incoming \"automatic\" message: Class: 0x"));
-              _debugSerial.print(packetBuf.cls, HEX);
-              _debugSerial.print(F(" ID: 0x"));
-              _debugSerial.print(packetBuf.id, HEX);
-              _debugSerial.print(F(" logBecauseAuto:"));
-              _debugSerial.print(logBecauseAuto);
-              _debugSerial.print(F(" logBecauseEnabled:"));
-              _debugSerial.println(logBecauseEnabled);
-            }
-#endif
-          }
+// //           if (payloadAuto == nullptr) // Check if the alloc failed
+// //           {
+// // #ifndef SFE_UBLOX_REDUCED_PROG_MEM
+// //             if ((_printDebug == true) || (_printLimitedDebug == true)) // This is important. Print this if doing limited debugging
+// //             {
+// //               _debugSerial.print(F("process: memory allocation failed for \"automatic\" message: Class: 0x"));
+// //               _debugSerial.print(packetBuf.cls, HEX);
+// //               _debugSerial.print(F(" ID: 0x"));
+// //               _debugSerial.println(packetBuf.id, HEX);
+// //               _debugSerial.println(F("process: \"automatic\" message could overwrite data"));
+// //             }
+// // #endif
+// //             // The RAM allocation failed so fall back to using incomingUBX (usually packetCfg) even though we risk overwriting data
+// //             activePacketBuffer = SFE_UBLOX_PACKET_PACKETCFG;
+// //             incomingUBX->cls = packetBuf.cls; // Copy the class and ID into incomingUBX (usually packetCfg)
+// //             incomingUBX->id = packetBuf.id;
+// //             incomingUBX->counter = packetBuf.counter; // Copy over the .counter too
+// //           }
+// //           else
+//           {
+//             // The RAM allocation was successful so we start diverting data into packetAuto and process it
+//             activePacketBuffer = SFE_UBLOX_PACKET_PACKETAUTO;
+//             packetAuto.cls = packetBuf.cls; // Copy the class and ID into packetAuto
+//             packetAuto.id = packetBuf.id;
+//             packetAuto.counter = packetBuf.counter;           // Copy over the .counter too
+//             packetAuto.startingSpot = packetBuf.startingSpot; // And the starting spot? (Probably redundant)
+// #ifndef SFE_UBLOX_REDUCED_PROG_MEM
+//             if (_printDebug == true)
+//             {
+//               _debugSerial.print(F("process: incoming \"automatic\" message: Class: 0x"));
+//               _debugSerial.print(packetBuf.cls, HEX);
+//               _debugSerial.print(F(" ID: 0x"));
+//               _debugSerial.print(packetBuf.id, HEX);
+//               _debugSerial.print(F(" logBecauseAuto:"));
+//               _debugSerial.print(logBecauseAuto);
+//               _debugSerial.print(F(" logBecauseEnabled:"));
+//               _debugSerial.println(logBecauseEnabled);
+//             }
+// #endif
+//           }COMMENTED OUT BY BRENT!!!
         }
         else
         {

@@ -1574,7 +1574,8 @@ protected:
   uint8_t payloadBuf[2];           // Temporary buffer used to screen incoming packets or dump unrequested packets
   size_t packetCfgPayloadSize = 0; // Size for the packetCfg payload. .begin will set this to MAX_PAYLOAD_SIZE if necessary. User can change with setPacketCfgPayloadSize
   uint8_t *payloadCfg = nullptr;
-  uint8_t *payloadAuto = nullptr;
+  //uint8_t *payloadAuto = nullptr; BRENT COMMENTED THIS OUT
+  uint8_t payloadAutoStatic[256];
 
   uint8_t *spiBuffer = nullptr;                                // A buffer to store any bytes being recieved back from the device while we are sending via SPI
   size_t spiBufferIndex = 0;                                   // Index into the SPI buffer
@@ -1585,7 +1586,7 @@ protected:
   ubxPacket packetAck = {0, 0, 0, 0, 0, payloadAck, 0, 0, SFE_UBLOX_PACKET_VALIDITY_NOT_DEFINED, SFE_UBLOX_PACKET_VALIDITY_NOT_DEFINED};
   ubxPacket packetBuf = {0, 0, 0, 0, 0, payloadBuf, 0, 0, SFE_UBLOX_PACKET_VALIDITY_NOT_DEFINED, SFE_UBLOX_PACKET_VALIDITY_NOT_DEFINED};
   ubxPacket packetCfg = {0, 0, 0, 0, 0, payloadCfg, 0, 0, SFE_UBLOX_PACKET_VALIDITY_NOT_DEFINED, SFE_UBLOX_PACKET_VALIDITY_NOT_DEFINED};
-  ubxPacket packetAuto = {0, 0, 0, 0, 0, payloadAuto, 0, 0, SFE_UBLOX_PACKET_VALIDITY_NOT_DEFINED, SFE_UBLOX_PACKET_VALIDITY_NOT_DEFINED};
+  ubxPacket packetAuto = {0, 0, 0, 0, 0, payloadAutoStatic, 0, 0, SFE_UBLOX_PACKET_VALIDITY_NOT_DEFINED, SFE_UBLOX_PACKET_VALIDITY_NOT_DEFINED};
 
   // Flag if this packet is unrequested (and so should be ignored and not copied into packetCfg or packetAck)
   bool ignoreThisPayload = false;
