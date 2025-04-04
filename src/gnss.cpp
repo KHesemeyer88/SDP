@@ -92,6 +92,7 @@ bool initializeGNSS() {
     // Initialize the SPI bus with your defined pins
     static SPIClass GNSSSPI(HSPI);
     GNSSSPI.begin(NAV_SCK_PIN, NAV_MISO_PIN, NAV_MOSI_PIN, NAV_CS_PIN);
+
     delay(100);
 
     // Dummy SPI sync

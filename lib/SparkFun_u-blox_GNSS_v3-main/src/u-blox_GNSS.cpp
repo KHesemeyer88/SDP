@@ -1617,7 +1617,7 @@ void DevUBLOXGNSS::process(uint8_t incoming, ubxPacket *incomingUBX, uint8_t req
     storedID = requestedID;
   }
 
-  _outputPort.write(incoming); // Echo this byte to the serial port
+  //_outputPort.write(incoming); // Echo this byte to the serial port BRENT COMMENTED OUT
 
   if ((currentSentence == SFE_UBLOX_SENTENCE_TYPE_NONE) || (currentSentence == SFE_UBLOX_SENTENCE_TYPE_NMEA))
   {
@@ -1887,8 +1887,8 @@ void DevUBLOXGNSS::process(uint8_t incoming, ubxPacket *incomingUBX, uint8_t req
 
     // If user has assigned an output port then pipe the characters there,
     // but only if the port is different (otherwise we'll output each character twice!)
-    if (_outputPort != _ubxOutputPort)
-      _ubxOutputPort.write(incoming); // Echo this byte to the serial port
+    // if (_outputPort != _ubxOutputPort)
+    //   _ubxOutputPort.write(incoming); // Echo this byte to the serial port BRENT COMMENTED OUT!!!
 
     // Finally, increment the frame counter
     ubxFrameCounter++;
@@ -1949,8 +1949,8 @@ void DevUBLOXGNSS::process(uint8_t incoming, ubxPacket *incomingUBX, uint8_t req
           processNMEA(nmeaAddressField[i]); // Process the start character and address field
           // If user has assigned an output port then pipe the characters there,
           // but only if the port is different (otherwise we'll output each character twice!)
-          if (_outputPort != _nmeaOutputPort)
-            _nmeaOutputPort.write(nmeaAddressField[i]); // Echo this byte to the serial port
+          // if (_outputPort != _nmeaOutputPort)
+          //   _nmeaOutputPort.write(nmeaAddressField[i]); // Echo this byte to the serial port BRENT COMMENTED OUT!!
         }
       }
     }
@@ -1992,8 +1992,8 @@ void DevUBLOXGNSS::process(uint8_t incoming, ubxPacket *incomingUBX, uint8_t req
         processNMEA(incoming); // Pass incoming to processNMEA
         // If user has assigned an output port then pipe the characters there,
         // but only if the port is different (otherwise we'll output each character twice!)
-        if (_outputPort != _nmeaOutputPort)
-          _nmeaOutputPort.write(incoming); // Echo this byte to the serial port
+        // if (_outputPort != _nmeaOutputPort)
+        //   _nmeaOutputPort.write(incoming); // Echo this byte to the serial port BRENT COMMENTED OUT!!!
       }
     }
 
@@ -2278,8 +2278,8 @@ void DevUBLOXGNSS::process(uint8_t incoming, ubxPacket *incomingUBX, uint8_t req
 
     // If user has assigned an output port then pipe the characters there,
     // but only if the port is different (otherwise we'll output each character twice!)
-    if (_outputPort != _rtcmOutputPort)
-      _rtcmOutputPort.write(incoming); // Echo this byte to the serial port
+    // if (_outputPort != _rtcmOutputPort)
+    //   _rtcmOutputPort.write(incoming); // Echo this byte to the serial port BRENT COMMENTED OUT!!!
   }
 }
 

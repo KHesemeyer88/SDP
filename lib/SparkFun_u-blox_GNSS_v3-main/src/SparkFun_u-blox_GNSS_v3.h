@@ -50,6 +50,8 @@
 
 #pragma once
 
+#warning "Using LOCAL modified SparkFun GNSS library"
+
 #include <Arduino.h>
 
 #include <Wire.h>
