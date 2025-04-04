@@ -25,6 +25,7 @@ Servo escServo;
 // Forward declarations of functions implemented in other files
 void WebSocketTask(void *pvParameters);
 void ControlTask(void *pvParameters);
+void RTCMTask(void *pvParameters);
 
 // Initialize all RTOS components
 void initRTOS() {
@@ -50,7 +51,14 @@ void initRTOS() {
         handleSystemError("Failed to create ntripClient mutex", true);
         return;
     }
-    
+
+    // Create mutex for SPI bus access to GNSS module
+    spiBusMutex = xSemaphoreCreateMutex();
+    if (spiBusMutex == NULL) {
+        handleSystemError("Failed to create SPI bus mutex", true);
+        return;
+    }
+
     // Create command queue
     commandQueue = xQueueCreate(10, sizeof(ControlCommand));
     if (commandQueue == NULL) {
@@ -140,6 +148,21 @@ void initRTOS() {
         handleSystemError("Failed to create GNSSTask", true);
         return;
     }
+
+    BaseType_t xReturnedRTCM = xTaskCreatePinnedToCore(
+        RTCMTask,
+        "RTCMTask",
+        4096,                // Stack size (adjust as needed)
+        NULL,
+        GNSS_TASK_PRIORITY,  // Same priority as GNSSTask
+        NULL,
+        1                    // Core 1 with GNSS
+    );
+    
+    if (xReturnedRTCM != pdPASS) {
+        handleSystemError("Failed to create RTCMTask", true);
+        return;
+    }    
 
     // Create the navigation task
     BaseType_t xReturnedNav = xTaskCreatePinnedToCore(

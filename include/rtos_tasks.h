@@ -81,6 +81,8 @@ void ControlTask(void *pvParameters);
 // WebSocket task now only handles periodic updates, not the WebSocket loop()
 void WebSocketTask(void *pvParameters);
 
+extern void RTCMTask(void *pvParameters);
+
 // Initialize all RTOS components
 void initRTOS();
 

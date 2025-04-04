@@ -2,6 +2,7 @@
 #include "websocket_handler.h"
 #include "logging.h"
 #include <sys/time.h>
+#include "rtcm_buffer.h"
 
 // Flag to track if the system time has been set
 static bool systemTimeSet = false;
@@ -101,35 +102,40 @@ bool initializeGNSS() {
     GNSSSPI.endTransaction();
     delay(100);
     
-    // Use SPI to begin communication with GPS module - note reduced frequency for stability
-    if (!myGPS.begin(GNSSSPI, NAV_CS_PIN, NAV_SPI_FREQUENCY)) {  // 4MHz instead of 20MHz
-        LOG_ERROR("u-blox GNSS not detected over SPI. Check wiring.");
-        return false;
-    }
-    
-    LOG_DEBUG("GNSS module found over SPI!");
-    
-    // Configure SPI port to output UBX (critical)
-    myGPS.setSPIOutput(COM_TYPE_UBX);
-    myGPS.setSPIInput(COM_TYPE_UBX | COM_TYPE_RTCM3);
+    if (xSemaphoreTake(spiBusMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        // Use SPI to begin communication with GPS module - note reduced frequency for stability
+        if (!myGPS.begin(GNSSSPI, NAV_CS_PIN, NAV_SPI_FREQUENCY)) {  // 4MHz instead of 20MHz
+            LOG_ERROR("u-blox GNSS not detected over SPI. Check wiring.");
+            return false;
+        }
+        
+        LOG_DEBUG("GNSS module found over SPI!");
+        
+        // Configure SPI port to output UBX (critical)
+        myGPS.setSPIOutput(COM_TYPE_UBX);
+        myGPS.setSPIInput(COM_TYPE_UBX | COM_TYPE_RTCM3);
 
-    
-    myGPS.setNavigationFrequency(NAV_FREQ);
-    myGPS.setDGNSSConfiguration(SFE_UBLOX_DGNSS_MODE_FIXED);
-    myGPS.setMainTalkerID(SFE_UBLOX_MAIN_TALKER_ID_GP);
-    myGPS.setNMEAGPGGAcallbackPtr(&pushGPGGA);
-    
-    // Use SPI-specific message configuration
-    myGPS.setVal8(UBLOX_CFG_MSGOUT_NMEA_ID_GGA_SPI, 20);
-    
-    // Enable the callback for PVT messages
-    myGPS.setAutoPVTcallbackPtr(&pvtCallback);
-    
-    // Disable sensor fusion
-    if (!myGPS.setVal8(UBLOX_CFG_SFCORE_USE_SF, 0)) {
-        LOG_ERROR("Failed to disable sensor fusion.");
+        
+        myGPS.setNavigationFrequency(NAV_FREQ);
+        myGPS.setDGNSSConfiguration(SFE_UBLOX_DGNSS_MODE_FIXED);
+        myGPS.setMainTalkerID(SFE_UBLOX_MAIN_TALKER_ID_GP);
+        myGPS.setNMEAGPGGAcallbackPtr(&pushGPGGA);
+        
+        // Use SPI-specific message configuration
+        myGPS.setVal8(UBLOX_CFG_MSGOUT_NMEA_ID_GGA_SPI, 20);
+        
+        // Enable the callback for PVT messages
+        myGPS.setAutoPVTcallbackPtr(&pvtCallback);
+        
+        // Disable sensor fusion
+        if (!myGPS.setVal8(UBLOX_CFG_SFCORE_USE_SF, 0)) {
+            LOG_ERROR("Failed to disable sensor fusion.");
+        } else {
+            LOG_DEBUG("IMU sensor fusion disabled.");
+        }
+        xSemaphoreGive(spiBusMutex);
     } else {
-        LOG_DEBUG("IMU sensor fusion disabled.");
+        LOG_ERROR("SPI mutex timeout during setSPIOutput");
     }
     
     return true;
@@ -140,7 +146,15 @@ bool initializeGNSS() {
 char* getFusionStatus(char* buffer, size_t bufferSize) {
     LOG_DEBUG("getFusionStatus");
     // Temporarily set nav frequency to 1Hz for status check
-    myGPS.setNavigationFrequency(1);
+    //myGPS.setNavigationFrequency(1);
+    //must use spi bus mutex:
+    if (xSemaphoreTake(spiBusMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        myGPS.setNavigationFrequency(1);
+        xSemaphoreGive(spiBusMutex);
+    } else {
+        LOG_ERROR("SPI mutex timeout during setNavigationFrequency (1Hz)");
+    }
+    
     const char* defaultStatus = "Failed to get fusion data";
     
     // Initialize buffer with default message
@@ -149,25 +163,38 @@ char* getFusionStatus(char* buffer, size_t bufferSize) {
     // Try to get ESF info with timeout
     unsigned long startTime = millis();
     const unsigned long ESF_TIMEOUT = 2000; 
-    if (!myGPS.getEsfInfo()) {
-        while (millis() - startTime < ESF_TIMEOUT) {
-            LOG_DEBUG("getEsfInfo");
-            if (myGPS.getEsfInfo()) {
-                uint8_t fusionMode = myGPS.packetUBXESFSTATUS->data.fusionMode;
-                LOG_DEBUG("fusionMode, %s", fusionMode);
-                switch(fusionMode) {
-                    case 0: snprintf(buffer, bufferSize, "Initializing"); break;
-                    case 1: snprintf(buffer, bufferSize, "Calibrated"); break;
-                    case 2: snprintf(buffer, bufferSize, "Suspended"); break;
-                    case 3: snprintf(buffer, bufferSize, "Disabled"); break;
+    if (xSemaphoreTake(spiBusMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        if (!myGPS.getEsfInfo()) {
+            while (millis() - startTime < ESF_TIMEOUT) {
+                LOG_DEBUG("getEsfInfo");
+                if (myGPS.getEsfInfo()) {
+                    uint8_t fusionMode = myGPS.packetUBXESFSTATUS->data.fusionMode;
+                    LOG_DEBUG("fusionMode, %s", fusionMode);
+                    switch(fusionMode) {
+                        case 0: snprintf(buffer, bufferSize, "Initializing"); break;
+                        case 1: snprintf(buffer, bufferSize, "Calibrated"); break;
+                        case 2: snprintf(buffer, bufferSize, "Suspended"); break;
+                        case 3: snprintf(buffer, bufferSize, "Disabled"); break;
+                    }
+                    break;
                 }
-                break;
             }
         }
+        xSemaphoreGive(spiBusMutex);
+    } else {
+        LOG_ERROR("SPI mutex timeout during setNavigationFrequency (1Hz)");
     }
 
     // Restore original navigation frequency
-    myGPS.setNavigationFrequency(NAV_FREQ);
+    //myGPS.setNavigationFrequency(NAV_FREQ);
+
+    if (xSemaphoreTake(spiBusMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        myGPS.setNavigationFrequency(NAV_FREQ);
+        xSemaphoreGive(spiBusMutex);
+    } else {
+        LOG_ERROR("SPI mutex timeout during setNavigationFrequency (1Hz)");
+    }
+    
     return buffer;
 }
 
@@ -222,9 +249,20 @@ bool processRTKConnection() {
             // Update the timestamp for when we last received any correction data
             lastReceivedRTCM_ms = millis();
             
-            // Push all collected data to the GPS module at once
-            myGPS.pushRawData(rtcmBuffer, rtcmCount);
-            LOG_DEBUG("pushRawData time, %lu", millis() - lastReceivedRTCM_ms);
+            // // Push all collected data to the GPS module at once
+            // if (xSemaphoreTake(spiBusMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+            //     myGPS.pushRawData(rtcmBuffer, rtcmCount);
+            //     xSemaphoreGive(spiBusMutex);
+            // } else {
+            //     LOG_ERROR("SPI mutex timeout during pushRawData");
+            // }
+            size_t written = writeRtcmData(rtcmBuffer, rtcmCount);
+            if (written < rtcmCount) {
+                LOG_ERROR("RTCM buffer overflow — dropped %u bytes", rtcmCount - written);
+            }
+            //LOG_DEBUG("Wrote %u RTCM bytes to buffer", written);
+
+            LOG_DEBUG("RTCM write-buffer time, %lu", millis() - lastReceivedRTCM_ms);
         }
     }
     
@@ -502,6 +540,32 @@ void GNSSTask(void *pvParameters) {
         // }
         
         // Tie task frequency to NAV_FREQ
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
+    }
+}
+
+void RTCMTask(void *pvParameters) {
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    const TickType_t xFrequency = pdMS_TO_TICKS(500); // 2 Hz
+    uint8_t rtcmChunk[256]; // Working buffer
+
+    for (;;) {
+        size_t available = getRtcmBytesAvailable();
+        if (available > 0) {
+            size_t toRead = min(sizeof(rtcmChunk), available);
+            size_t read = readRtcmData(rtcmChunk, toRead);
+
+            if (read > 0) {
+                if (xSemaphoreTake(spiBusMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+                    myGPS.pushRawData(rtcmChunk, read);
+                    xSemaphoreGive(spiBusMutex);
+                    //LOG_DEBUG("RTCMTask: pushed %u bytes", read);
+                } else {
+                    LOG_ERROR("RTCMTask: SPI mutex timeout");
+                }
+            }
+        }
+
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
 }

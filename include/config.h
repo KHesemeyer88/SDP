@@ -115,5 +115,7 @@ extern WiFiClient ntripClient;
 
 // Mutex for thread-safe access to ntripClient
 extern SemaphoreHandle_t ntripClientMutex;
+//SPI bus mutex for avoiding collisions
+extern SemaphoreHandle_t spiBusMutex;
 
 #endif // CONFIG_H

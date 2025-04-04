@@ -12,6 +12,8 @@ WiFiClient ntripClient;
 
 // Definition for ntripClient mutex (declared as extern in config.h)
 SemaphoreHandle_t ntripClientMutex = NULL;
+//definition for spi bus mutex (declared as extern in config.h)
+SemaphoreHandle_t spiBusMutex = NULL;
 
 const char* logLevelToString(LogLevel level);
 
