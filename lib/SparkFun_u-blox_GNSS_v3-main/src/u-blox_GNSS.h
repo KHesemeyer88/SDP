@@ -257,7 +257,9 @@ public:
   sfe_ublox_status_e waitForNoACKResponse(ubxPacket *outgoingUBX, uint8_t requestedClass, uint8_t requestedID, uint16_t maxTime = kUBLOXGNSSDefaultMaxWait); // Poll the module until a config packet is received
 
   // Check if any callbacks need to be called
-  void checkCallbacks(void);
+  //void checkCallbacks(void); //COMMENTED OUT BY BRENT !!!
+  void checkPVTCallbackOnly();//BRENT ADDED THIS
+
 
   // Push (e.g.) RTCM or Assist Now data directly to the module
   // Warning: this function does not check that the data is valid. It is the user's responsibility to ensure the data is valid before pushing.
@@ -1575,7 +1577,7 @@ protected:
   size_t packetCfgPayloadSize = 0; // Size for the packetCfg payload. .begin will set this to MAX_PAYLOAD_SIZE if necessary. User can change with setPacketCfgPayloadSize
   uint8_t *payloadCfg = nullptr;
   //uint8_t *payloadAuto = nullptr; BRENT COMMENTED THIS OUT
-  uint8_t payloadAutoStatic[256];
+  uint8_t payloadAutoStatic[256]; //BRENT CHANGED THIS
 
   uint8_t *spiBuffer = nullptr;                                // A buffer to store any bytes being recieved back from the device while we are sending via SPI
   size_t spiBufferIndex = 0;                                   // Index into the SPI buffer
@@ -1586,7 +1588,7 @@ protected:
   ubxPacket packetAck = {0, 0, 0, 0, 0, payloadAck, 0, 0, SFE_UBLOX_PACKET_VALIDITY_NOT_DEFINED, SFE_UBLOX_PACKET_VALIDITY_NOT_DEFINED};
   ubxPacket packetBuf = {0, 0, 0, 0, 0, payloadBuf, 0, 0, SFE_UBLOX_PACKET_VALIDITY_NOT_DEFINED, SFE_UBLOX_PACKET_VALIDITY_NOT_DEFINED};
   ubxPacket packetCfg = {0, 0, 0, 0, 0, payloadCfg, 0, 0, SFE_UBLOX_PACKET_VALIDITY_NOT_DEFINED, SFE_UBLOX_PACKET_VALIDITY_NOT_DEFINED};
-  ubxPacket packetAuto = {0, 0, 0, 0, 0, payloadAutoStatic, 0, 0, SFE_UBLOX_PACKET_VALIDITY_NOT_DEFINED, SFE_UBLOX_PACKET_VALIDITY_NOT_DEFINED};
+  ubxPacket packetAuto = {0, 0, 0, 0, 0, payloadAutoStatic, 0, 0, SFE_UBLOX_PACKET_VALIDITY_NOT_DEFINED, SFE_UBLOX_PACKET_VALIDITY_NOT_DEFINED};//BRENT CHANGED THIS
 
   // Flag if this packet is unrequested (and so should be ignored and not copied into packetCfg or packetAck)
   bool ignoreThisPayload = false;

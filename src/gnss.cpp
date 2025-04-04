@@ -455,7 +455,7 @@ void GNSSTask(void *pvParameters) {
         if (checkUbloxTime > 0) {  // Only log if it took significant time
             LOG_DEBUG("GNSS checkUblox time, %lu", checkUbloxTime);
         }
-        myGPS.checkCallbacks();
+        myGPS.checkPVTCallbackOnly();
         unsigned long checkCallbacksTime = millis() - loopStartTime;
         if (checkCallbacksTime > 0) {  // Only log if it took significant time
             LOG_DEBUG("GNSS checkCallbacks time, %lu", checkCallbacksTime);
