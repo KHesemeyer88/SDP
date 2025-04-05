@@ -563,7 +563,7 @@ static void checkDestinationStatus(float lat, float lon) {
 
 // Handle waypoint reached - move to next waypoint or stop
 static void handleWaypointReached() {
-    LOG_DEBUG("handleWaypointReached");
+    //LOG_DEBUG("handleWaypointReached");
     bool followingWaypoints = false;
     int currentWaypoint = 0;
     int totalWaypoints = 0;
@@ -577,8 +577,8 @@ static void handleWaypointReached() {
             currentWaypoint = navStatus.currentWaypoint;
             
             // Important diagnostic logging
-            LOG_NAV("currentWaypoint, totalWaypoints, followingWaypoints, %d, %d, %d", 
-                  currentWaypoint, totalWaypoints, followingWaypoints);
+            //LOG_NAV("currentWaypoint, totalWaypoints, followingWaypoints, %d, %d, %d", 
+            //      currentWaypoint, totalWaypoints, followingWaypoints);
                        
             // Handle waypoint reaching based on mode
             if (followingWaypoints) {
@@ -614,7 +614,7 @@ static void handleWaypointReached() {
                     // Update status message
                     snprintf((char*)navStatus.statusMessage, sizeof(((NavStatus*)0)->statusMessage), "Starting waypoint sequence again");
                     
-                    LOG_NAV("Last waypoint reached, looping back");
+                    //LOG_NAV("Last waypoint reached, looping back");
                     //LOG_NAV("Looping back to waypoint 0. targetLat=%.7f, targetLon=%.7f", 
                     //       waypoints[0].latitude, waypoints[0].longitude);
                 }
@@ -682,7 +682,7 @@ NavStatus getNavStatus() {
 
 // Add a waypoint to the list (thread-safe)
 bool addWaypoint(float latitude, float longitude) {
-    LOG_NAV("addWaypoint");
+    //LOG_NAV("addWaypoint");
 
     NavCommand cmd;
     cmd.type = NAV_CMD_ADD_WAYPOINT;
@@ -691,7 +691,7 @@ bool addWaypoint(float latitude, float longitude) {
 
     // Log queue state before sending
     UBaseType_t queueSpacesAvailable = uxQueueSpacesAvailable(navCommandQueue);
-    LOG_NAV("navCommandQueue spaces, %d", queueSpacesAvailable);
+    //LOG_NAV("navCommandQueue spaces, %d", queueSpacesAvailable);
     
     if (xQueueSend(navCommandQueue, &cmd, pdMS_TO_TICKS(100)) != pdTRUE) {
         LOG_ERROR("navCommandQueue fail in addWaypoint");
