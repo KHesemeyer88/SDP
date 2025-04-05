@@ -105,7 +105,7 @@ void webSocketEventRTOS(AsyncWebSocket *server, AsyncWebSocketClient *client,
                     // Handle autonomous navigation commands
                     else if (doc.containsKey("autonomous")) {
                         String command = doc["autonomous"].as<String>();
-                        LOG_NAV("WebSocket received autonomous command, %s", command.c_str());
+                        //LOG_NAV("WebSocket received autonomous command, %s", command.c_str());
                         
                         if (command == "start") {
                             // Start autonomous navigation                            
@@ -120,8 +120,8 @@ void webSocketEventRTOS(AsyncWebSocket *server, AsyncWebSocketClient *client,
                             float latitude = 0.0f;
                             float longitude = 0.0f;
                             
-                            LOG_NAV("webSocketEventRTOS data, %.2f, %.2f, %d, %d", 
-                                targetPace, targetDistance, hasCoordinates, getWaypointCount());
+                            // LOG_NAV("webSocketEventRTOS data, %.2f, %.2f, %d, %d", 
+                            //     targetPace, targetDistance, hasCoordinates, getWaypointCount());
 
                             if (hasCoordinates) {
                                 // Start navigation to specific coordinates
@@ -138,19 +138,19 @@ void webSocketEventRTOS(AsyncWebSocket *server, AsyncWebSocketClient *client,
                         } 
                         else if (command == "stop") {
                             // Stop autonomous navigation
-                            LOG_NAV("Stop command received");
+                            //LOG_NAV("Stop command received");
                             stopNavigation();
                             sendStatusMessage("Navigation stopped");
                         }
                         else if (command == "pause") {
                             // Pause navigation
-                            LOG_NAV("Pause command received");
+                            //LOG_NAV("Pause command received");
                             pauseNavigation();
                             sendStatusMessage("Navigation paused");
                         }
                         else if (command == "resume") {
                             // Resume navigation
-                            LOG_NAV("Resume command received");
+                            //LOG_NAV("Resume command received");
                             resumeNavigation();
                             sendStatusMessage("Navigation resumed");
                         }
@@ -164,7 +164,7 @@ void webSocketEventRTOS(AsyncWebSocket *server, AsyncWebSocketClient *client,
                         if (command == "record") {
                             // Get current position and record as waypoint
 
-                            LOG_NAV("command = record");
+                            //LOG_NAV("command = record");
                             if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
                                 float lat = gnssData.latitude;
                                 float lon = gnssData.longitude;

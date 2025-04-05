@@ -145,7 +145,7 @@ bool startWaypointNavigation(float targetPace, float targetDistance) {
     // Set waypoint navigation flags BEFORE sending command
     if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
         targetData.followingWaypoints = true;
-        LOG_NAV("followingWaypoints to true, %d", waypointCount);
+        //LOG_NAV("followingWaypoints to true, %d", waypointCount);
         xSemaphoreGive(waypointMutex);
     }
     
@@ -265,7 +265,7 @@ void NavigationTask(void *pvParameters) {
         static bool lastActive = false;
         static bool lastPaused = false;
         if (isActive != lastActive || isPaused != lastPaused) {
-            LOG_NAV("isActive or lastActive chg, %d, %d", isActive, isPaused);
+            //LOG_NAV("isActive or lastActive chg, %d, %d", isActive, isPaused);
             lastActive = isActive;
             lastPaused = isPaused;
         }
@@ -305,12 +305,12 @@ void NavigationTask(void *pvParameters) {
 }
 
 static void processNavigationCommand(NavCommand cmd) {
-    LOG_NAV("processNavigationCommand, %d", cmd.type);
+    //LOG_NAV("processNavigationCommand, %d", cmd.type);
     
     switch (cmd.type) {
         case NAV_CMD_START:
-            LOG_NAV("NAV_CMD_START, %.2f, %.2f, %d", 
-                cmd.start.targetPace, cmd.start.targetDistance, targetData.followingWaypoints);
+            // LOG_NAV("NAV_CMD_START, %.2f, %.2f, %d", 
+            //     cmd.start.targetPace, cmd.start.targetDistance, targetData.followingWaypoints);
             // Start navigation to a single waypoint
             if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
                 navStatus.autonomousMode = true;
@@ -333,8 +333,8 @@ static void processNavigationCommand(NavCommand cmd) {
             break;
             
         case NAV_CMD_STOP:
-            LOG_NAV("NAV_CMD_STOP, %d, %d", 
-                navStatus.autonomousMode, navStatus.isPaused);
+            // LOG_NAV("NAV_CMD_STOP, %d, %d", 
+            //     navStatus.autonomousMode, navStatus.isPaused);
             // Stop navigation
             if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
                 navStatus.autonomousMode = false;
@@ -347,7 +347,7 @@ static void processNavigationCommand(NavCommand cmd) {
             break;
             
         case NAV_CMD_PAUSE:
-            LOG_NAV("NAV_CMD_PAUSE");
+            //LOG_NAV("NAV_CMD_PAUSE");
             // Pause navigation without losing progress
             if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
                 navStatus.isPaused = true;
@@ -360,7 +360,7 @@ static void processNavigationCommand(NavCommand cmd) {
             
         case NAV_CMD_RESUME:
         
-            LOG_NAV("NAV_CMD_RESUME");
+            //LOG_NAV("NAV_CMD_RESUME");
             // Resume navigation from paused state
             if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
                 if (navStatus.autonomousMode) {
@@ -374,7 +374,7 @@ static void processNavigationCommand(NavCommand cmd) {
             break;
             
         case NAV_CMD_RESET_STATS:
-        LOG_NAV("NAV_CMD_RESET_STATS");
+        //LOG_NAV("NAV_CMD_RESET_STATS");
             // Reset distance and time tracking
             if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
                 navStatus.distanceTraveled = 0.0;
@@ -387,8 +387,8 @@ static void processNavigationCommand(NavCommand cmd) {
             
         case NAV_CMD_ADD_WAYPOINT:
             // Add a waypoint to the list
-            LOG_NAV("NAV_CMD_ADD_WAYPOINT, %.7f, %.7f", 
-                cmd.waypoint.latitude, cmd.waypoint.longitude);
+            // LOG_NAV("NAV_CMD_ADD_WAYPOINT, %.7f, %.7f", 
+            //     cmd.waypoint.latitude, cmd.waypoint.longitude);
 
             if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
                 //LOG_NAV("waypointMutex taken, current count=%d, max=%d", waypointCount, MAX_WAYPOINTS);
@@ -403,7 +403,7 @@ static void processNavigationCommand(NavCommand cmd) {
                     if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
                         navStatus.totalWaypoints = waypointCount;
 
-                        LOG_NAV("navStatus.totalWaypoints, %d", waypointCount);
+                        //LOG_NAV("navStatus.totalWaypoints, %d", waypointCount);
                         xSemaphoreGive(navDataMutex);
                     } else {
                         LOG_ERROR("navDataMutex fail in processNavigationCommand");
@@ -420,7 +420,7 @@ static void processNavigationCommand(NavCommand cmd) {
             break;
             
         case NAV_CMD_CLEAR_WAYPOINTS:
-        LOG_NAV("NAV_CMD_CLEAR_WAYPOINTS");
+        //LOG_NAV("NAV_CMD_CLEAR_WAYPOINTS");
             // Clear all waypoints
             if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
                 waypointCount = 0;
@@ -531,7 +531,7 @@ static void checkDestinationStatus(float lat, float lon) {
     
     // Check if we've reached the waypoint
     if (distToWaypoint < WAYPOINT_REACHED_RADIUS) {
-        LOG_NAV("wp reached, %.2f", distToWaypoint);
+        //LOG_NAV("wp reached, %.2f", distToWaypoint);
         handleWaypointReached();
     }
     
@@ -547,8 +547,8 @@ static void checkDestinationStatus(float lat, float lon) {
             // Update status message
             snprintf((char*)navStatus.statusMessage, sizeof(((NavStatus*)0)->statusMessage), "Target distance reached");
             
-            LOG_NAV("tgt distance reached, %.2f, %.2f", 
-                     targetDistance, distanceTraveled);
+            // LOG_NAV("tgt distance reached, %.2f, %.2f", 
+            //          targetDistance, distanceTraveled);
                      
             xSemaphoreGive(navDataMutex);
         }
@@ -563,7 +563,7 @@ static void checkDestinationStatus(float lat, float lon) {
 
 // Handle waypoint reached - move to next waypoint or stop
 static void handleWaypointReached() {
-    LOG_DEBUG("handleWaypointReached");
+    //LOG_DEBUG("handleWaypointReached");
     bool followingWaypoints = false;
     int currentWaypoint = 0;
     int totalWaypoints = 0;
@@ -577,8 +577,8 @@ static void handleWaypointReached() {
             currentWaypoint = navStatus.currentWaypoint;
             
             // Important diagnostic logging
-            LOG_NAV("currentWaypoint, totalWaypoints, followingWaypoints, %d, %d, %d", 
-                  currentWaypoint, totalWaypoints, followingWaypoints);
+            // LOG_NAV("currentWaypoint, totalWaypoints, followingWaypoints, %d, %d, %d", 
+            //       currentWaypoint, totalWaypoints, followingWaypoints);
                        
             // Handle waypoint reaching based on mode
             if (followingWaypoints) {
@@ -614,7 +614,7 @@ static void handleWaypointReached() {
                     // Update status message
                     snprintf((char*)navStatus.statusMessage, sizeof(((NavStatus*)0)->statusMessage), "Starting waypoint sequence again");
                     
-                    LOG_NAV("Last waypoint reached, looping back");
+                    //LOG_NAV("Last waypoint reached, looping back");
                     //LOG_NAV("Looping back to waypoint 0. targetLat=%.7f, targetLon=%.7f", 
                     //       waypoints[0].latitude, waypoints[0].longitude);
                 }
@@ -682,7 +682,7 @@ NavStatus getNavStatus() {
 
 // Add a waypoint to the list (thread-safe)
 bool addWaypoint(float latitude, float longitude) {
-    LOG_NAV("addWaypoint");
+    //LOG_NAV("addWaypoint");
 
     NavCommand cmd;
     cmd.type = NAV_CMD_ADD_WAYPOINT;
@@ -691,7 +691,7 @@ bool addWaypoint(float latitude, float longitude) {
 
     // Log queue state before sending
     UBaseType_t queueSpacesAvailable = uxQueueSpacesAvailable(navCommandQueue);
-    LOG_NAV("navCommandQueue spaces, %d", queueSpacesAvailable);
+    //LOG_NAV("navCommandQueue spaces, %d", queueSpacesAvailable);
     
     if (xQueueSend(navCommandQueue, &cmd, pdMS_TO_TICKS(100)) != pdTRUE) {
         LOG_ERROR("navCommandQueue fail in addWaypoint");

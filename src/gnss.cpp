@@ -405,7 +405,7 @@ bool connectToNTRIP() {
                 xSemaphoreGive(ntripClientMutex);
                 return false;
             } else {
-                LOG_DEBUG("connectionResult = 200, %s", casterHost);
+                //LOG_DEBUG("connectionResult = 200, %s", casterHost);
                 lastReceivedRTCM_ms = millis(); // Reset timeout
                 isConnected = true;
             }

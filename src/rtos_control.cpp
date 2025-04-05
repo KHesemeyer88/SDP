@@ -185,8 +185,8 @@ void ControlTask(void *pvParameters) {
             static bool lastAutoMode = false;
             static bool lastPaused = false;
             if (nav.autonomousMode != lastAutoMode || nav.isPaused != lastPaused) {
-                LOG_NAV("ControlTask state chg, %d, %d", 
-                        nav.autonomousMode, nav.isPaused);
+                // LOG_NAV("ControlTask state chg, %d, %d", 
+                //         nav.autonomousMode, nav.isPaused);
                 lastAutoMode = nav.autonomousMode;
                 lastPaused = nav.isPaused;
             }
@@ -198,7 +198,7 @@ void ControlTask(void *pvParameters) {
             if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
                 unsigned long now = millis();
                 unsigned long age = now - gnssData.gnssFixTime;
-                LOG_DEBUG("GNSS fix age at control loop: %lu ms", age); //THIS IS POSITION - CONTROL LATENCY!!!!
+                LOG_DEBUG("position-control latency, %lu", age); //THIS IS POSITION - CONTROL LATENCY!!!!
                 currentLat = gnssData.latitude;
                 currentLon = gnssData.longitude;
                 currentSpeed = gnssData.speed;
