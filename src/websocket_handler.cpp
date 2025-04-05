@@ -384,7 +384,7 @@ void WebSocketTask(void *pvParameters) {
         // Calculate and log the total loop time if significant
         unsigned long loopTime = millis() - loopStartTime;
         if (loopTime > 50) {  // Only log if the loop took a significant amount of time
-            //LOG_DEBUG("WebSocketTask time, %lu", loopTime);
+            LOG_DEBUG("WebSocketTask time, %lu", loopTime);
         }
         
         // Use a short delay to prevent task starvation
