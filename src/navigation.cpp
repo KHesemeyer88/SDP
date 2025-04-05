@@ -563,7 +563,7 @@ static void checkDestinationStatus(float lat, float lon) {
 
 // Handle waypoint reached - move to next waypoint or stop
 static void handleWaypointReached() {
-    LOG_DEBUG("handleWaypointReached");
+    //LOG_DEBUG("handleWaypointReached");
     bool followingWaypoints = false;
     int currentWaypoint = 0;
     int totalWaypoints = 0;

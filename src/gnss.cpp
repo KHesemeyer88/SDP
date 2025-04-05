@@ -525,8 +525,8 @@ void GNSSTask(void *pvParameters) {
         
         // Log total loop time if significant
         unsigned long loopTime = millis() - loopStartTime;
-        if (loopTime > 200) {  // Only log if the loop took a significant amount of time
-            //LOG_DEBUG("GNSSTask time, %lu", loopTime);
+        if (loopTime > 50) {  // Only log if the loop took a significant amount of time
+            LOG_DEBUG("GNSSTask time, %lu", loopTime);
         }
         
         // Use a short delay to prevent task starvation
