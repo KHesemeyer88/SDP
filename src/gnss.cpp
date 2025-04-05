@@ -404,7 +404,7 @@ bool connectToNTRIP() {
                 xSemaphoreGive(ntripClientMutex);
                 return false;
             } else {
-                LOG_DEBUG("connectionResult = 200, %s", casterHost);
+                //LOG_DEBUG("connectionResult = 200, %s", casterHost);
                 lastReceivedRTCM_ms = millis(); // Reset timeout
                 isConnected = true;
             }
@@ -497,7 +497,7 @@ void GNSSTask(void *pvParameters) {
         // Log total loop time if significant
         unsigned long loopTime = millis() - loopStartTime;
         if (loopTime > 200) {  // Only log if the loop took a significant amount of time
-            //LOG_DEBUG("GNSSTask time, %lu", loopTime);
+            LOG_DEBUG("GNSSTask time, %lu", loopTime);
         }
         
         // Use a short delay to prevent task starvation
