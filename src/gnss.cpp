@@ -12,21 +12,29 @@
 
 #define UBX_CS NAV_CS_PIN
 #define UBX_SPI_FREQ NAV_SPI_FREQUENCY
+#define RTCM_RING_SIZE 2048
 
 static SPIClass GNSSSPI(HSPI);
 TaskHandle_t gnssTaskHandle = NULL;
 volatile GNSSData gnssData = {0};
 SemaphoreHandle_t gnssMutex = NULL;
+SemaphoreHandle_t rtcmRingMutex = NULL; 
+
+uint8_t rtcmRing[RTCM_RING_SIZE];
+volatile size_t ringHead = 0;
+volatile size_t ringTail = 0;
 
 extern WiFiClient ntripClient;
 extern SemaphoreHandle_t ntripClientMutex;
 volatile CorrectionStatus rtcmCorrectionStatus = CORR_NONE;
 unsigned long correctionAge = 0;
-unsigned long lastReceivedRTCM_ms = 0;
+unsigned long lastInjectedRTCM_ms = 0;
 const unsigned long maxTimeBeforeHangup_ms = 10000UL;
 
 static char lastGGA[128] = {0};
 static bool systemTimeSet = false;
+
+volatile int lastAckResult = -1;
 
 // --- Internal SPI helpers ---
 static void ubx_write_packet(const uint8_t* data, size_t len) {
@@ -47,10 +55,14 @@ static void poll_nav_pvt() {
     LOG_DEBUG("NAV-PVT poll sent");
 }
 
-static void send_valset_u8(uint32_t key, uint8_t val) {
+bool send_valset_u8_blocking(uint32_t key, uint8_t val) {
+    // Build VALSET packet
     uint8_t payload[11] = {
-        0x00, 0x00, 0x07, 0x00, 0x00, 0x00,  // <- enable RAM | BBR | FLASH    
-        (uint8_t)(key), (uint8_t)(key >> 8), (uint8_t)(key >> 16), (uint8_t)(key >> 24), val
+        //0x00, 0x00, 0x07, 0x00, 0x00, 0x00, // RAM | BBR | FLASH
+        0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  // RAM only
+        (uint8_t)(key), (uint8_t)(key >> 8),
+        (uint8_t)(key >> 16), (uint8_t)(key >> 24),
+        val
     };
     uint8_t packet[8 + sizeof(payload)];
     packet[0] = 0xB5; packet[1] = 0x62;
@@ -67,12 +79,34 @@ static void send_valset_u8(uint32_t key, uint8_t val) {
     packet[sizeof(packet) - 2] = ck_a;
     packet[sizeof(packet) - 1] = ck_b;
 
+    // Clear previous ACK state
+    extern volatile int lastAckResult;
+    lastAckResult = -1;
+
+    // Send packet
     ubx_write_packet(packet, sizeof(packet));
-    LOG_DEBUG("VALSET sent, key: 0x%08lX val: %d", key, val);
+
+    // Wait for ACK response
+    unsigned long start = millis();
+    while (lastAckResult == -1 && millis() - start < 200) {
+        processGNSSInput(); // poll for ACK
+    }
+
+    if (lastAckResult == 1) {
+        LOG_DEBUG("VALSET 0x%08lX accepted (ACK)", key);
+        return true;
+    } else if (lastAckResult == 0) {
+        LOG_ERROR("VALSET 0x%08lX rejected (NAK)", key);
+        return false;
+    } else {
+        LOG_ERROR("VALSET 0x%08lX timed out (no ACK)", key);
+        return false;
+    }
 }
 
 // --- GNSS Callbacks ---
 static void handlePVT(const UBX_NAV_PVT_data_t* pvt) {
+    unsigned long tCbStart = millis();
     if (xSemaphoreTake(gnssMutex, 0) == pdTRUE) {
         gnssData.latitude = pvt->lat / 1e7;
         gnssData.longitude = pvt->lon / 1e7;
@@ -84,7 +118,8 @@ static void handlePVT(const UBX_NAV_PVT_data_t* pvt) {
         gnssData.newDataAvailable = true;
         gnssData.gnssFixTime = millis();
 
-        LOG_DEBUG("handlePVT() lat: %ld lon: %ld fix: %d", pvt->lat, pvt->lon, pvt->fixType);
+        LOG_DEBUG("handlePVT() lat: %.7f lon: %.7f fix: %d carrSoln: %d", 
+          gnssData.latitude, gnssData.longitude, gnssData.fixType, gnssData.carrSoln);
 
         if (!systemTimeSet && pvt->fixType >= 3) {
             struct tm timeinfo = {0};
@@ -98,10 +133,18 @@ static void handlePVT(const UBX_NAV_PVT_data_t* pvt) {
             struct timeval tv = {.tv_sec = epoch, .tv_usec = 0};
             settimeofday(&tv, NULL);
             systemTimeSet = true;
+            LOG_ERROR("------------------------------------------");
+            LOG_ERROR("GNSS SYS TIME: %04d-%02d-%02d %02d:%02d (UTC)",
+                      pvt->year, pvt->month, pvt->day, pvt->hour, pvt->min);
+            LOG_ERROR("------------------------------------------");
         }
         xSemaphoreGive(gnssMutex);
     }
     generateGGA(pvt, lastGGA, sizeof(lastGGA));
+    unsigned long tCbElapsed = millis() - tCbStart;
+    if (tCbElapsed > 0) {
+        LOG_DEBUG("GNSS checkCallbacks time, %lu", tCbElapsed);
+    }
 }
 
 static void handleACK(uint8_t ack_id) {
@@ -115,83 +158,86 @@ static void handleACK(uint8_t ack_id) {
 // --- Initialization ---
 bool initializeGNSS() {
     LOG_DEBUG("initializeGNSS() start");
+
+    // Configure SPI pins
     pinMode(UBX_CS, OUTPUT);
     digitalWrite(UBX_CS, HIGH);
     pinMode(NAV_RST_PIN, OUTPUT);
     digitalWrite(NAV_RST_PIN, HIGH);
 
+    // Start SPI interface
     LOG_DEBUG("Calling GNSSSPI.begin()");
     GNSSSPI.begin(NAV_SCK_PIN, NAV_MISO_PIN, NAV_MOSI_PIN, UBX_CS);
-    delay(100);
+    delay(500); // Give GNSS module time to stabilize
 
+    // Register UBX callbacks
     ubx_set_pvt_callback(handlePVT);
     ubx_set_ack_callback(handleACK);
 
-    // Configure protocols and message output
-    LOG_DEBUG("Sending VALSET: CFG-SPIOUTPROT-UBX");
-    send_valset_u8(0x10540001, 1); // CFG-SPIOUTPROT-UBX
-    LOG_DEBUG("Sending poll_nav_pvt() 1");
-    poll_nav_pvt(); // send dummy request after config
-    delay(50);      // wait for a response
-    processGNSSInput(); // manually trigger polling cycle
+    struct {
+        uint32_t key;
+        uint8_t  val;
+        const char* label;
+    } gnssInitConfig[] = {
+        { 0x10540002, 0, "CFG-SPIOUTPROT-NMEA" },
+        { 0x10540001, 1, "CFG-SPIOUTPROT-UBX" },
+        { 0x10740001, 1, "CFG-SPIINPROT-UBX" },
+        { 0x10740004, 1, "CFG-SPIINPROT-RTCM" },
+        { 0x20910007, 1, "CFG-MSGOUT-UBX_NAV_PVT_SPI" },
+        { 0x30210001, 100, "CFG-RATE-MEAS" },
+        { 0x30210002, 1, "CFG-RATE-NAV" }
+    };
+    
+    for (size_t i = 0; i < sizeof(gnssInitConfig) / sizeof(gnssInitConfig[0]); ++i) {
+        const auto& cfg = gnssInitConfig[i];
+        LOG_DEBUG("VALSET: %s -> %d", cfg.label, cfg.val);
+        if (!send_valset_u8_blocking(cfg.key, cfg.val)) {
+            LOG_ERROR("VALSET failed for %s (key 0x%08lX)", cfg.label, cfg.key);
+        } else {
+            LOG_DEBUG("VALSET success: %s", cfg.label);
+        }
+    }    
 
-    send_valset_u8(0x10740001, 1); // CFG-SPIINPROT-UBX
-    LOG_DEBUG("Sending poll_nav_pvt() 2");
-    poll_nav_pvt(); // send dummy request after config
-    delay(50);      // wait for a response
-    processGNSSInput(); // manually trigger polling cycle
+    // Optional: send one poll to confirm early communication
+    LOG_DEBUG("Polling NAV-PVT once to verify GNSS response");
+    poll_nav_pvt();
+    delay(50);
+    processGNSSInput();
 
-    send_valset_u8(0x10740004, 1); // CFG-SPIINPROT-RTCM
-    LOG_DEBUG("Sending poll_nav_pvt() 3");
-    poll_nav_pvt(); // send dummy request after config
-    delay(50);      // wait for a response
-    processGNSSInput(); // manually trigger polling cycle
-
-    send_valset_u8(0x20910007, 1); // CFG-MSGOUT-UBX_NAV_PVT_SPI
-    LOG_DEBUG("Sending poll_nav_pvt() 4");
-    poll_nav_pvt(); // send dummy request after config
-    delay(50);      // wait for a response
-    processGNSSInput(); // manually trigger polling cycle
-
+    LOG_DEBUG("GNSS initialization complete");
     return true;
 }
 
 void processGNSSInput() {
+    LOG_DEBUG("Entering processGNSSInput");
+    unsigned long tStart = millis();
     GNSSSPI.beginTransaction(SPISettings(UBX_SPI_FREQ, MSBFIRST, SPI_MODE0));
     digitalWrite(UBX_CS, LOW);
     delayMicroseconds(1);
 
-    uint8_t buf[64];
-    for (int i = 0; i < 64; ++i) {
+    uint8_t buf[200];
+    for (int i = 0; i < sizeof(buf); ++i) {
         buf[i] = GNSSSPI.transfer(0xFF);
         ubx_parse_byte(buf[i]);
     }
 
     digitalWrite(UBX_CS, HIGH);
     GNSSSPI.endTransaction();
-
-    for (int i = 0; i < 64; i += 8) {
-        LOG_DEBUG("SPI bytes: %02X %02X %02X %02X %02X %02X %02X %02X",
-            buf[i], buf[i+1], buf[i+2], buf[i+3],
-            buf[i+4], buf[i+5], buf[i+6], buf[i+7]);
+    unsigned long tElapsed = millis() - tStart;
+    if (tElapsed > 0) {
+        LOG_DEBUG("GNSS checkUblox time, %lu", tElapsed);
     }
+
+
+    // for (int i = 0; i < 64; i += 8) {
+    //     LOG_DEBUG("SPI bytes: %02X %02X %02X %02X %02X %02X %02X %02X",
+    //         buf[i], buf[i+1], buf[i+2], buf[i+3],
+    //         buf[i+4], buf[i+5], buf[i+6], buf[i+7]);
+    // }
 }
 
-
-// // --- Periodic GNSS byte reader ---
-// void processGNSSInput() {
-//     GNSSSPI.beginTransaction(SPISettings(UBX_SPI_FREQ, MSBFIRST, SPI_MODE0));
-//     digitalWrite(UBX_CS, LOW);
-//     delayMicroseconds(1);
-//     for (int i = 0; i < 200; ++i) {
-//         uint8_t b = GNSSSPI.transfer(0xFF);
-//         ubx_parse_byte(b);
-//     }
-//     digitalWrite(UBX_CS, HIGH);
-//     GNSSSPI.endTransaction();
-// }
-
 bool processRTKConnection() {
+    LOG_DEBUG("Entering processRTKConnection, about to set clientConnected false");
     bool clientConnected = false;
     bool dataAvailable = false;
 
@@ -201,36 +247,42 @@ bool processRTKConnection() {
         if (!dataAvailable)
             xSemaphoreGive(ntripClientMutex);
     }
+    LOG_DEBUG("processRTKConnection: connected=%d, available=%d",
+        clientConnected, dataAvailable);
 
-    if (dataAvailable) {
-        uint8_t rtcmBuf[1024];
-        size_t count = 0;
-        while (ntripClient.available() && count < sizeof(rtcmBuf))
-            rtcmBuf[count++] = ntripClient.read();
+    size_t bytesRead = 0;
 
-        LOG_DEBUG("RTCM bytes read: %u", count);
+    if (dataAvailable && xSemaphoreTake(rtcmRingMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+        while (ntripClient.available()) {
+            uint8_t b = ntripClient.read();
+            size_t nextHead = (ringHead + 1) % RTCM_RING_SIZE;
+            if (nextHead == ringTail) {
+                ringTail = (ringTail + 1) % RTCM_RING_SIZE; // Overwrite oldest
+            }
+            rtcmRing[ringHead] = b;
+            ringHead = nextHead;
+            bytesRead++;
+        }
+
+        xSemaphoreGive(rtcmRingMutex);
         xSemaphoreGive(ntripClientMutex);
+        lastInjectedRTCM_ms = millis();
 
-        if (count > 0) {
-            lastReceivedRTCM_ms = millis();
-            GNSSSPI.beginTransaction(SPISettings(UBX_SPI_FREQ, MSBFIRST, SPI_MODE0));
-            digitalWrite(UBX_CS, LOW);
-            delayMicroseconds(1);
-            for (size_t i = 0; i < count; ++i) GNSSSPI.transfer(rtcmBuf[i]);
-            digitalWrite(UBX_CS, HIGH);
-            GNSSSPI.endTransaction();
+        if (bytesRead > 0) {
+            LOG_DEBUG("RTCM received: %u bytes added to ring buffer", bytesRead);
         }
     }
 
-    correctionAge = millis() - lastReceivedRTCM_ms;
-    if (correctionAge < 5000) rtcmCorrectionStatus = CORR_FRESH;
-    else if (correctionAge < 30000) rtcmCorrectionStatus = CORR_STALE;
-    else rtcmCorrectionStatus = CORR_NONE;
+    // correctionAge = millis() - lastReceivedRTCM_ms;
+    // if (correctionAge < 5000) rtcmCorrectionStatus = CORR_FRESH;
+    // else if (correctionAge < 30000) rtcmCorrectionStatus = CORR_STALE;
+    // else rtcmCorrectionStatus = CORR_NONE;
 
     return clientConnected;
 }
 
 bool connectToNTRIP() {
+    LOG_DEBUG("Entering connectToNTRIP");
     if (xSemaphoreTake(ntripClientMutex, pdMS_TO_TICKS(500)) != pdTRUE)
         return false;
 
@@ -262,8 +314,21 @@ bool connectToNTRIP() {
 
     ntripClient.write(request, strlen(request));
     LOG_DEBUG("Sent NTRIP request to %s:%u", casterHost, casterPort);
+    delay(500);  // Give time for HTTP response
+
+    char response[256] = {0};
+    int idx = 0;
+    while (ntripClient.available() && idx < sizeof(response) - 1) {
+        response[idx++] = ntripClient.read();
+    }
+    response[idx] = '\0';
+    LOG_DEBUG("NTRIP HTTP response:\n%s", response);
 
     xSemaphoreGive(ntripClientMutex);
+
+    LOG_DEBUG("NTRIP socket state: connected=%d, available=%d", 
+        ntripClient.connected(), ntripClient.available());
+
     return true;
 }
 
@@ -273,14 +338,26 @@ void GNSSTask(void *pvParameters) {
     initializeGNSS();
     const TickType_t xFrequency = pdMS_TO_TICKS(1000 / NAV_UPDATE_FREQUENCY);
     TickType_t xLastWakeTime = xTaskGetTickCount();
-
+    LOG_DEBUG("GNSSTask about to enter main loop");
     while (true) {
-        if (!ntripClient.connected()) {
+        LOG_DEBUG("GNSSTask inside main loop");
+        const unsigned long maxCorrectionAgeBeforeReconnect = 1000; 
+        static bool forceReconnect = true;
+
+        if (forceReconnect || correctionAge > maxCorrectionAgeBeforeReconnect) {
+            LOG_DEBUG("NTRIP reconnect triggered (correctionAge = %lu ms)", correctionAge);
             connectToNTRIP();
+            forceReconnect = false;
+        }
+
+        bool gotRTCM = processRTKConnection();
+        if (!gotRTCM) {
+            // could log or increment diagnostics counter here
         }
     
         processGNSSInput();
         processRTKConnection();
+        LOG_DEBUG("GNSSTask stack high water mark: %u", uxTaskGetStackHighWaterMark(NULL));
     
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
@@ -326,6 +403,7 @@ bool generateGGA(const UBX_NAV_PVT_data_t* pvt, char* out, size_t outLen) {
 }
 
 void GGATask(void *pvParameters) {
+    LOG_DEBUG("GGATask Start");
     const TickType_t interval = pdMS_TO_TICKS(1000); // 1 Hz
     TickType_t lastWakeTime = xTaskGetTickCount();
 
@@ -388,3 +466,122 @@ bool encodeBase64(const char* input, char* output, size_t outputSize) {
     return (ret == 0);
 }
 
+void RTCMInjectionTask(void *pvParameters) {
+    LOG_DEBUG("RTCMInjectionTask start");
+    const TickType_t interval = pdMS_TO_TICKS(500);
+    TickType_t lastWake = xTaskGetTickCount();
+
+    uint8_t chunk[256];
+
+    while (true) {
+        
+        LOG_DEBUG("RTCMInjectionTask: ringHead=%u, ringTail=%u", ringHead, ringTail);
+        size_t count = 0;
+
+        if (xSemaphoreTake(rtcmRingMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+            while (ringTail != ringHead && count < sizeof(chunk)) {
+                chunk[count++] = rtcmRing[ringTail];
+                ringTail = (ringTail + 1) % RTCM_RING_SIZE;
+            }
+            xSemaphoreGive(rtcmRingMutex);
+        }
+
+        if (count > 0) {
+            LOG_DEBUG("Injecting RTCM chunk (%u bytes)", count);
+            unsigned long tPushStart = millis();
+            GNSSSPI.beginTransaction(SPISettings(UBX_SPI_FREQ, MSBFIRST, SPI_MODE0));
+            digitalWrite(UBX_CS, LOW);
+            delayMicroseconds(1);
+            for (size_t i = 0; i < count; ++i)
+                GNSSSPI.transfer(chunk[i]);
+            digitalWrite(UBX_CS, HIGH);
+            unsigned long tPushElapsed = millis() - tPushStart;
+            if (tPushElapsed > 0) {
+                LOG_DEBUG("pushRawData time, %lu", tPushElapsed);
+            }
+            GNSSSPI.endTransaction();
+            lastInjectedRTCM_ms = millis(); // rename if you want
+        }
+        correctionAge = millis() - lastInjectedRTCM_ms;    
+        if (correctionAge < 5000) rtcmCorrectionStatus = CORR_FRESH;
+        else if (correctionAge < 30000) rtcmCorrectionStatus = CORR_STALE;
+        else rtcmCorrectionStatus = CORR_NONE;
+        vTaskDelayUntil(&lastWake, interval);
+    }
+}
+
+bool get_val_u8(uint32_t key, uint8_t* out) {
+    if (!out) return false;
+
+    // Build VALGET packet
+    uint8_t payload[8] = {
+        0x00, 0x00, 0x00, 0x00, // Layers: RAM only (0x00000000)
+        (uint8_t)(key), (uint8_t)(key >> 8),
+        (uint8_t)(key >> 16), (uint8_t)(key >> 24)
+    };
+
+    uint8_t packet[8 + sizeof(payload)];
+    packet[0] = 0xB5; packet[1] = 0x62;
+    packet[2] = 0x06; packet[3] = 0x8B; // VALGET
+    packet[4] = sizeof(payload) & 0xFF;
+    packet[5] = (sizeof(payload) >> 8) & 0xFF;
+    memcpy(&packet[6], payload, sizeof(payload));
+
+    uint8_t ck_a = 0, ck_b = 0;
+    for (size_t i = 2; i < sizeof(packet) - 2; ++i) {
+        ck_a += packet[i];
+        ck_b += ck_a;
+    }
+    packet[sizeof(packet) - 2] = ck_a;
+    packet[sizeof(packet) - 1] = ck_b;
+
+    // Send the VALGET packet
+    ubx_write_packet(packet, sizeof(packet));
+
+    // Read response into buffer
+    uint8_t response[64];
+    size_t len = 0;
+    unsigned long start = millis();
+    bool found = false;
+
+    while (millis() - start < 200 && !found) {
+        GNSSSPI.beginTransaction(SPISettings(UBX_SPI_FREQ, MSBFIRST, SPI_MODE0));
+        digitalWrite(UBX_CS, LOW);
+        delayMicroseconds(1);
+        for (int i = 0; i < 64; ++i) {
+            if (len < sizeof(response)) {
+                response[len++] = GNSSSPI.transfer(0xFF);
+            }
+        }
+        digitalWrite(UBX_CS, HIGH);
+        GNSSSPI.endTransaction();
+
+        // Search for key match + value
+        for (size_t i = 0; i + 4 < len; ++i) {
+            if (response[i] == (uint8_t)(key) &&
+                response[i + 1] == (uint8_t)(key >> 8) &&
+                response[i + 2] == (uint8_t)(key >> 16) &&
+                response[i + 3] == (uint8_t)(key >> 24)) {
+
+                *out = response[i + 4];
+                LOG_DEBUG("VALGET 0x%08lX = %d", key, *out);
+                found = true;
+                break;
+            }
+        }
+    }
+    // Debug: Dump the raw SPI response bytes
+    if (!found) {
+        LOG_DEBUG("VALGET raw response (%u bytes):", len);
+        char hexLine[3 * 16 + 1] = {0};
+        for (size_t i = 0; i < len; ++i) {
+            sprintf(&hexLine[(i % 16) * 3], "%02X ", response[i]);
+            if ((i + 1) % 16 == 0 || i == len - 1) {
+                LOG_DEBUG("%s", hexLine);
+                memset(hexLine, 0, sizeof(hexLine));
+            }
+        }
+    }
+
+    return found;
+}

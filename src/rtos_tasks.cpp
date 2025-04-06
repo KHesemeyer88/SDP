@@ -51,6 +51,11 @@ void initRTOS() {
         handleSystemError("Failed to create ntripClient mutex", true);
         return;
     }
+
+    rtcmRingMutex = xSemaphoreCreateMutex();
+    if (rtcmRingMutex == NULL) {
+        handleSystemError("Failed to create RTCM ring buffer mutex", true);
+    }
     
     // Create command queue
     commandQueue = xQueueCreate(10, sizeof(ControlCommand));
@@ -170,6 +175,21 @@ void initRTOS() {
     
     if (xReturnedGGA != pdPASS) {
         handleSystemError("Failed to create GGATask", true);
+        return;
+    }    
+
+    BaseType_t xReturnedRTCM = xTaskCreatePinnedToCore(
+        RTCMInjectionTask,
+        "RTCMInject",
+        2048,
+        NULL,
+        GNSS_TASK_PRIORITY, // same as GNSS task
+        NULL,
+        1
+    );
+    
+    if (xReturnedRTCM != pdPASS) {
+        handleSystemError("Failed to create RTCMInjectionTask", true);
         return;
     }    
 
