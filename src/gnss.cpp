@@ -30,11 +30,13 @@ static bool systemTimeSet = false;
 // --- Internal SPI helpers ---
 static void ubx_write_packet(const uint8_t* data, size_t len) {
     GNSSSPI.beginTransaction(SPISettings(UBX_SPI_FREQ, MSBFIRST, SPI_MODE0));
+    LOG_DEBUG("CS LOW, starting SPI write");
     digitalWrite(UBX_CS, LOW);
     delayMicroseconds(1);
     for (size_t i = 0; i < len; ++i)
         GNSSSPI.transfer(data[i]);
     digitalWrite(UBX_CS, HIGH);
+    LOG_DEBUG("SPI write complete, CS HIGH");
     GNSSSPI.endTransaction();
 }
 
@@ -46,7 +48,7 @@ static void poll_nav_pvt() {
 
 static void send_valset_u8(uint32_t key, uint8_t val) {
     uint8_t payload[11] = {
-        0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x07, 0x00, 0x00, 0x00,  // <- enable RAM | BBR | FLASH    
         (uint8_t)(key), (uint8_t)(key >> 8), (uint8_t)(key >> 16), (uint8_t)(key >> 24), val
     };
     uint8_t packet[8 + sizeof(payload)];
@@ -102,7 +104,11 @@ static void handlePVT(const UBX_NAV_PVT_data_t* pvt) {
 }
 
 static void handleACK(uint8_t ack_id) {
-    LOG_DEBUG("UBX ACK %s", ack_id == 0x01 ? "ACK" : "NAK");
+    if (ack_id == 0x01) {
+        LOG_DEBUG("Received UBX-ACK-ACK");
+    } else {
+        LOG_ERROR("Received UBX-ACK-NAK");
+    }
 }
 
 // --- Initialization ---
@@ -113,6 +119,7 @@ bool initializeGNSS() {
     pinMode(NAV_RST_PIN, OUTPUT);
     digitalWrite(NAV_RST_PIN, HIGH);
 
+    LOG_DEBUG("Calling GNSSSPI.begin()");
     GNSSSPI.begin(NAV_SCK_PIN, NAV_MISO_PIN, NAV_MOSI_PIN, UBX_CS);
     delay(100);
 
@@ -120,26 +127,68 @@ bool initializeGNSS() {
     ubx_set_ack_callback(handleACK);
 
     // Configure protocols and message output
+    LOG_DEBUG("Sending VALSET: CFG-SPIOUTPROT-UBX");
     send_valset_u8(0x10540001, 1); // CFG-SPIOUTPROT-UBX
+    LOG_DEBUG("Sending poll_nav_pvt() 1");
+    poll_nav_pvt(); // send dummy request after config
+    delay(50);      // wait for a response
+    processGNSSInput(); // manually trigger polling cycle
+
     send_valset_u8(0x10740001, 1); // CFG-SPIINPROT-UBX
+    LOG_DEBUG("Sending poll_nav_pvt() 2");
+    poll_nav_pvt(); // send dummy request after config
+    delay(50);      // wait for a response
+    processGNSSInput(); // manually trigger polling cycle
+
     send_valset_u8(0x10740004, 1); // CFG-SPIINPROT-RTCM
+    LOG_DEBUG("Sending poll_nav_pvt() 3");
+    poll_nav_pvt(); // send dummy request after config
+    delay(50);      // wait for a response
+    processGNSSInput(); // manually trigger polling cycle
+
     send_valset_u8(0x20910007, 1); // CFG-MSGOUT-UBX_NAV_PVT_SPI
+    LOG_DEBUG("Sending poll_nav_pvt() 4");
+    poll_nav_pvt(); // send dummy request after config
+    delay(50);      // wait for a response
+    processGNSSInput(); // manually trigger polling cycle
 
     return true;
 }
 
-// --- Periodic GNSS byte reader ---
 void processGNSSInput() {
     GNSSSPI.beginTransaction(SPISettings(UBX_SPI_FREQ, MSBFIRST, SPI_MODE0));
     digitalWrite(UBX_CS, LOW);
     delayMicroseconds(1);
-    for (int i = 0; i < 200; ++i) {
-        uint8_t b = GNSSSPI.transfer(0xFF);
-        ubx_parse_byte(b);
+
+    uint8_t buf[64];
+    for (int i = 0; i < 64; ++i) {
+        buf[i] = GNSSSPI.transfer(0xFF);
+        ubx_parse_byte(buf[i]);
     }
+
     digitalWrite(UBX_CS, HIGH);
     GNSSSPI.endTransaction();
+
+    for (int i = 0; i < 64; i += 8) {
+        LOG_DEBUG("SPI bytes: %02X %02X %02X %02X %02X %02X %02X %02X",
+            buf[i], buf[i+1], buf[i+2], buf[i+3],
+            buf[i+4], buf[i+5], buf[i+6], buf[i+7]);
+    }
 }
+
+
+// // --- Periodic GNSS byte reader ---
+// void processGNSSInput() {
+//     GNSSSPI.beginTransaction(SPISettings(UBX_SPI_FREQ, MSBFIRST, SPI_MODE0));
+//     digitalWrite(UBX_CS, LOW);
+//     delayMicroseconds(1);
+//     for (int i = 0; i < 200; ++i) {
+//         uint8_t b = GNSSSPI.transfer(0xFF);
+//         ubx_parse_byte(b);
+//     }
+//     digitalWrite(UBX_CS, HIGH);
+//     GNSSSPI.endTransaction();
+// }
 
 bool processRTKConnection() {
     bool clientConnected = false;
@@ -184,6 +233,7 @@ bool processRTKConnection() {
 // --- FreeRTOS task ---
 void GNSSTask(void *pvParameters) {
     LOG_DEBUG("GNSSTask started");
+    initializeGNSS();
     const TickType_t xFrequency = pdMS_TO_TICKS(1000 / NAV_UPDATE_FREQUENCY);
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
