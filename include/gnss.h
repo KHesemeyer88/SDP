@@ -1,4 +1,4 @@
-// gnss.h - rewritten to match custom UBX parser architecture
+// gnss.h - updated for full integration with ubx_parser
 #pragma once
 
 #include <stdint.h>
@@ -6,6 +6,7 @@
 #include "config.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "ubx_parser.h"  // provides UBX_NAV_PVT_data_t
 
 // Shared GNSS data structure
 typedef struct {
@@ -27,6 +28,7 @@ extern TaskHandle_t gnssTaskHandle;
 extern SemaphoreHandle_t gnssMutex;
 extern volatile GNSSData gnssData;
 extern volatile CorrectionStatus rtcmCorrectionStatus;
+extern unsigned long correctionAge;
 
 // Setup GNSS hardware and parser
 bool initializeGNSS();
@@ -47,4 +49,4 @@ void GNSSTask(void *pvParameters);
 }
 #endif
 
-extern unsigned long correctionAge;
+bool generateGGA(const UBX_NAV_PVT_data_t* pvt, char* out, size_t outLen);
