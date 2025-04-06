@@ -65,6 +65,7 @@ struct ControlCommand {
 // Task handles
 extern TaskHandle_t controlTaskHandle;
 extern TaskHandle_t websocketTaskHandle;
+extern TaskHandle_t ggaTaskHandle;
 
 // Mutex for accessing shared resources
 extern SemaphoreHandle_t servoMutex;

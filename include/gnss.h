@@ -50,3 +50,5 @@ void GNSSTask(void *pvParameters);
 #endif
 
 bool generateGGA(const UBX_NAV_PVT_data_t* pvt, char* out, size_t outLen);
+void GGATask(void *pvParameters);
+bool encodeBase64(const char* input, char* output, size_t outputSize);

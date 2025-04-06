@@ -8,6 +8,7 @@
 #include <sys/time.h>
 #include <stdio.h>
 #include <string.h>
+#include "mbedtls/base64.h"
 
 #define UBX_CS NAV_CS_PIN
 #define UBX_SPI_FREQ NAV_SPI_FREQUENCY
@@ -215,7 +216,6 @@ bool processRTKConnection() {
             GNSSSPI.beginTransaction(SPISettings(UBX_SPI_FREQ, MSBFIRST, SPI_MODE0));
             digitalWrite(UBX_CS, LOW);
             delayMicroseconds(1);
-            for (const char* p = lastGGA; *p; ++p) GNSSSPI.transfer(*p);
             for (size_t i = 0; i < count; ++i) GNSSSPI.transfer(rtcmBuf[i]);
             digitalWrite(UBX_CS, HIGH);
             GNSSSPI.endTransaction();
@@ -230,6 +230,43 @@ bool processRTKConnection() {
     return clientConnected;
 }
 
+bool connectToNTRIP() {
+    if (xSemaphoreTake(ntripClientMutex, pdMS_TO_TICKS(500)) != pdTRUE)
+        return false;
+
+    if (ntripClient.connected()) {
+        xSemaphoreGive(ntripClientMutex);
+        return true;
+    }
+
+    if (!ntripClient.connect(casterHost, casterPort)) {
+        LOG_ERROR("Failed to connect to caster");
+        xSemaphoreGive(ntripClientMutex);
+        return false;
+    }
+
+    char auth[128], encoded[200];
+    snprintf(auth, sizeof(auth), "%s:%s", casterUser, casterUserPW);
+    encodeBase64(auth, encoded, sizeof(encoded));
+
+    char request[512];
+    snprintf(request, sizeof(request),
+        "GET /%s HTTP/1.0\r\n"
+        "User-Agent: NTRIP u-blox Client\r\n"
+        "Accept: */*\r\n"
+        "Connection: close\r\n"
+        "Authorization: Basic %s\r\n"
+        "\r\n",
+        mountPoint, encoded
+    );
+
+    ntripClient.write(request, strlen(request));
+    LOG_DEBUG("Sent NTRIP request to %s:%u", casterHost, casterPort);
+
+    xSemaphoreGive(ntripClientMutex);
+    return true;
+}
+
 // --- FreeRTOS task ---
 void GNSSTask(void *pvParameters) {
     LOG_DEBUG("GNSSTask started");
@@ -238,10 +275,16 @@ void GNSSTask(void *pvParameters) {
     TickType_t xLastWakeTime = xTaskGetTickCount();
 
     while (true) {
+        if (!ntripClient.connected()) {
+            connectToNTRIP();
+        }
+    
         processGNSSInput();
         processRTKConnection();
+    
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
+    
 }
 
 // --- GGA generation ---
@@ -271,5 +314,77 @@ bool generateGGA(const UBX_NAV_PVT_data_t* pvt, char* out, size_t outLen) {
     char cs[6];
     snprintf(cs, sizeof(cs), "*%02X\r\n", checksum);
     strncat(out, cs, outLen - strlen(out) - 1);
+
+    static unsigned long lastLogTime = 0;
+    unsigned long now = millis();
+    if (now - lastLogTime > 3000) {
+        LOG_DEBUG("generateGGA(): %s", out);
+        lastLogTime = now;
+    }
+
     return true;
 }
+
+void GGATask(void *pvParameters) {
+    const TickType_t interval = pdMS_TO_TICKS(1000); // 1 Hz
+    TickType_t lastWakeTime = xTaskGetTickCount();
+
+    while (true) {
+        UBX_NAV_PVT_data_t currentPVT;
+
+        if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            // Copy last known fix into a local PVT
+            currentPVT.lat = gnssData.latitude * 1e7;
+            currentPVT.lon = gnssData.longitude * 1e7;
+            currentPVT.fixType = gnssData.fixType;
+            currentPVT.hAcc = gnssData.hAcc * 10;
+            currentPVT.hMSL = gnssData.latitude != 0 ? 100000 : 0; // Default fake value for altitude
+            currentPVT.flags = (gnssData.carrSoln & 0x03) << 6;
+            currentPVT.hour = 12;  // dummy
+            currentPVT.min = 0;
+            currentPVT.sec = 0;
+            currentPVT.numSV = 10;
+            xSemaphoreGive(gnssMutex);
+        } else {
+            vTaskDelay(interval);
+            continue;
+        }
+
+        // Generate GGA string
+        char gga[128];
+        if (generateGGA(&currentPVT, gga, sizeof(gga))) {
+            LOG_DEBUG("GGA Task: %s", gga);
+            GNSSSPI.beginTransaction(SPISettings(UBX_SPI_FREQ, MSBFIRST, SPI_MODE0));
+            digitalWrite(UBX_CS, LOW);
+            delayMicroseconds(1);
+            for (const char* p = gga; *p; ++p)
+                GNSSSPI.transfer(*p);
+            digitalWrite(UBX_CS, HIGH);
+            GNSSSPI.endTransaction();
+
+            // Also forward GGA to the NTRIP caster
+            if (xSemaphoreTake(ntripClientMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+                if (ntripClient.connected()) {
+                    ntripClient.print(gga);
+                    LOG_DEBUG("GGA forwarded to caster: %s", gga);
+                }
+                xSemaphoreGive(ntripClientMutex);
+            }
+
+        }
+
+        vTaskDelayUntil(&lastWakeTime, interval);
+    }
+}
+
+bool encodeBase64(const char* input, char* output, size_t outputSize) {
+    size_t olen = 0;
+    int ret = mbedtls_base64_encode(
+        (unsigned char*)output, outputSize,
+        &olen,
+        (const unsigned char*)input,
+        strlen(input)
+    );
+    return (ret == 0);
+}
+

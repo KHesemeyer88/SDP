@@ -11,6 +11,7 @@
 TaskHandle_t controlTaskHandle = NULL;
 TaskHandle_t websocketTaskHandle = NULL;
 TaskHandle_t httpServerTaskHandle = NULL;
+TaskHandle_t ggaTaskHandle = NULL;
 
 // Mutex for accessing shared resources
 SemaphoreHandle_t servoMutex = NULL;
@@ -156,6 +157,21 @@ void initRTOS() {
         handleSystemError("Failed to create NavigationTask", true);
         return;
     }
+
+    BaseType_t xReturnedGGA = xTaskCreatePinnedToCore(
+        GGATask,
+        "GGATask",
+        2048,        // 2KB stack should be plenty
+        NULL,
+        GNSS_TASK_PRIORITY,           // same as GNSS
+        &ggaTaskHandle,
+        1            // Pin to core 1 to stay with GNSS-related tasks
+    );
+    
+    if (xReturnedGGA != pdPASS) {
+        handleSystemError("Failed to create GGATask", true);
+        return;
+    }    
 
     //Create the logging task
     Serial.printf("logQueue address: %p\n", logQueue);
