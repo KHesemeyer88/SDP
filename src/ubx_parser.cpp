@@ -1,6 +1,7 @@
 #include "ubx_parser.h"
 #include <string.h>
 #include <stdint.h>
+#include "logging.h"
 
 #define UBX_SYNC1 0xB5
 #define UBX_SYNC2 0x62
@@ -148,6 +149,13 @@ ubx_result_t ubx_parse_byte(uint8_t byte) {
                         result.key = payload[0] | (payload[1] << 8) | (payload[2] << 16) | (payload[3] << 24);
                         result.val = payload[4];
                         result.valid = true;
+                        LOG_ERROR("VALGET response received, payload_len=%d", payload_len);
+                        for (int i = 0; i < payload_len && i < 32; i += 8) {
+                            LOG_ERROR("VALGET bytes: %02X %02X %02X %02X %02X %02X %02X %02X",
+                                payload[i], payload[i+1], payload[i+2], payload[i+3],
+                                payload[i+4], payload[i+5], payload[i+6], payload[i+7]);
+                        }
+
                         valget_callback(&result);
                         reset_parser();
                         return UBX_RESULT_VALGET_READY;

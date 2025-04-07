@@ -128,6 +128,52 @@ bool send_valset_u8_blocking(uint32_t key, uint8_t val) {
     }
 }
 
+bool send_valset_u16_blocking(uint32_t key, uint16_t val) {
+    lastAckResult = -1;
+
+    uint8_t payload[12] = {
+        0x00, 0x00, 0x03, 0x00, 0x00, 0x00,  // version, layers (RAM+BBR), reserved
+        (uint8_t)(key), (uint8_t)(key >> 8),
+        (uint8_t)(key >> 16), (uint8_t)(key >> 24),
+        (uint8_t)(val), (uint8_t)(val >> 8)  // low byte, high byte
+    };
+
+    uint8_t packet[8 + sizeof(payload)];
+    packet[0] = 0xB5; packet[1] = 0x62;
+    packet[2] = 0x06; packet[3] = 0x8A;  // VALSET
+    packet[4] = sizeof(payload) & 0xFF;
+    packet[5] = (sizeof(payload) >> 8) & 0xFF;
+    memcpy(&packet[6], payload, sizeof(payload));
+
+    uint8_t ck_a = 0, ck_b = 0;
+    for (size_t i = 2; i < sizeof(packet) - 2; ++i) {
+        ck_a += packet[i];
+        ck_b += ck_a;
+    }
+    packet[sizeof(packet) - 2] = ck_a;
+    packet[sizeof(packet) - 1] = ck_b;
+
+    ubx_write_packet(packet, sizeof(packet));
+
+    unsigned long start = millis();
+    while (millis() - start < 200) {
+        processGNSSInput();
+        if (lastAckResult != -1) break;
+        delay(5);
+    }
+
+    if (lastAckResult == 1) {
+        LOG_DEBUG("VALSET 0x%08lX accepted (ACK)", key);
+        return true;
+    } else if (lastAckResult == 0) {
+        LOG_ERROR("VALSET 0x%08lX rejected (NAK)", key);
+        return false;
+    } else {
+        LOG_ERROR("VALSET 0x%08lX timed out (no ACK)", key);
+        return false;
+    }
+}
+
 // --- GNSS Callbacks ---
 static void handlePVT(const UBX_NAV_PVT_data_t* pvt) {
     unsigned long tCbStart = millis();
@@ -195,7 +241,18 @@ bool initializeGNSS() {
     // Start SPI interface
     LOG_DEBUG("Calling GNSSSPI.begin()");
     GNSSSPI.begin(NAV_SCK_PIN, NAV_MISO_PIN, NAV_MOSI_PIN, UBX_CS);
-    delay(3000); // Give GNSS module time to stabilize
+    LOG_ERROR("Waiting for first fix before sending VALSET...");
+
+    unsigned long start = millis();
+    while (millis() - start < 10000) {
+        processGNSSInput();
+        if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            bool ready = gnssData.fixType >= 3;
+            xSemaphoreGive(gnssMutex);
+            if (ready) break;
+        }
+        delay(100);
+    }    
 
     // Register UBX callbacks
     ubx_set_pvt_callback(handlePVT);
@@ -216,14 +273,9 @@ bool initializeGNSS() {
     // LOG_ERROR("Readback: 0x%02X", val);
 
     //TEST:
-    send_valset_u8_blocking(0x10540001, 1);  // CFG-SPIOUTPROT-UBX
-    vTaskDelay(pdMS_TO_TICKS(20));
-    uint8_t val = 0xFF;
-    if (get_val_u8(0x10540001, &val)) {
-        LOG_ERROR("VALGET readback: 0x%02X", val);
-    } else {
-        LOG_ERROR("VALGET failed for CFG-SPIOUTPROT-UBX");
-    }
+    send_valset_u16_blocking(0x30210001, 100);  // MEAS = 100 ms
+    send_valset_u8_blocking(0x30210002, 1);     // NAV = every 1 cycle
+
 
     struct {
         uint32_t key;
@@ -271,12 +323,6 @@ bool initializeGNSS() {
             LOG_ERROR("VALGET FAILED for %s (0x%08lX)", item.label, item.key);
         }
     }
-    
-    // Optional: send one poll to confirm early communication
-    LOG_DEBUG("Polling NAV-PVT once to verify GNSS response");
-    poll_nav_pvt();
-    delay(50);
-    processGNSSInput();
 
     LOG_DEBUG("GNSS initialization complete");
     return true;
@@ -657,3 +703,8 @@ void send_valget_u8(uint32_t key) {
     ubx_write_packet(packet, sizeof(packet));
 }
 
+// Function to poll UBX-MON-VER
+static void poll_mon_ver() {
+    const uint8_t cmd[] = {0xB5, 0x62, 0x0A, 0x04, 0x00, 0x00, 0x0E, 0x34};
+    ubx_write_packet(cmd, sizeof(cmd));
+}

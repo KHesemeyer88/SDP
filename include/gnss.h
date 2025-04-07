@@ -45,10 +45,6 @@ extern "C" {
 
 void GNSSTask(void *pvParameters);
 
-#ifdef __cplusplus
-}
-#endif
-
 bool generateGGA(const UBX_NAV_PVT_data_t* pvt, char* out, size_t outLen);
 void GGATask(void *pvParameters);
 bool encodeBase64(const char* input, char* output, size_t outputSize);
@@ -64,3 +60,7 @@ bool get_val_u8(uint32_t key, uint8_t* out);
 
 extern SemaphoreHandle_t gnssSpiMutex;
 extern void send_valget_u8(uint32_t key);
+
+#ifdef __cplusplus
+}
+#endif
