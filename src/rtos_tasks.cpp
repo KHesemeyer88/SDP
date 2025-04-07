@@ -156,7 +156,7 @@ void initRTOS() {
         NULL,
         NAV_TASK_PRIORITY,
         &navTaskHandle,
-        1  // Pin to Core 1
+        0
     );
     
     if (xReturnedNav != pdPASS) {
