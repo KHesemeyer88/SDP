@@ -167,43 +167,73 @@ bool initializeGNSS() {
     // Start SPI interface
     LOG_DEBUG("Calling GNSSSPI.begin()");
     GNSSSPI.begin(NAV_SCK_PIN, NAV_MISO_PIN, NAV_MOSI_PIN, UBX_CS);
-    delay(100); // Give GNSS module time to stabilize
+    delay(50); // Give GNSS module time to stabilize
 
     // Register UBX callbacks
     ubx_set_pvt_callback(handlePVT);
     ubx_set_ack_callback(handleACK);
 
-    delay(100);
-    send_valset_u8_blocking(0x10540001, 1);  // CFG-SPIOUTPROT-UBX
-    delay(100);
-    uint8_t val;
-    get_val_u8(0x10540001, &val);
-    LOG_ERROR("Post-VALSET readback: 0x%02X", val);
+    delay(50);
+    // send_valset_u8_blocking(0x107A0001, 1); // known to work from u-center
+    // delay(50);
 
-    // struct {
-    //     uint32_t key;
-    //     uint8_t  val;
-    //     const char* label;
-    // } gnssInitConfig[] = {
-    //     { 0x10540002, 0, "CFG-SPIOUTPROT-NMEA" },
-    //     { 0x10540001, 1, "CFG-SPIOUTPROT-UBX" },
-    //     { 0x10740001, 1, "CFG-SPIINPROT-UBX" },
-    //     { 0x10740004, 1, "CFG-SPIINPROT-RTCM" },
-    //     { 0x20910007, 1, "CFG-MSGOUT-UBX_NAV_PVT_SPI" },
-    //     { 0x30210001, 100, "CFG-RATE-MEAS" },
-    //     { 0x30210002, 1, "CFG-RATE-NAV" }
-    // };
+    // //send_valset_u8_blocking(0x10540001, 1);  // CFG-SPIOUTPROT-UBX
+    // // delay(100);
+    // // uint8_t val;
+    // // get_val_u8(0x10540001, &val);
+    // // LOG_ERROR("Post-VALSET readback: 0x%02X", val);
+    // uint8_t val;
+    // get_val_u8(0x107A0001, &val);
+    // LOG_ERROR("Readback: 0x%02X", val);
+
+
+    struct {
+        uint32_t key;
+        uint8_t  val;
+        const char* label;
+    } gnssInitConfig[] = {
+        { 0x10540002, 0, "CFG-SPIOUTPROT-NMEA" },
+        { 0x10540001, 1, "CFG-SPIOUTPROT-UBX" },
+        { 0x10740001, 1, "CFG-SPIINPROT-UBX" },
+        { 0x10740004, 1, "CFG-SPIINPROT-RTCM" },
+        { 0x20910007, 1, "CFG-MSGOUT-UBX_NAV_PVT_SPI" },
+        { 0x30210001, 100, "CFG-RATE-MEAS" },
+        { 0x30210002, 1, "CFG-RATE-NAV" }
+    };
     
-    // for (size_t i = 0; i < sizeof(gnssInitConfig) / sizeof(gnssInitConfig[0]); ++i) {
-    //     const auto& cfg = gnssInitConfig[i];
-    //     LOG_DEBUG("VALSET: %s -> %d", cfg.label, cfg.val);
-    //     if (!send_valset_u8_blocking(cfg.key, cfg.val)) {
-    //         LOG_ERROR("VALSET failed for %s (key 0x%08lX)", cfg.label, cfg.key);
-    //     } else {
-    //         LOG_DEBUG("VALSET success: %s", cfg.label);
-    //     }
-    // }    
-
+    for (size_t i = 0; i < sizeof(gnssInitConfig) / sizeof(gnssInitConfig[0]); ++i) {
+        const auto& cfg = gnssInitConfig[i];
+        LOG_DEBUG("VALSET: %s -> %d", cfg.label, cfg.val);
+        if (!send_valset_u8_blocking(cfg.key, cfg.val)) {
+            LOG_ERROR("VALSET failed for %s (key 0x%08lX)", cfg.label, cfg.key);
+        } else {
+            LOG_DEBUG("VALSET success: %s", cfg.label);
+        }
+    }    
+    
+    struct {
+        uint32_t key;
+        const char* label;
+    } gnssReadbackKeys[] = {
+        { 0x10540002, "CFG-SPIOUTPROT-NMEA" },
+        { 0x10540001, "CFG-SPIOUTPROT-UBX" },
+        { 0x10740001, "CFG-SPIINPROT-UBX" },
+        { 0x10740004, "CFG-SPIINPROT-RTCM" },
+        { 0x20910007, "CFG-MSGOUT-UBX_NAV_PVT_SPI" },
+        { 0x30210001, "CFG-RATE-MEAS" },
+        { 0x30210002, "CFG-RATE-NAV" }
+    };
+    
+    for (size_t i = 0; i < sizeof(gnssReadbackKeys) / sizeof(gnssReadbackKeys[0]); ++i) {
+        const auto& item = gnssReadbackKeys[i];
+        uint8_t val;
+        if (get_val_u8(item.key, &val)) {
+            LOG_ERROR("VALGET %s (0x%08lX): 0x%02X", item.label, item.key, val);
+        } else {
+            LOG_ERROR("VALGET FAILED for %s (0x%08lX)", item.label, item.key);
+        }
+    }
+    
     // Optional: send one poll to confirm early communication
     LOG_DEBUG("Polling NAV-PVT once to verify GNSS response");
     poll_nav_pvt();
@@ -521,7 +551,7 @@ bool get_val_u8(uint32_t key, uint8_t* out) {
 
     // Build VALGET packet
     uint8_t payload[8] = {
-        0x00, 0x00, 0x01, 0x00,  // BBR and Flash
+        0x00, 0x00, 0x07, 0x00,
         (uint8_t)(key), (uint8_t)(key >> 8),
         (uint8_t)(key >> 16), (uint8_t)(key >> 24)
     };    
@@ -570,20 +600,27 @@ bool get_val_u8(uint32_t key, uint8_t* out) {
                 response[i + 3] == (uint8_t)(key >> 24)) {
 
                 *out = response[i + 4];
-                LOG_DEBUG("VALGET 0x%08lX = %d", key, *out);
+                LOG_ERROR("VALGET 0x%08lX = %d", key, *out);
                 found = true;
+
+                LOG_ERROR("VALGET raw response (%u bytes):", len);
+                char hexDump[3 * sizeof(response) + 1] = {0};
+                for (size_t i = 0; i < len; ++i)
+                    sprintf(&hexDump[i * 3], "%02X ", response[i]);
+                    LOG_ERROR("%s", hexDump);
+
                 break;
             }
         }
     }
     // Debug: Dump the raw SPI response bytes
     if (!found) {
-        LOG_DEBUG("VALGET raw response (%u bytes):", len);
+        LOG_ERROR("VALGET raw response (%u bytes):", len);
         char hexLine[3 * 16 + 1] = {0};
         for (size_t i = 0; i < len; ++i) {
             sprintf(&hexLine[(i % 16) * 3], "%02X ", response[i]);
             if ((i + 1) % 16 == 0 || i == len - 1) {
-                LOG_DEBUG("%s", hexLine);
+                LOG_ERROR("%s", hexLine);
                 memset(hexLine, 0, sizeof(hexLine));
             }
         }
