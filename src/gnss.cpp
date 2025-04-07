@@ -210,27 +210,42 @@ bool processRTKConnection() {
         clientConnected, dataAvailable);
 
     size_t bytesRead = 0;
-
-    if (dataAvailable && xSemaphoreTake(rtcmRingMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+    
+    if (dataAvailable && xSemaphoreTake(gnssSpiMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        GNSSSPI.beginTransaction(SPISettings(UBX_SPI_FREQ, MSBFIRST, SPI_MODE0));
+        digitalWrite(UBX_CS, LOW);
+        delayMicroseconds(1);
         while (ntripClient.available()) {
             uint8_t b = ntripClient.read();
-            size_t nextHead = (ringHead + 1) % RTCM_RING_SIZE;
-            if (nextHead == ringTail) {
-                ringTail = (ringTail + 1) % RTCM_RING_SIZE; // Overwrite oldest
-            }
-            rtcmRing[ringHead] = b;
-            ringHead = nextHead;
-            bytesRead++;
+            GNSSSPI.transfer(b);
         }
-
-        xSemaphoreGive(rtcmRingMutex);
+        digitalWrite(UBX_CS, HIGH);
+        GNSSSPI.endTransaction();
+        xSemaphoreGive(gnssSpiMutex);
         xSemaphoreGive(ntripClientMutex);
         lastReceivedRTCM_ms = millis();
-
-        if (bytesRead > 0) {
-            LOG_DEBUG("RTCM received: %u bytes added to ring buffer", bytesRead);
-        }
     }
+    
+    // if (dataAvailable && xSemaphoreTake(rtcmRingMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+    //     while (ntripClient.available()) {
+    //         uint8_t b = ntripClient.read();
+    //         size_t nextHead = (ringHead + 1) % RTCM_RING_SIZE;
+    //         if (nextHead == ringTail) {
+    //             ringTail = (ringTail + 1) % RTCM_RING_SIZE; // Overwrite oldest
+    //         }
+    //         rtcmRing[ringHead] = b;
+    //         ringHead = nextHead;
+    //         bytesRead++;
+    //     }
+
+    //     xSemaphoreGive(rtcmRingMutex);
+    //     xSemaphoreGive(ntripClientMutex);
+    //     lastReceivedRTCM_ms = millis();
+
+    //     if (bytesRead > 0) {
+    //         LOG_DEBUG("RTCM received: %u bytes added to ring buffer", bytesRead);
+    //     }
+    // }
 
     correctionAge = millis() - lastReceivedRTCM_ms;
     if (correctionAge < 5000) rtcmCorrectionStatus = CORR_FRESH;
