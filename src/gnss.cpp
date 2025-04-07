@@ -58,8 +58,7 @@ static void poll_nav_pvt() {
 bool send_valset_u8_blocking(uint32_t key, uint8_t val) {
     // Build VALSET packet
     uint8_t payload[11] = {
-        //0x00, 0x00, 0x07, 0x00, 0x00, 0x00, // RAM | BBR | FLASH
-        0x00, 0x00, 0x01, 0x00, 0x00, 0x00,  // RAM only
+        0x00, 0x00, 0x01, 0x00, 0x00, 0x00, // RAM | BBR | FLASH
         (uint8_t)(key), (uint8_t)(key >> 8),
         (uint8_t)(key >> 16), (uint8_t)(key >> 24),
         val
@@ -143,7 +142,7 @@ static void handlePVT(const UBX_NAV_PVT_data_t* pvt) {
     generateGGA(pvt, lastGGA, sizeof(lastGGA));
     unsigned long tCbElapsed = millis() - tCbStart;
     if (tCbElapsed > 0) {
-        LOG_DEBUG("GNSS checkCallbacks time, %lu", tCbElapsed);
+        LOG_ERROR("GNSS checkCallbacks time, %lu", tCbElapsed);
     }
 }
 
@@ -168,35 +167,42 @@ bool initializeGNSS() {
     // Start SPI interface
     LOG_DEBUG("Calling GNSSSPI.begin()");
     GNSSSPI.begin(NAV_SCK_PIN, NAV_MISO_PIN, NAV_MOSI_PIN, UBX_CS);
-    delay(500); // Give GNSS module time to stabilize
+    delay(100); // Give GNSS module time to stabilize
 
     // Register UBX callbacks
     ubx_set_pvt_callback(handlePVT);
     ubx_set_ack_callback(handleACK);
 
-    struct {
-        uint32_t key;
-        uint8_t  val;
-        const char* label;
-    } gnssInitConfig[] = {
-        { 0x10540002, 0, "CFG-SPIOUTPROT-NMEA" },
-        { 0x10540001, 1, "CFG-SPIOUTPROT-UBX" },
-        { 0x10740001, 1, "CFG-SPIINPROT-UBX" },
-        { 0x10740004, 1, "CFG-SPIINPROT-RTCM" },
-        { 0x20910007, 1, "CFG-MSGOUT-UBX_NAV_PVT_SPI" },
-        { 0x30210001, 100, "CFG-RATE-MEAS" },
-        { 0x30210002, 1, "CFG-RATE-NAV" }
-    };
+    delay(100);
+    send_valset_u8_blocking(0x10540001, 1);  // CFG-SPIOUTPROT-UBX
+    delay(100);
+    uint8_t val;
+    get_val_u8(0x10540001, &val);
+    LOG_ERROR("Post-VALSET readback: 0x%02X", val);
+
+    // struct {
+    //     uint32_t key;
+    //     uint8_t  val;
+    //     const char* label;
+    // } gnssInitConfig[] = {
+    //     { 0x10540002, 0, "CFG-SPIOUTPROT-NMEA" },
+    //     { 0x10540001, 1, "CFG-SPIOUTPROT-UBX" },
+    //     { 0x10740001, 1, "CFG-SPIINPROT-UBX" },
+    //     { 0x10740004, 1, "CFG-SPIINPROT-RTCM" },
+    //     { 0x20910007, 1, "CFG-MSGOUT-UBX_NAV_PVT_SPI" },
+    //     { 0x30210001, 100, "CFG-RATE-MEAS" },
+    //     { 0x30210002, 1, "CFG-RATE-NAV" }
+    // };
     
-    for (size_t i = 0; i < sizeof(gnssInitConfig) / sizeof(gnssInitConfig[0]); ++i) {
-        const auto& cfg = gnssInitConfig[i];
-        LOG_DEBUG("VALSET: %s -> %d", cfg.label, cfg.val);
-        if (!send_valset_u8_blocking(cfg.key, cfg.val)) {
-            LOG_ERROR("VALSET failed for %s (key 0x%08lX)", cfg.label, cfg.key);
-        } else {
-            LOG_DEBUG("VALSET success: %s", cfg.label);
-        }
-    }    
+    // for (size_t i = 0; i < sizeof(gnssInitConfig) / sizeof(gnssInitConfig[0]); ++i) {
+    //     const auto& cfg = gnssInitConfig[i];
+    //     LOG_DEBUG("VALSET: %s -> %d", cfg.label, cfg.val);
+    //     if (!send_valset_u8_blocking(cfg.key, cfg.val)) {
+    //         LOG_ERROR("VALSET failed for %s (key 0x%08lX)", cfg.label, cfg.key);
+    //     } else {
+    //         LOG_DEBUG("VALSET success: %s", cfg.label);
+    //     }
+    // }    
 
     // Optional: send one poll to confirm early communication
     LOG_DEBUG("Polling NAV-PVT once to verify GNSS response");
@@ -225,7 +231,7 @@ void processGNSSInput() {
     GNSSSPI.endTransaction();
     unsigned long tElapsed = millis() - tStart;
     if (tElapsed > 0) {
-        LOG_DEBUG("GNSS checkUblox time, %lu", tElapsed);
+        LOG_ERROR("GNSS checkUblox time, %lu", tElapsed);
     }
 
 
@@ -497,7 +503,7 @@ void RTCMInjectionTask(void *pvParameters) {
             digitalWrite(UBX_CS, HIGH);
             unsigned long tPushElapsed = millis() - tPushStart;
             if (tPushElapsed > 0) {
-                LOG_DEBUG("pushRawData time, %lu", tPushElapsed);
+                LOG_ERROR("pushRawData time, %lu", tPushElapsed);
             }
             GNSSSPI.endTransaction();
             lastInjectedRTCM_ms = millis(); // rename if you want
@@ -515,10 +521,10 @@ bool get_val_u8(uint32_t key, uint8_t* out) {
 
     // Build VALGET packet
     uint8_t payload[8] = {
-        0x00, 0x00, 0x00, 0x00, // Layers: RAM only (0x00000000)
+        0x00, 0x00, 0x01, 0x00,  // BBR and Flash
         (uint8_t)(key), (uint8_t)(key >> 8),
         (uint8_t)(key >> 16), (uint8_t)(key >> 24)
-    };
+    };    
 
     uint8_t packet[8 + sizeof(payload)];
     packet[0] = 0xB5; packet[1] = 0x62;

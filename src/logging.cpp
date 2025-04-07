@@ -8,7 +8,7 @@
 #define LOG_FLUSH_INTERVAL 5000  // 5 seconds
 
 // Global variables
-LogLevel currentLogLevel = LOG_DEBUG; // Default to debug level
+LogLevel currentLogLevel = LOG_ERROR; // Default to debug level
 QueueHandle_t logQueue = NULL;
 TaskHandle_t logTaskHandle = NULL;
 static File logFile;
