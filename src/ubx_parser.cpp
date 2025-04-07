@@ -7,9 +7,6 @@
 #define UBX_SYNC2 0x62
 #define UBX_NAV_PVT_EXPECTED_LEN 92
 
-static ubx_valget_callback_t valget_callback = NULL;
-void ubx_set_valget_callback(ubx_valget_callback_t cb) { valget_callback = cb; }
-
 typedef enum {
     UBX_STATE_SYNC1,
     UBX_STATE_SYNC2,
@@ -138,28 +135,6 @@ ubx_result_t ubx_parse_byte(uint8_t byte) {
                     ack_callback(msg_id); // 0x01 = ACK-ACK, 0x00 = ACK-NAK
                     reset_parser();
                     return UBX_RESULT_ACK;
-                }
-                else if (msg_class == 0x06 && msg_id == 0x8B && valget_callback) {
-                    // We're assuming:
-                    //   - layers = 0x07 (RAM+BBR+Flash)
-                    //   - position = 0
-                    //   - single key (i.e., payload[0..3] = key, payload[4] = val)
-                    if (payload_len >= 5) {
-                        ubx_valget_u8_result_t result;
-                        result.key = payload[0] | (payload[1] << 8) | (payload[2] << 16) | (payload[3] << 24);
-                        result.val = payload[4];
-                        result.valid = true;
-                        LOG_ERROR("VALGET response received, payload_len=%d", payload_len);
-                        for (int i = 0; i < payload_len && i < 32; i += 8) {
-                            LOG_ERROR("VALGET bytes: %02X %02X %02X %02X %02X %02X %02X %02X",
-                                payload[i], payload[i+1], payload[i+2], payload[i+3],
-                                payload[i+4], payload[i+5], payload[i+6], payload[i+7]);
-                        }
-
-                        valget_callback(&result);
-                        reset_parser();
-                        return UBX_RESULT_VALGET_READY;
-                    }
                 }
                 
             } else {

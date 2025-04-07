@@ -36,7 +36,6 @@ typedef enum {
     UBX_RESULT_NONE,
     UBX_RESULT_PVT_READY,
     UBX_RESULT_ACK,
-    UBX_RESULT_VALGET_READY,
     UBX_RESULT_ERROR
 } ubx_result_t;
 
@@ -48,16 +47,6 @@ typedef void (*ubx_ack_callback_t)(uint8_t ack_id);
 void ubx_set_pvt_callback(ubx_pvt_callback_t cb);
 void ubx_set_ack_callback(ubx_ack_callback_t cb);
 ubx_result_t ubx_parse_byte(uint8_t byte);
-
-typedef struct {
-    uint32_t key;
-    uint8_t val;
-    bool valid;
-} ubx_valget_u8_result_t;
-
-typedef void (*ubx_valget_callback_t)(const ubx_valget_u8_result_t*);
-void ubx_set_valget_callback(ubx_valget_callback_t cb);
-
 
 #ifdef __cplusplus
 }

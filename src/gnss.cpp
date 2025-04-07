@@ -17,6 +17,7 @@
 static SPIClass GNSSSPI(HSPI);
 TaskHandle_t gnssTaskHandle = NULL;
 volatile GNSSData gnssData = {0};
+volatile UBX_NAV_PVT_data_t lastValidPVT = {0};
 SemaphoreHandle_t gnssMutex = NULL;
 SemaphoreHandle_t rtcmRingMutex = NULL; 
 
@@ -29,6 +30,7 @@ extern SemaphoreHandle_t ntripClientMutex;
 volatile CorrectionStatus rtcmCorrectionStatus = CORR_NONE;
 unsigned long correctionAge = 0;
 unsigned long lastInjectedRTCM_ms = 0;
+unsigned long lastReceivedRTCM_ms = 0;
 const unsigned long maxTimeBeforeHangup_ms = 10000UL;
 
 static char lastGGA[128] = {0};
@@ -37,20 +39,6 @@ static bool systemTimeSet = false;
 volatile int lastAckResult = -1;
 
 SemaphoreHandle_t gnssSpiMutex = NULL;
-
-static volatile bool valgetReady = false;
-static volatile ubx_valget_u8_result_t lastValget = {0};
-
-void send_valget_u8(uint32_t key);
-
-static void handleVALGET(const ubx_valget_u8_result_t* res) {
-    if (res && res->valid) {
-        lastValget.key = res->key;
-        lastValget.val = res->val;
-        lastValget.valid = res->valid;
-        valgetReady = true;
-    }
-}
 
 // --- Internal SPI helpers ---
 static void ubx_write_packet(const uint8_t* data, size_t len) {
@@ -78,102 +66,6 @@ static void poll_nav_pvt() {
     LOG_DEBUG("NAV-PVT poll sent");
 }
 
-bool send_valset_u8_blocking(uint32_t key, uint8_t val) {
-    lastAckResult = -1;
-    // Build VALSET packet
-    uint8_t payload[11] = {
-        0x00, 0x00, 0x03, 0x00, 0x00, 0x00, // RAM | BBR | FLASH
-        (uint8_t)(key), (uint8_t)(key >> 8),
-        (uint8_t)(key >> 16), (uint8_t)(key >> 24),
-        val
-    };
-    uint8_t packet[8 + sizeof(payload)];
-    packet[0] = 0xB5; packet[1] = 0x62;
-    packet[2] = 0x06; packet[3] = 0x8A;
-    packet[4] = sizeof(payload) & 0xFF;
-    packet[5] = (sizeof(payload) >> 8) & 0xFF;
-    memcpy(&packet[6], payload, sizeof(payload));
-
-    uint8_t ck_a = 0, ck_b = 0;
-    for (size_t i = 2; i < sizeof(packet) - 2; ++i) {
-        ck_a += packet[i];
-        ck_b += ck_a;
-    }
-    packet[sizeof(packet) - 2] = ck_a;
-    packet[sizeof(packet) - 1] = ck_b;
-
-    extern volatile int lastAckResult;
-    lastAckResult = -1;
-
-    // Send packet
-    ubx_write_packet(packet, sizeof(packet));
-
-    // Wait for ACK response
-    unsigned long start = millis();
-    while (millis() - start < 200) {
-        processGNSSInput();
-        if (lastAckResult != -1) break;
-        delay(5);  // Let SPI rest; helps if ACK comes a few ms later
-    }
-
-    if (lastAckResult == 1) {
-        LOG_DEBUG("VALSET 0x%08lX accepted (ACK)", key);
-        return true;
-    } else if (lastAckResult == 0) {
-        LOG_ERROR("VALSET 0x%08lX rejected (NAK)", key);
-        return false;
-    } else {
-        LOG_ERROR("VALSET 0x%08lX timed out (no ACK)", key);
-        return false;
-    }
-}
-
-bool send_valset_u16_blocking(uint32_t key, uint16_t val) {
-    lastAckResult = -1;
-
-    uint8_t payload[12] = {
-        0x00, 0x00, 0x03, 0x00, 0x00, 0x00,  // version, layers (RAM+BBR), reserved
-        (uint8_t)(key), (uint8_t)(key >> 8),
-        (uint8_t)(key >> 16), (uint8_t)(key >> 24),
-        (uint8_t)(val), (uint8_t)(val >> 8)  // low byte, high byte
-    };
-
-    uint8_t packet[8 + sizeof(payload)];
-    packet[0] = 0xB5; packet[1] = 0x62;
-    packet[2] = 0x06; packet[3] = 0x8A;  // VALSET
-    packet[4] = sizeof(payload) & 0xFF;
-    packet[5] = (sizeof(payload) >> 8) & 0xFF;
-    memcpy(&packet[6], payload, sizeof(payload));
-
-    uint8_t ck_a = 0, ck_b = 0;
-    for (size_t i = 2; i < sizeof(packet) - 2; ++i) {
-        ck_a += packet[i];
-        ck_b += ck_a;
-    }
-    packet[sizeof(packet) - 2] = ck_a;
-    packet[sizeof(packet) - 1] = ck_b;
-
-    ubx_write_packet(packet, sizeof(packet));
-
-    unsigned long start = millis();
-    while (millis() - start < 200) {
-        processGNSSInput();
-        if (lastAckResult != -1) break;
-        delay(5);
-    }
-
-    if (lastAckResult == 1) {
-        LOG_DEBUG("VALSET 0x%08lX accepted (ACK)", key);
-        return true;
-    } else if (lastAckResult == 0) {
-        LOG_ERROR("VALSET 0x%08lX rejected (NAK)", key);
-        return false;
-    } else {
-        LOG_ERROR("VALSET 0x%08lX timed out (no ACK)", key);
-        return false;
-    }
-}
-
 // --- GNSS Callbacks ---
 static void handlePVT(const UBX_NAV_PVT_data_t* pvt) {
     unsigned long tCbStart = millis();
@@ -187,6 +79,8 @@ static void handlePVT(const UBX_NAV_PVT_data_t* pvt) {
         gnssData.hAcc = pvt->hAcc / 10.0;
         gnssData.newDataAvailable = true;
         gnssData.gnssFixTime = millis();
+
+        memcpy((void*)&lastValidPVT, (const void*)pvt, sizeof(UBX_NAV_PVT_data_t));
 
         LOG_DEBUG("handlePVT() lat: %.7f lon: %.7f fix: %d carrSoln: %d", 
           gnssData.latitude, gnssData.longitude, gnssData.fixType, gnssData.carrSoln);
@@ -257,72 +151,8 @@ bool initializeGNSS() {
     // Register UBX callbacks
     ubx_set_pvt_callback(handlePVT);
     ubx_set_ack_callback(handleACK);
-    ubx_set_valget_callback(handleVALGET);
 
     delay(50);
-    // send_valset_u8_blocking(0x107A0001, 1); // known to work from u-center
-    // delay(50);
-
-    // //send_valset_u8_blocking(0x10540001, 1);  // CFG-SPIOUTPROT-UBX
-    // // delay(100);
-    // // uint8_t val;
-    // // get_val_u8(0x10540001, &val);
-    // // LOG_ERROR("Post-VALSET readback: 0x%02X", val);
-    // uint8_t val;
-    // get_val_u8(0x107A0001, &val);
-    // LOG_ERROR("Readback: 0x%02X", val);
-
-    //TEST:
-    send_valset_u16_blocking(0x30210001, 100);  // MEAS = 100 ms
-    send_valset_u8_blocking(0x30210002, 1);     // NAV = every 1 cycle
-
-
-    struct {
-        uint32_t key;
-        uint8_t  val;
-        const char* label;
-    } gnssInitConfig[] = {
-        { 0x10540002, 0, "CFG-SPIOUTPROT-NMEA" },
-        { 0x10540001, 1, "CFG-SPIOUTPROT-UBX" },
-        { 0x10740001, 1, "CFG-SPIINPROT-UBX" },
-        { 0x10740004, 1, "CFG-SPIINPROT-RTCM" },
-        { 0x20910007, 1, "CFG-MSGOUT-UBX_NAV_PVT_SPI" },
-        { 0x30210001, 100, "CFG-RATE-MEAS" },
-        { 0x30210002, 1, "CFG-RATE-NAV" }
-    };
-    
-    for (size_t i = 0; i < sizeof(gnssInitConfig) / sizeof(gnssInitConfig[0]); ++i) {
-        const auto& cfg = gnssInitConfig[i];
-        LOG_DEBUG("VALSET: %s -> %d", cfg.label, cfg.val);
-        if (!send_valset_u8_blocking(cfg.key, cfg.val)) {
-            LOG_ERROR("VALSET failed for %s (key 0x%08lX)", cfg.label, cfg.key);
-        } else {
-            LOG_DEBUG("VALSET success: %s", cfg.label);
-        }
-    }    
-    
-    struct {
-        uint32_t key;
-        const char* label;
-    } gnssReadbackKeys[] = {
-        { 0x10540002, "CFG-SPIOUTPROT-NMEA" },
-        { 0x10540001, "CFG-SPIOUTPROT-UBX" },
-        { 0x10740001, "CFG-SPIINPROT-UBX" },
-        { 0x10740004, "CFG-SPIINPROT-RTCM" },
-        { 0x20910007, "CFG-MSGOUT-UBX_NAV_PVT_SPI" },
-        { 0x30210001, "CFG-RATE-MEAS" },
-        { 0x30210002, "CFG-RATE-NAV" }
-    };
-    
-    for (size_t i = 0; i < sizeof(gnssReadbackKeys) / sizeof(gnssReadbackKeys[0]); ++i) {
-        const auto& item = gnssReadbackKeys[i];
-        uint8_t val;
-        if (get_val_u8(item.key, &val)) {
-            LOG_ERROR("VALGET %s (0x%08lX): 0x%02X", item.label, item.key, val);
-        } else {
-            LOG_ERROR("VALGET FAILED for %s (0x%08lX)", item.label, item.key);
-        }
-    }
 
     LOG_DEBUG("GNSS initialization complete");
     return true;
@@ -395,17 +225,17 @@ bool processRTKConnection() {
 
         xSemaphoreGive(rtcmRingMutex);
         xSemaphoreGive(ntripClientMutex);
-        lastInjectedRTCM_ms = millis();
+        lastReceivedRTCM_ms = millis();
 
         if (bytesRead > 0) {
             LOG_DEBUG("RTCM received: %u bytes added to ring buffer", bytesRead);
         }
     }
 
-    // correctionAge = millis() - lastReceivedRTCM_ms;
-    // if (correctionAge < 5000) rtcmCorrectionStatus = CORR_FRESH;
-    // else if (correctionAge < 30000) rtcmCorrectionStatus = CORR_STALE;
-    // else rtcmCorrectionStatus = CORR_NONE;
+    correctionAge = millis() - lastReceivedRTCM_ms;
+    if (correctionAge < 5000) rtcmCorrectionStatus = CORR_FRESH;
+    else if (correctionAge < 30000) rtcmCorrectionStatus = CORR_STALE;
+    else rtcmCorrectionStatus = CORR_NONE;
 
     return clientConnected;
 }
@@ -540,17 +370,7 @@ void GGATask(void *pvParameters) {
         UBX_NAV_PVT_data_t currentPVT;
 
         if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-            // Copy last known fix into a local PVT
-            currentPVT.lat = gnssData.latitude * 1e7;
-            currentPVT.lon = gnssData.longitude * 1e7;
-            currentPVT.fixType = gnssData.fixType;
-            currentPVT.hAcc = gnssData.hAcc * 10;
-            currentPVT.hMSL = gnssData.latitude != 0 ? 100000 : 0; // Default fake value for altitude
-            currentPVT.flags = (gnssData.carrSoln & 0x03) << 6;
-            currentPVT.hour = 12;  // dummy
-            currentPVT.min = 0;
-            currentPVT.sec = 0;
-            currentPVT.numSV = 10;
+            memcpy(&currentPVT, (const void*)&lastValidPVT, sizeof(UBX_NAV_PVT_data_t));
             xSemaphoreGive(gnssMutex);
         } else {
             vTaskDelay(interval);
@@ -561,21 +381,9 @@ void GGATask(void *pvParameters) {
         char gga[128];
         if (generateGGA(&currentPVT, gga, sizeof(gga))) {
             LOG_DEBUG("GGA Task: %s", gga);
-            
-            // Protect SPI access with mutex
-            if (xSemaphoreTake(gnssSpiMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-                GNSSSPI.beginTransaction(SPISettings(UBX_SPI_FREQ, MSBFIRST, SPI_MODE0));
-                digitalWrite(UBX_CS, LOW);
-                delayMicroseconds(1);
-                for (const char* p = gga; *p; ++p)
-                    GNSSSPI.transfer(*p);
-                digitalWrite(UBX_CS, HIGH);
-                GNSSSPI.endTransaction();
-                xSemaphoreGive(gnssSpiMutex);
-            } else {
-                LOG_ERROR("Failed to get SPI mutex in GGATask");
-            }
-
+            // GGA string generated and sent to NTRIP caster only.
+            // No need to transmit it over SPI to the GNSS module.
+            //MAY NEED TO REVISIT THIS IF RTK NEVER WORKS
             // Also forward GGA to the NTRIP caster
             if (xSemaphoreTake(ntripClientMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
                 if (ntripClient.connected()) {
@@ -647,64 +455,11 @@ void RTCMInjectionTask(void *pvParameters) {
             }
         }
         
-        correctionAge = millis() - lastInjectedRTCM_ms;    
-        if (correctionAge < 5000) rtcmCorrectionStatus = CORR_FRESH;
-        else if (correctionAge < 30000) rtcmCorrectionStatus = CORR_STALE;
-        else rtcmCorrectionStatus = CORR_NONE;
+        // correctionAge = millis() - lastInjectedRTCM_ms;    
+        // if (correctionAge < 5000) rtcmCorrectionStatus = CORR_FRESH;
+        // else if (correctionAge < 30000) rtcmCorrectionStatus = CORR_STALE;
+        // else rtcmCorrectionStatus = CORR_NONE;
         
         vTaskDelayUntil(&lastWake, interval);
     }
-}
-
-bool get_val_u8(uint32_t key, uint8_t* out) {
-    if (!out) return false;
-
-    valgetReady = false;
-    lastValget.valid = false;
-
-    send_valget_u8(key);  // Just send request
-
-    unsigned long start = millis();
-    while (!valgetReady && millis() - start < 200) {
-        processGNSSInput();  // parse incoming UBX data
-        delay(5);            // avoid locking SPI constantly
-    }
-
-    if (valgetReady && lastValget.key == key && lastValget.valid) {
-        *out = lastValget.val;
-        return true;
-    }
-
-    return false;
-}
-
-void send_valget_u8(uint32_t key) {
-    uint8_t payload[8] = {
-        0x00, 0x00, 0x03, 0x00,  // version, layers = RAM+BBR+FLASH, position = 0
-        (uint8_t)(key), (uint8_t)(key >> 8),
-        (uint8_t)(key >> 16), (uint8_t)(key >> 24)
-    };
-
-    uint8_t packet[8 + sizeof(payload)];
-    packet[0] = 0xB5; packet[1] = 0x62;
-    packet[2] = 0x06; packet[3] = 0x8B;  // VALGET
-    packet[4] = sizeof(payload) & 0xFF;
-    packet[5] = (sizeof(payload) >> 8) & 0xFF;
-    memcpy(&packet[6], payload, sizeof(payload));
-
-    uint8_t ck_a = 0, ck_b = 0;
-    for (size_t i = 2; i < sizeof(packet) - 2; ++i) {
-        ck_a += packet[i];
-        ck_b += ck_a;
-    }
-    packet[sizeof(packet) - 2] = ck_a;
-    packet[sizeof(packet) - 1] = ck_b;
-
-    ubx_write_packet(packet, sizeof(packet));
-}
-
-// Function to poll UBX-MON-VER
-static void poll_mon_ver() {
-    const uint8_t cmd[] = {0xB5, 0x62, 0x0A, 0x04, 0x00, 0x00, 0x0E, 0x34};
-    ubx_write_packet(cmd, sizeof(cmd));
 }
