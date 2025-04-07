@@ -49,13 +49,6 @@ bool generateGGA(const UBX_NAV_PVT_data_t* pvt, char* out, size_t outLen);
 void GGATask(void *pvParameters);
 bool encodeBase64(const char* input, char* output, size_t outputSize);
 extern SemaphoreHandle_t rtcmRingMutex;
-// gnss.h
-#define RTCM_RING_SIZE 2048
-extern uint8_t rtcmRing[RTCM_RING_SIZE];
-extern volatile size_t ringHead;
-extern volatile size_t ringTail;
-extern SemaphoreHandle_t rtcmRingMutex;
-void RTCMInjectionTask(void *pvParameters);
 
 extern SemaphoreHandle_t gnssSpiMutex;
 

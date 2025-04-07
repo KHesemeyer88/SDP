@@ -198,7 +198,7 @@ void ControlTask(void *pvParameters) {
             if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
                 unsigned long now = millis();
                 unsigned long age = now - gnssData.gnssFixTime;
-                LOG_DEBUG("position-control latency time, %lu", age); //THIS IS POSITION - CONTROL LATENCY!!!!
+                LOG_ERROR("position-control latency time, %lu", age); //THIS IS POSITION - CONTROL LATENCY!!!!
                 currentLat = gnssData.latitude;
                 currentLon = gnssData.longitude;
                 currentSpeed = gnssData.speed;
@@ -255,7 +255,7 @@ void ControlTask(void *pvParameters) {
                 xSemaphoreGive(servoMutex);
             }
         }
-        
+        LOG_ERROR("ControlTask time, %lu", millis() - currentTime);
         // Use vTaskDelayUntil to ensure consistent timing
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }

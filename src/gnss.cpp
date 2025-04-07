@@ -19,11 +19,6 @@ TaskHandle_t gnssTaskHandle = NULL;
 volatile GNSSData gnssData = {0};
 volatile UBX_NAV_PVT_data_t lastValidPVT = {0};
 SemaphoreHandle_t gnssMutex = NULL;
-SemaphoreHandle_t rtcmRingMutex = NULL; 
-
-uint8_t rtcmRing[RTCM_RING_SIZE];
-volatile size_t ringHead = 0;
-volatile size_t ringTail = 0;
 
 extern WiFiClient ntripClient;
 extern SemaphoreHandle_t ntripClientMutex;
@@ -212,6 +207,7 @@ bool processRTKConnection() {
     size_t bytesRead = 0;
     
     if (dataAvailable && xSemaphoreTake(gnssSpiMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        unsigned long tPushStart = millis();
         GNSSSPI.beginTransaction(SPISettings(UBX_SPI_FREQ, MSBFIRST, SPI_MODE0));
         digitalWrite(UBX_CS, LOW);
         delayMicroseconds(1);
@@ -221,8 +217,10 @@ bool processRTKConnection() {
         }
         digitalWrite(UBX_CS, HIGH);
         GNSSSPI.endTransaction();
+        unsigned long tPushElapsed = millis() - tPushStart;
         xSemaphoreGive(gnssSpiMutex);
         xSemaphoreGive(ntripClientMutex);
+        LOG_ERROR("pushRawData time, %lu", tPushElapsed);
         lastReceivedRTCM_ms = millis();
     }
     
@@ -315,6 +313,7 @@ void GNSSTask(void *pvParameters) {
     LOG_DEBUG("GNSSTask about to enter main loop");
     while (true) {
         LOG_DEBUG("GNSSTask inside main loop");
+        const unsigned long start = millis();
         const unsigned long maxCorrectionAgeBeforeReconnect = 1000; 
         static bool forceReconnect = true;
 
@@ -332,7 +331,7 @@ void GNSSTask(void *pvParameters) {
         processGNSSInput();
         processRTKConnection();
         LOG_DEBUG("GNSSTask stack high water mark: %u", uxTaskGetStackHighWaterMark(NULL));
-    
+        LOG_ERROR("GNSSTask time, %lu", millis() - start);
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
     
@@ -383,7 +382,7 @@ void GGATask(void *pvParameters) {
 
     while (true) {
         UBX_NAV_PVT_data_t currentPVT;
-
+        const unsigned long start = millis();
         if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
             memcpy(&currentPVT, (const void*)&lastValidPVT, sizeof(UBX_NAV_PVT_data_t));
             xSemaphoreGive(gnssMutex);
@@ -408,7 +407,7 @@ void GGATask(void *pvParameters) {
                 xSemaphoreGive(ntripClientMutex);
             }
         }
-
+        LOG_ERROR("GGATask time, %lu", millis() - start);
         vTaskDelayUntil(&lastWakeTime, interval);
     }
 }
@@ -422,59 +421,4 @@ bool encodeBase64(const char* input, char* output, size_t outputSize) {
         strlen(input)
     );
     return (ret == 0);
-}
-
-void RTCMInjectionTask(void *pvParameters) {
-    LOG_DEBUG("RTCMInjectionTask start");
-    const TickType_t interval = pdMS_TO_TICKS(500);
-    TickType_t lastWake = xTaskGetTickCount();
-
-    uint8_t chunk[256];
-
-    while (true) {
-        
-        LOG_DEBUG("RTCMInjectionTask: ringHead=%u, ringTail=%u", ringHead, ringTail);
-        size_t count = 0;
-
-        if (xSemaphoreTake(rtcmRingMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
-            while (ringTail != ringHead && count < sizeof(chunk)) {
-                chunk[count++] = rtcmRing[ringTail];
-                ringTail = (ringTail + 1) % RTCM_RING_SIZE;
-            }
-            xSemaphoreGive(rtcmRingMutex);
-        }
-
-        if (count > 0) {
-            LOG_DEBUG("Injecting RTCM chunk (%u bytes)", count);
-            unsigned long tPushStart = millis();
-            
-            // Protect SPI access with mutex
-            if (xSemaphoreTake(gnssSpiMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
-                GNSSSPI.beginTransaction(SPISettings(UBX_SPI_FREQ, MSBFIRST, SPI_MODE0));
-                digitalWrite(UBX_CS, LOW);
-                delayMicroseconds(1);
-                for (size_t i = 0; i < count; ++i)
-                    GNSSSPI.transfer(chunk[i]);
-                digitalWrite(UBX_CS, HIGH);
-                GNSSSPI.endTransaction();
-                xSemaphoreGive(gnssSpiMutex);
-                
-                unsigned long tPushElapsed = millis() - tPushStart;
-                if (tPushElapsed > 0) {
-                    LOG_ERROR("pushRawData time, %lu", tPushElapsed);
-                }
-                
-                lastInjectedRTCM_ms = millis(); // rename if you want
-            } else {
-                LOG_ERROR("Failed to get SPI mutex in RTCMInjectionTask");
-            }
-        }
-        
-        // correctionAge = millis() - lastInjectedRTCM_ms;    
-        // if (correctionAge < 5000) rtcmCorrectionStatus = CORR_FRESH;
-        // else if (correctionAge < 30000) rtcmCorrectionStatus = CORR_STALE;
-        // else rtcmCorrectionStatus = CORR_NONE;
-        
-        vTaskDelayUntil(&lastWake, interval);
-    }
 }

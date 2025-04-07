@@ -245,6 +245,7 @@ void NavigationTask(void *pvParameters) {
     
     // Task loop
     while (true) {
+        const unsigned long start = millis();
         // Process any pending commands
         while (xQueueReceive(navCommandQueue, &cmd, 0) == pdTRUE) {
             processNavigationCommand(cmd);
@@ -298,7 +299,7 @@ void NavigationTask(void *pvParameters) {
                 updateTargetData();
             }
         }
-        
+        LOG_ERROR("NavigationTask time, %lu", millis() - start);
         // Delay until next cycle for consistent timing
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
