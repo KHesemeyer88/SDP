@@ -36,8 +36,15 @@ static bool systemTimeSet = false;
 
 volatile int lastAckResult = -1;
 
+SemaphoreHandle_t gnssSpiMutex = NULL;
+
 // --- Internal SPI helpers ---
 static void ubx_write_packet(const uint8_t* data, size_t len) {
+    if (xSemaphoreTake(gnssSpiMutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+        LOG_ERROR("Failed to get SPI mutex for ubx_write_packet");
+        return;
+    }
+    
     GNSSSPI.beginTransaction(SPISettings(UBX_SPI_FREQ, MSBFIRST, SPI_MODE0));
     LOG_DEBUG("CS LOW, starting SPI write");
     digitalWrite(UBX_CS, LOW);
@@ -47,6 +54,8 @@ static void ubx_write_packet(const uint8_t* data, size_t len) {
     digitalWrite(UBX_CS, HIGH);
     LOG_DEBUG("SPI write complete, CS HIGH");
     GNSSSPI.endTransaction();
+    
+    xSemaphoreGive(gnssSpiMutex);
 }
 
 static void poll_nav_pvt() {
@@ -246,6 +255,12 @@ bool initializeGNSS() {
 
 void processGNSSInput() {
     LOG_DEBUG("Entering processGNSSInput");
+    
+    if (xSemaphoreTake(gnssSpiMutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+        LOG_ERROR("Failed to get SPI mutex in processGNSSInput");
+        return;
+    }
+    
     unsigned long tStart = millis();
     GNSSSPI.beginTransaction(SPISettings(UBX_SPI_FREQ, MSBFIRST, SPI_MODE0));
     digitalWrite(UBX_CS, LOW);
@@ -259,6 +274,9 @@ void processGNSSInput() {
 
     digitalWrite(UBX_CS, HIGH);
     GNSSSPI.endTransaction();
+    
+    xSemaphoreGive(gnssSpiMutex);
+    
     unsigned long tElapsed = millis() - tStart;
     if (tElapsed > 0) {
         LOG_ERROR("GNSS checkUblox time, %lu", tElapsed);
@@ -468,13 +486,20 @@ void GGATask(void *pvParameters) {
         char gga[128];
         if (generateGGA(&currentPVT, gga, sizeof(gga))) {
             LOG_DEBUG("GGA Task: %s", gga);
-            GNSSSPI.beginTransaction(SPISettings(UBX_SPI_FREQ, MSBFIRST, SPI_MODE0));
-            digitalWrite(UBX_CS, LOW);
-            delayMicroseconds(1);
-            for (const char* p = gga; *p; ++p)
-                GNSSSPI.transfer(*p);
-            digitalWrite(UBX_CS, HIGH);
-            GNSSSPI.endTransaction();
+            
+            // Protect SPI access with mutex
+            if (xSemaphoreTake(gnssSpiMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+                GNSSSPI.beginTransaction(SPISettings(UBX_SPI_FREQ, MSBFIRST, SPI_MODE0));
+                digitalWrite(UBX_CS, LOW);
+                delayMicroseconds(1);
+                for (const char* p = gga; *p; ++p)
+                    GNSSSPI.transfer(*p);
+                digitalWrite(UBX_CS, HIGH);
+                GNSSSPI.endTransaction();
+                xSemaphoreGive(gnssSpiMutex);
+            } else {
+                LOG_ERROR("Failed to get SPI mutex in GGATask");
+            }
 
             // Also forward GGA to the NTRIP caster
             if (xSemaphoreTake(ntripClientMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
@@ -484,7 +509,6 @@ void GGATask(void *pvParameters) {
                 }
                 xSemaphoreGive(ntripClientMutex);
             }
-
         }
 
         vTaskDelayUntil(&lastWakeTime, interval);
@@ -525,23 +549,34 @@ void RTCMInjectionTask(void *pvParameters) {
         if (count > 0) {
             LOG_DEBUG("Injecting RTCM chunk (%u bytes)", count);
             unsigned long tPushStart = millis();
-            GNSSSPI.beginTransaction(SPISettings(UBX_SPI_FREQ, MSBFIRST, SPI_MODE0));
-            digitalWrite(UBX_CS, LOW);
-            delayMicroseconds(1);
-            for (size_t i = 0; i < count; ++i)
-                GNSSSPI.transfer(chunk[i]);
-            digitalWrite(UBX_CS, HIGH);
-            unsigned long tPushElapsed = millis() - tPushStart;
-            if (tPushElapsed > 0) {
-                LOG_ERROR("pushRawData time, %lu", tPushElapsed);
+            
+            // Protect SPI access with mutex
+            if (xSemaphoreTake(gnssSpiMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+                GNSSSPI.beginTransaction(SPISettings(UBX_SPI_FREQ, MSBFIRST, SPI_MODE0));
+                digitalWrite(UBX_CS, LOW);
+                delayMicroseconds(1);
+                for (size_t i = 0; i < count; ++i)
+                    GNSSSPI.transfer(chunk[i]);
+                digitalWrite(UBX_CS, HIGH);
+                GNSSSPI.endTransaction();
+                xSemaphoreGive(gnssSpiMutex);
+                
+                unsigned long tPushElapsed = millis() - tPushStart;
+                if (tPushElapsed > 0) {
+                    LOG_ERROR("pushRawData time, %lu", tPushElapsed);
+                }
+                
+                lastInjectedRTCM_ms = millis(); // rename if you want
+            } else {
+                LOG_ERROR("Failed to get SPI mutex in RTCMInjectionTask");
             }
-            GNSSSPI.endTransaction();
-            lastInjectedRTCM_ms = millis(); // rename if you want
         }
+        
         correctionAge = millis() - lastInjectedRTCM_ms;    
         if (correctionAge < 5000) rtcmCorrectionStatus = CORR_FRESH;
         else if (correctionAge < 30000) rtcmCorrectionStatus = CORR_STALE;
         else rtcmCorrectionStatus = CORR_NONE;
+        
         vTaskDelayUntil(&lastWake, interval);
     }
 }
@@ -571,7 +606,7 @@ bool get_val_u8(uint32_t key, uint8_t* out) {
     packet[sizeof(packet) - 2] = ck_a;
     packet[sizeof(packet) - 1] = ck_b;
 
-    // Send the VALGET packet
+    // Send the VALGET packet - ubx_write_packet is already protected with mutex
     ubx_write_packet(packet, sizeof(packet));
 
     // Read response into buffer
@@ -581,6 +616,13 @@ bool get_val_u8(uint32_t key, uint8_t* out) {
     bool found = false;
 
     while (millis() - start < 200 && !found) {
+        // Protect SPI access with mutex
+        if (xSemaphoreTake(gnssSpiMutex, pdMS_TO_TICKS(100)) != pdTRUE) {
+            LOG_ERROR("Failed to get SPI mutex in get_val_u8");
+            delay(10);  // Small delay before retrying
+            continue;
+        }
+        
         GNSSSPI.beginTransaction(SPISettings(UBX_SPI_FREQ, MSBFIRST, SPI_MODE0));
         digitalWrite(UBX_CS, LOW);
         delayMicroseconds(1);
@@ -591,6 +633,8 @@ bool get_val_u8(uint32_t key, uint8_t* out) {
         }
         digitalWrite(UBX_CS, HIGH);
         GNSSSPI.endTransaction();
+        
+        xSemaphoreGive(gnssSpiMutex);
 
         // Search for key match + value
         for (size_t i = 0; i + 4 < len; ++i) {

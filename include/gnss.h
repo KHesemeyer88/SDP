@@ -61,3 +61,5 @@ extern volatile size_t ringTail;
 extern SemaphoreHandle_t rtcmRingMutex;
 void RTCMInjectionTask(void *pvParameters);
 bool get_val_u8(uint32_t key, uint8_t* out);
+
+extern SemaphoreHandle_t gnssSpiMutex;

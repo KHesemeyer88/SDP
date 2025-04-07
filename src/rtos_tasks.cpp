@@ -56,6 +56,12 @@ void initRTOS() {
     if (rtcmRingMutex == NULL) {
         handleSystemError("Failed to create RTCM ring buffer mutex", true);
     }
+
+    gnssSpiMutex = xSemaphoreCreateMutex();
+    if (gnssSpiMutex == NULL) {
+        handleSystemError("Failed to create GNSS SPI mutex", true);
+        return;
+    }
     
     // Create command queue
     commandQueue = xQueueCreate(10, sizeof(ControlCommand));
