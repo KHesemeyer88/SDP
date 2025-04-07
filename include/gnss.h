@@ -63,3 +63,4 @@ void RTCMInjectionTask(void *pvParameters);
 bool get_val_u8(uint32_t key, uint8_t* out);
 
 extern SemaphoreHandle_t gnssSpiMutex;
+extern void send_valget_u8(uint32_t key);

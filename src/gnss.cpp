@@ -38,6 +38,20 @@ volatile int lastAckResult = -1;
 
 SemaphoreHandle_t gnssSpiMutex = NULL;
 
+static volatile bool valgetReady = false;
+static volatile ubx_valget_u8_result_t lastValget = {0};
+
+void send_valget_u8(uint32_t key);
+
+static void handleVALGET(const ubx_valget_u8_result_t* res) {
+    if (res && res->valid) {
+        lastValget.key = res->key;
+        lastValget.val = res->val;
+        lastValget.valid = res->valid;
+        valgetReady = true;
+    }
+}
+
 // --- Internal SPI helpers ---
 static void ubx_write_packet(const uint8_t* data, size_t len) {
     if (xSemaphoreTake(gnssSpiMutex, pdMS_TO_TICKS(100)) != pdTRUE) {
@@ -65,9 +79,10 @@ static void poll_nav_pvt() {
 }
 
 bool send_valset_u8_blocking(uint32_t key, uint8_t val) {
+    lastAckResult = -1;
     // Build VALSET packet
     uint8_t payload[11] = {
-        0x00, 0x00, 0x01, 0x00, 0x00, 0x00, // RAM | BBR | FLASH
+        0x00, 0x00, 0x03, 0x00, 0x00, 0x00, // RAM | BBR | FLASH
         (uint8_t)(key), (uint8_t)(key >> 8),
         (uint8_t)(key >> 16), (uint8_t)(key >> 24),
         val
@@ -87,7 +102,6 @@ bool send_valset_u8_blocking(uint32_t key, uint8_t val) {
     packet[sizeof(packet) - 2] = ck_a;
     packet[sizeof(packet) - 1] = ck_b;
 
-    // Clear previous ACK state
     extern volatile int lastAckResult;
     lastAckResult = -1;
 
@@ -96,8 +110,10 @@ bool send_valset_u8_blocking(uint32_t key, uint8_t val) {
 
     // Wait for ACK response
     unsigned long start = millis();
-    while (lastAckResult == -1 && millis() - start < 200) {
-        processGNSSInput(); // poll for ACK
+    while (millis() - start < 200) {
+        processGNSSInput();
+        if (lastAckResult != -1) break;
+        delay(5);  // Let SPI rest; helps if ACK comes a few ms later
     }
 
     if (lastAckResult == 1) {
@@ -157,11 +173,14 @@ static void handlePVT(const UBX_NAV_PVT_data_t* pvt) {
 
 static void handleACK(uint8_t ack_id) {
     if (ack_id == 0x01) {
-        LOG_DEBUG("Received UBX-ACK-ACK");
+        lastAckResult = 1;
+        LOG_ERROR("Received UBX-ACK-ACK");
     } else {
+        lastAckResult = 0;
         LOG_ERROR("Received UBX-ACK-NAK");
     }
 }
+
 
 // --- Initialization ---
 bool initializeGNSS() {
@@ -176,11 +195,12 @@ bool initializeGNSS() {
     // Start SPI interface
     LOG_DEBUG("Calling GNSSSPI.begin()");
     GNSSSPI.begin(NAV_SCK_PIN, NAV_MISO_PIN, NAV_MOSI_PIN, UBX_CS);
-    delay(50); // Give GNSS module time to stabilize
+    delay(3000); // Give GNSS module time to stabilize
 
     // Register UBX callbacks
     ubx_set_pvt_callback(handlePVT);
     ubx_set_ack_callback(handleACK);
+    ubx_set_valget_callback(handleVALGET);
 
     delay(50);
     // send_valset_u8_blocking(0x107A0001, 1); // known to work from u-center
@@ -195,6 +215,15 @@ bool initializeGNSS() {
     // get_val_u8(0x107A0001, &val);
     // LOG_ERROR("Readback: 0x%02X", val);
 
+    //TEST:
+    send_valset_u8_blocking(0x10540001, 1);  // CFG-SPIOUTPROT-UBX
+    vTaskDelay(pdMS_TO_TICKS(20));
+    uint8_t val = 0xFF;
+    if (get_val_u8(0x10540001, &val)) {
+        LOG_ERROR("VALGET readback: 0x%02X", val);
+    } else {
+        LOG_ERROR("VALGET failed for CFG-SPIOUTPROT-UBX");
+    }
 
     struct {
         uint32_t key;
@@ -584,16 +613,35 @@ void RTCMInjectionTask(void *pvParameters) {
 bool get_val_u8(uint32_t key, uint8_t* out) {
     if (!out) return false;
 
-    // Build VALGET packet
+    valgetReady = false;
+    lastValget.valid = false;
+
+    send_valget_u8(key);  // Just send request
+
+    unsigned long start = millis();
+    while (!valgetReady && millis() - start < 200) {
+        processGNSSInput();  // parse incoming UBX data
+        delay(5);            // avoid locking SPI constantly
+    }
+
+    if (valgetReady && lastValget.key == key && lastValget.valid) {
+        *out = lastValget.val;
+        return true;
+    }
+
+    return false;
+}
+
+void send_valget_u8(uint32_t key) {
     uint8_t payload[8] = {
-        0x00, 0x00, 0x07, 0x00,
+        0x00, 0x00, 0x03, 0x00,  // version, layers = RAM+BBR+FLASH, position = 0
         (uint8_t)(key), (uint8_t)(key >> 8),
         (uint8_t)(key >> 16), (uint8_t)(key >> 24)
-    };    
+    };
 
     uint8_t packet[8 + sizeof(payload)];
     packet[0] = 0xB5; packet[1] = 0x62;
-    packet[2] = 0x06; packet[3] = 0x8B; // VALGET
+    packet[2] = 0x06; packet[3] = 0x8B;  // VALGET
     packet[4] = sizeof(payload) & 0xFF;
     packet[5] = (sizeof(payload) >> 8) & 0xFF;
     memcpy(&packet[6], payload, sizeof(payload));
@@ -606,69 +654,6 @@ bool get_val_u8(uint32_t key, uint8_t* out) {
     packet[sizeof(packet) - 2] = ck_a;
     packet[sizeof(packet) - 1] = ck_b;
 
-    // Send the VALGET packet - ubx_write_packet is already protected with mutex
     ubx_write_packet(packet, sizeof(packet));
-
-    // Read response into buffer
-    uint8_t response[64];
-    size_t len = 0;
-    unsigned long start = millis();
-    bool found = false;
-
-    while (millis() - start < 200 && !found) {
-        // Protect SPI access with mutex
-        if (xSemaphoreTake(gnssSpiMutex, pdMS_TO_TICKS(100)) != pdTRUE) {
-            LOG_ERROR("Failed to get SPI mutex in get_val_u8");
-            delay(10);  // Small delay before retrying
-            continue;
-        }
-        
-        GNSSSPI.beginTransaction(SPISettings(UBX_SPI_FREQ, MSBFIRST, SPI_MODE0));
-        digitalWrite(UBX_CS, LOW);
-        delayMicroseconds(1);
-        for (int i = 0; i < 64; ++i) {
-            if (len < sizeof(response)) {
-                response[len++] = GNSSSPI.transfer(0xFF);
-            }
-        }
-        digitalWrite(UBX_CS, HIGH);
-        GNSSSPI.endTransaction();
-        
-        xSemaphoreGive(gnssSpiMutex);
-
-        // Search for key match + value
-        for (size_t i = 0; i + 4 < len; ++i) {
-            if (response[i] == (uint8_t)(key) &&
-                response[i + 1] == (uint8_t)(key >> 8) &&
-                response[i + 2] == (uint8_t)(key >> 16) &&
-                response[i + 3] == (uint8_t)(key >> 24)) {
-
-                *out = response[i + 4];
-                LOG_ERROR("VALGET 0x%08lX = %d", key, *out);
-                found = true;
-
-                LOG_ERROR("VALGET raw response (%u bytes):", len);
-                char hexDump[3 * sizeof(response) + 1] = {0};
-                for (size_t i = 0; i < len; ++i)
-                    sprintf(&hexDump[i * 3], "%02X ", response[i]);
-                    LOG_ERROR("%s", hexDump);
-
-                break;
-            }
-        }
-    }
-    // Debug: Dump the raw SPI response bytes
-    if (!found) {
-        LOG_ERROR("VALGET raw response (%u bytes):", len);
-        char hexLine[3 * 16 + 1] = {0};
-        for (size_t i = 0; i < len; ++i) {
-            sprintf(&hexLine[(i % 16) * 3], "%02X ", response[i]);
-            if ((i + 1) % 16 == 0 || i == len - 1) {
-                LOG_ERROR("%s", hexLine);
-                memset(hexLine, 0, sizeof(hexLine));
-            }
-        }
-    }
-
-    return found;
 }
+
