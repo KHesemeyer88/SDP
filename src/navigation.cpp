@@ -295,7 +295,10 @@ void NavigationTask(void *pvParameters) {
                 
                 // Update target data
                 updateTargetData();
+            } else {
+                LOG_ERROR("NAV update skipped due to fixType=%d", fixType);
             }
+            
         }
         LOG_ERROR("NavigationTask time, %lu", millis() - start);
         // Delay until next cycle for consistent timing
