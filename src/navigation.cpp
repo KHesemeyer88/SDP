@@ -260,6 +260,8 @@ void NavigationTask(void *pvParameters) {
             isActive = navStatus.autonomousMode;
             isPaused = navStatus.isPaused;
             xSemaphoreGive(navDataMutex);
+        } else {
+            LOG_ERROR("NavigationTask navDataMutex timeout");
         }
         
         // Add state tracking
@@ -286,6 +288,8 @@ void NavigationTask(void *pvParameters) {
                 hAcc = gnssData.hAcc;
                 validPosition = (fixType >= 3);
                 xSemaphoreGive(gnssMutex);
+            } else {
+                LOG_ERROR("NavigationTask gnssMutex timeout");
             }
             
             if (validPosition) {
@@ -323,6 +327,8 @@ static void processNavigationCommand(NavCommand cmd) {
                 navStatus.currentPace = 0.0;
                 navStatus.averagePace = 0.0;
                 xSemaphoreGive(navDataMutex);
+            } else {
+                LOG_ERROR("processNavigationCommand navDataMutex timeout in START");
             }
             
             if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
@@ -330,6 +336,8 @@ static void processNavigationCommand(NavCommand cmd) {
                 targetData.targetLat = cmd.start.latitude;
                 targetData.targetLon = cmd.start.longitude;
                 xSemaphoreGive(waypointMutex);
+            } else {
+                LOG_ERROR("processNavigationCommand waypointMutex timeout in START");
             }
             break;
             
@@ -344,6 +352,8 @@ static void processNavigationCommand(NavCommand cmd) {
                 // Set status message
                 snprintf((char*)navStatus.statusMessage, sizeof(((NavStatus*)0)->statusMessage), "Navigation stopped");
                 xSemaphoreGive(navDataMutex);
+            } else {
+                LOG_ERROR("processNavigationCommand navDataMutex timeout in STOP");
             }
             break;
             
@@ -356,6 +366,8 @@ static void processNavigationCommand(NavCommand cmd) {
                 // Set status message
                 snprintf((char*)navStatus.statusMessage, sizeof(((NavStatus*)0)->statusMessage), "Navigation paused");
                 xSemaphoreGive(navDataMutex);
+            } else {
+                LOG_ERROR("processNavigationCommand navDataMutex timeout in PAUSE");
             }
             break;
             
@@ -370,6 +382,9 @@ static void processNavigationCommand(NavCommand cmd) {
                     // Set status message
                     snprintf((char*)navStatus.statusMessage, sizeof(((NavStatus*)0)->statusMessage), "Navigation resumed");
                 }
+                else {
+                    LOG_ERROR("processNavigationCommand navDataMutex timeout in RESUME");
+                }
                 xSemaphoreGive(navDataMutex);
             }
             break;
@@ -383,6 +398,8 @@ static void processNavigationCommand(NavCommand cmd) {
                 navStatus.currentPace = 0.0;
                 navStatus.averagePace = 0.0;
                 xSemaphoreGive(navDataMutex);
+            } else {
+                LOG_ERROR("processNavigationCommand navDataMutex timeout in RESET");
             }
             break;
             
@@ -407,7 +424,7 @@ static void processNavigationCommand(NavCommand cmd) {
                         LOG_NAV("navStatus.totalWaypoints, %d", waypointCount);
                         xSemaphoreGive(navDataMutex);
                     } else {
-                        LOG_ERROR("navDataMutex fail in processNavigationCommand");
+                        LOG_ERROR("processNavigationCommand navDataMutex timeout in ADD");
                     }
                 }
                 else {
@@ -416,7 +433,7 @@ static void processNavigationCommand(NavCommand cmd) {
                 xSemaphoreGive(waypointMutex);
                 //LOG_NAV("waypointMutex released after ADD_WAYPOINT processing");
             } else {
-                LOG_ERROR("waypointMutex fail in processNavigationCommand");
+                LOG_ERROR("processNavigationCommand waypointMutex timeout in ADD");
             }
             break;
             
@@ -433,6 +450,8 @@ static void processNavigationCommand(NavCommand cmd) {
                 }
                 
                 xSemaphoreGive(waypointMutex);
+            } else {
+                LOG_ERROR("processNavigationCommand waypointMutex timeout in CLEAR");
             }
             break;
             
@@ -472,6 +491,8 @@ static void updateNavigationStatus(float lat, float lon, float speed, uint8_t fi
                 }
                 
                 xSemaphoreGive(navDataMutex);
+            } else {
+                LOG_ERROR("updateNavigationStatus navDataMutex timeout 1");
             }
         }
     }
@@ -489,6 +510,8 @@ static void updateNavigationStatus(float lat, float lon, float speed, uint8_t fi
         targetLat = targetData.targetLat;
         targetLon = targetData.targetLon;
         xSemaphoreGive(waypointMutex);
+    } else {
+        LOG_ERROR("updateNavigationStatus waypointMutex timeout");
     }
     
     float distToWaypoint = calculateDistance(lat, lon, targetLat, targetLon);
@@ -496,6 +519,8 @@ static void updateNavigationStatus(float lat, float lon, float speed, uint8_t fi
     if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
         navStatus.distanceToWaypoint = distToWaypoint;
         xSemaphoreGive(navDataMutex);
+    } else {
+        LOG_ERROR("updateNavigationStatus navDataMutex timeout 2");
     }
 }
 
@@ -525,6 +550,8 @@ static void checkDestinationStatus(float lat, float lon) {
         
         // Release waypoint mutex, no longer needed
         xSemaphoreGive(waypointMutex);
+    } else {
+        LOG_ERROR("checkDestinationStatus waypointMutex timeout 1");
     }
     
     // Calculate distance to waypoint now that we have all the data
@@ -552,12 +579,16 @@ static void checkDestinationStatus(float lat, float lon) {
                      targetDistance, distanceTraveled);
                      
             xSemaphoreGive(navDataMutex);
+        } else {
+            LOG_ERROR("checkDestinationStatus navDataMutex timeout 1");
         }
         
         // Also need to update waypoint following status
         if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
             targetData.followingWaypoints = false;
             xSemaphoreGive(waypointMutex);
+        } else {
+            LOG_ERROR("checkDestinationStatus waypointMutex timeout 2");
         }
     }
 }
@@ -649,8 +680,12 @@ static void handleWaypointReached() {
             }
             
             xSemaphoreGive(navDataMutex);
+        } else {
+            LOG_ERROR("handleWaypointReached navDataMutex timeout 1");
         }
         xSemaphoreGive(waypointMutex);
+    } else {
+        LOG_ERROR("handleWaypointReached waypointMutex timeout 1");
     }
 }
 
