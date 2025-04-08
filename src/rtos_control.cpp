@@ -5,6 +5,7 @@
 #include "logging.h"
 #include "navigation.h"
 #include "gnss.h"
+#include "obstacle.h"
 
 // Control task variables
 unsigned long lastCommandTime = 0;
@@ -219,18 +220,28 @@ void ControlTask(void *pvParameters) {
                 followingWaypoints = targetData.followingWaypoints;
                 xSemaphoreGive(waypointMutex);
             }
+
+            if (obstacleOverride.active) {
+                // Direct servo control during avoidance (no mutex for fastest response)
+                steeringServo.write(obstacleOverride.overrideSteeringAngle);
+                escServo.write(obstacleOverride.overrideThrottle);
+                LOG_DEBUG("AVOIDING: Steering=%d Throttle=%d", 
+                         obstacleOverride.overrideSteeringAngle, obstacleOverride.overrideThrottle);
+            } 
             
-            // Calculate steering angle based on current and target positions
-            int steeringAngle = calculateSteeringAngle(currentLat, currentLon, targetLat, targetLon, currentHeading, nav.targetPace);
-            
-            // Calculate throttle value based on pace control
-            int throttleValue = calculateThrottle(currentSpeed, nav.targetPace);
-            
-            // Apply control commands
-            if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
-                steeringServo.write(steeringAngle);
-                escServo.write(throttleValue);
-                xSemaphoreGive(servoMutex);
+            else { // normal navigation
+                // Calculate steering angle based on current and target positions
+                int steeringAngle = calculateSteeringAngle(currentLat, currentLon, targetLat, targetLon, currentHeading, nav.targetPace);
+                
+                // Calculate throttle value based on pace control
+                int throttleValue = calculateThrottle(currentSpeed, nav.targetPace);
+                
+                // Apply control commands
+                if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+                    steeringServo.write(steeringAngle);
+                    escServo.write(throttleValue);
+                    xSemaphoreGive(servoMutex);
+                }
             }
             
             // Update command timestamp
@@ -304,6 +315,11 @@ int calculateSteeringAngle(float currentLat, float currentLon, float targetLat, 
 
 // Calculate throttle value based on current speed and target pace
 int calculateThrottle(float currentSpeed, float targetPace) {
+    // return slow speed immediately if in avodiance 
+    if (obstacleOverride.active) {
+        return obstacleOverride.overrideThrottle; // SLOW_THROTTLE
+    }
+
     //LOG_DEBUG("calculateThrottle");
     // Only adjust speed if we have a target pace
     if (targetPace <= 0) {

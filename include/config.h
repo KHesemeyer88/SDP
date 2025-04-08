@@ -57,8 +57,8 @@ const int ESC_PIN = 23;       // GPIO23 for ESC control
 // const int ECHO_PIN_RIGHT = 21;
 
 // Sonar thresholds (cm)
-const int FRONT_STOP_THRESHOLD = 150; // zero to suppress obst. avoidance
-const int SIDE_AVOID_THRESHOLD = 50;
+const int FRONT_STOP_THRESHOLD = 200; // zero to suppress obst. avoidance
+//const int SIDE_AVOID_THRESHOLD = 50;
 
 // Traxxas XL-2.5 ESC & servo values. Note ESC takes angles like a servo, but converts them to speed
 const int ESC_NEUTRAL = 90;     // Neutral position (1.5ms pulse)
@@ -68,8 +68,8 @@ const int ESC_MIN_FWD = 95;     // Minimum forward throttle
 const int ESC_MIN_REV = 85;     // Minimum reverse throttle
 const int STEERING_CENTER = 90;  // Center steering
 const int STEERING_MAX = 65;     // Maximum steering angle deviation
-const int TURN_ANGLE = 20;       // Angle to turn 
-const int TRIM_ANGLE = 2; //car lists left
+const int TURN_ANGLE = 15;       // Angle to turn 
+const int TRIM_ANGLE = 2;       //car lists left
 
 // WiFi settings
 // const char* ssid = "RC_Car_Control";
@@ -78,8 +78,11 @@ const int TRIM_ANGLE = 2; //car lists left
 //const char ssid[] = "Kians iPhone";
 //const char password[] = "Dove'sHamster";
 
-const char ssid[] = "Galaxy XCover FieldPro8858";
-const char password[] = "bugo4303";
+//const char ssid[] = "Galaxy XCover FieldPro8858";
+//const char password[] = "bugo4303";
+
+const char ssid[] = "chewchewchew";
+const char password[] = "03092738Ss";
 
 // MaCORS
 const char casterHost[] = "macorsrtk.massdot.state.ma.us"; 
