@@ -256,7 +256,7 @@ void NavigationTask(void *pvParameters) {
         bool isPaused = false;
         
         // Safely get navigation state
-        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {//changed from 5 to 50
             isActive = navStatus.autonomousMode;
             isPaused = navStatus.isPaused;
             xSemaphoreGive(navDataMutex);
@@ -277,7 +277,7 @@ void NavigationTask(void *pvParameters) {
             validPosition = false;
             
             // Try to get GNSS data with timeout
-            if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+            if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(50)) == pdTRUE) {//changed from 5 to 50
                 currentLat = gnssData.latitude;
                 currentLon = gnssData.longitude;
                 currentSpeed = gnssData.speed;
