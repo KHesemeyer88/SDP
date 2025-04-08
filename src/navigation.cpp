@@ -275,22 +275,16 @@ void NavigationTask(void *pvParameters) {
         
         // Only process navigation if active and not paused
         if (isActive && !isPaused) {
-            // Get current position data
+            // Get shadow GNSS data
             validPosition = false;
             
-            // Try to get GNSS data with timeout
-            if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(50)) == pdTRUE) {//changed from 5 to 50
-                currentLat = gnssData.latitude;
-                currentLon = gnssData.longitude;
-                currentSpeed = gnssData.speed;
-                fixType = gnssData.fixType;
-                carrSoln = gnssData.carrSoln;
-                hAcc = gnssData.hAcc;
-                validPosition = (fixType >= 3);
-                xSemaphoreGive(gnssMutex);
-            } else {
-                LOG_ERROR("NavigationTask gnssMutex timeout");
-            }
+            currentLat = gnssShadow.latitude;
+            currentLon = gnssShadow.longitude;
+            currentSpeed = gnssShadow.speed;
+            fixType = gnssShadow.fixType;
+            carrSoln = gnssShadow.carrSoln;
+            hAcc = gnssShadow.hAcc;
+            validPosition = (fixType >= 3);
             
             if (validPosition) {
                 // Update navigation with the copied values

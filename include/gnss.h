@@ -27,6 +27,8 @@ typedef enum CorrectionStatus CorrectionStatus;
 extern TaskHandle_t gnssTaskHandle;
 extern SemaphoreHandle_t gnssMutex;
 extern volatile GNSSData gnssData;
+extern volatile GNSSData gnssShadow;
+
 extern volatile CorrectionStatus rtcmCorrectionStatus;
 extern unsigned long correctionAge;
 

@@ -17,6 +17,8 @@
 static SPIClass GNSSSPI(HSPI);
 TaskHandle_t gnssTaskHandle = NULL;
 volatile GNSSData gnssData = {0};
+volatile GNSSData gnssShadow = {0};
+
 volatile UBX_NAV_PVT_data_t lastValidPVT = {0};
 SemaphoreHandle_t gnssMutex = NULL;
 
@@ -98,6 +100,7 @@ static void handlePVT(const UBX_NAV_PVT_data_t* pvt) {
             LOG_ERROR("------------------------------------------");
         }
         xSemaphoreGive(gnssMutex);
+        memcpy((void*)&gnssShadow, (const void*)&gnssData, sizeof(GNSSData));
     }
     generateGGA(pvt, lastGGA, sizeof(lastGGA));
     unsigned long tCbElapsed = millis() - tCbStart;
