@@ -21,10 +21,14 @@
 //     uint8_t length;  // optional, for variable-length payloads
 // };
 
+
+
+
+// ------ from esp32
 const uint8_t GNSS_ID = 1;
 //etc... 
 struct GNSS_data {
-    uint8_t struct_id = 1;
+    uint8_t struct_id = GNSS_ID;
     float lat = 0;
     float lon = 0;
     uint8_t gnss_fix_type;
@@ -58,6 +62,15 @@ struct Waypoint_data {
     float lon;
     uint8_t count;
 };
+// struct Auto_mode {
+//     uint8_t struct_id = 6;
+//     uint8_t auto_mode;
+// };
+
+
+
+
+// ----- from webpage
 
 struct Recieved_Waypoint {
     float lon;

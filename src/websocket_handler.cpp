@@ -35,16 +35,13 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
     //LOG_DEBUG("webSocketEventRTOS");
     switch (type) {
         case WS_EVT_CONNECT:
-            // // Client connected
-            IPAddress ip = client->remoteIP();
-            // //LOG_DEBUG("WebSocket client #%u connected from %d.%d.%d.%d", 
-            // //         client->id(), ip[0], ip[1], ip[2], ip[3]);
+            // Client connected
+            // IPAddress ip = client->remoteIP();
+            // LOG_DEBUG("WebSocket client #%u connected from %d.%d.%d.%d", client->id(), ip[0], ip[1], ip[2], ip[3]);
             
             // // Send initial data to the newly connected client
-            sendGPSData(client);
-            sendRTKStatus(client);
-            // sendGPSData();
-            // sendRTKStatus();
+            sendGPSData();
+            sendRTKStatus();
             break;
         case WS_EVT_DISCONNECT:
             // Client disconnected
@@ -54,13 +51,14 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
             // ----- handle messages -----
             if (len == sizeof(uint8_t)) { // binary size matches uint, its a MESSAGE
                 switch (*data) {
-                    case MESSAGE_STOP:
+                    case MESSAGE_STOP: {
                         // Stop autonomous navigation
                         LOG_NAV("Stop command received");
                         stopNavigation();
                         sendStatusMessage("Navigation stopped");
                         break;
-                    case MESSAGE_RECORD:
+                    }
+                    case MESSAGE_RECORD: {
                         // Get current position and record as waypoint
                         LOG_NAV("command = record");
                         if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
@@ -102,7 +100,8 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
                             sendErrorMessage("Cannot record waypoint: GPS data unavailable");
                         }
                         break;
-                    case MESSAGE_CLEAR:
+                    }
+                    case MESSAGE_CLEAR: {
                         //LOG_DEBUG("command = clear");
                         // Clear all waypoints
                         clearWaypoints();
@@ -128,25 +127,29 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
                         
                         sendStatusMessage("All waypoints cleared");
                         break;
-                    case MESSAGE_PAUSE:
+                    }
+                    case MESSAGE_PAUSE: {
                         // Pause navigation
                         LOG_NAV("Pause command received");
                         pauseNavigation();
                         sendStatusMessage("Navigation paused");
                         break;
-                    case MESSAGE_RESUME:
+                    }
+                    case MESSAGE_RESUME: {
                         // Resume navigation
                         LOG_NAV("Resume command received");
                         resumeNavigation();
                         sendStatusMessage("Navigation resumed");
                         break;
-                    case MESSAGE_RESET:
+                    }
+                    case MESSAGE_RESET: {
                         // Handle tracking reset command
                         //else if (doc.containsKey("tracking") && doc["tracking"].as<String>() == "reset") {
                         //LOG_DEBUG("command = tracking reset");
                         resetNavigationStats();
                         //sendStatusMessage("Tracking statistics reset");
                         break;
+                    }
                 }
             } else if (len == sizeof(command_control)){ // Handle control messages (manual driving), binary size matches control struct
                 command_control the_message;
@@ -311,13 +314,9 @@ void WebSocketTask(void *pvParameters) {
             prevAutonomousMode = isAutonomousActive;
             
             // Send mode change notification
-            DynamicJsonDocument modeDoc(128);
-            modeDoc["type"] = "mode";
-            modeDoc["autonomous"] = isAutonomousActive;
-            String modeJson;
-            serializeJson(modeDoc, modeJson);
-            ws.textAll(modeJson);
-            
+            // Auto_mode response_message;
+            // response_message.auto_mode = isAutonomousActive;
+            // ws.binaryAll((uint8_t*)&response_message, sizeof(response_message));            
             //LOG_NAV("Operation mode changed to: %s", isAutonomousActive ? "autonomous" : "manual");
         }
         

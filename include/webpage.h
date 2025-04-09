@@ -772,6 +772,7 @@ const char webPage[] PROGMEM = R"rawliteral(
                     lng: view.getFloat32(5, true),
                     count: view.getUint8(9)
                 };
+            //case 6: // Auto_mode
             default:
                 alert("couldn't identify websocket case");
                 break;
