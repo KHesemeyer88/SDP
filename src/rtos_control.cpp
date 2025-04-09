@@ -44,10 +44,10 @@ void ControlTask(void *pvParameters) {
     // Task loop
     while (true) {
         unsigned long currentTime = millis();
-        
+        LOG_NAV("ControlTask loop beginning");
         // Check for manual control commands
         if (xQueueReceive(commandQueue, &currentCmd, 0) == pdTRUE) {
-            //LOG_DEBUG("Received command queue");
+            LOG_NAV("Received command queue");
             // Process the command based on type
             if (currentCmd.type == CMD_MANUAL_CONTROL) {
                 // Manual control command received
@@ -185,7 +185,7 @@ void ControlTask(void *pvParameters) {
             static bool lastAutoMode = false;
             static bool lastPaused = false;
             if (nav.autonomousMode != lastAutoMode || nav.isPaused != lastPaused) {
-                LOG_NAV("ControlTask state chg, %d, %d", 
+                LOG_DEBUG("ControlTask state chg, %d, %d", 
                         nav.autonomousMode, nav.isPaused);
                 lastAutoMode = nav.autonomousMode;
                 lastPaused = nav.isPaused;
@@ -197,7 +197,7 @@ void ControlTask(void *pvParameters) {
             // Get shadow GNSS data
             unsigned long now = millis();
             unsigned long age = now - gnssShadow.gnssFixTime;
-            LOG_ERROR("position-control latency time, %lu", age); // keep this line
+            LOG_NAV("position-control latency time, %lu", age); // keep this line
 
             currentLat = gnssShadow.latitude;
             currentLon = gnssShadow.longitude;
@@ -209,6 +209,7 @@ void ControlTask(void *pvParameters) {
                 targetLat = targetData.targetLat;
                 targetLon = targetData.targetLon;
                 followingWaypoints = targetData.followingWaypoints;
+                LOG_NAV("ControlTask targetLat, targetLon, %.7f, %.7f", targetLat, targetLon);
                 xSemaphoreGive(waypointMutex);
             }
             
@@ -220,6 +221,7 @@ void ControlTask(void *pvParameters) {
             
             // Apply control commands
             if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+                LOG_NAV("ControlTask applying steeringAngle and throttleValue, %d, %d", steeringAngle, throttleValue);
                 steeringServo.write(steeringAngle);
                 escServo.write(throttleValue);
                 xSemaphoreGive(servoMutex);

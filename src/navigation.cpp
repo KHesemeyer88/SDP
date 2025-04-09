@@ -522,7 +522,8 @@ static void updateNavigationStatus(float lat, float lon, float speed, uint8_t fi
 
 // Check if we've reached the target waypoint or distance
 static void checkDestinationStatus(float lat, float lon) {
-    //LOG_DEBUG("checkDestinationStatus");
+    LOG_NAV("checkDestinationStatus called");
+
     float distToWaypoint = 0.0;
     bool followingWaypoints = false;
     float targetLat = 0.0;

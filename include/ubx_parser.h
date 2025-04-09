@@ -22,6 +22,8 @@ typedef struct {
     uint8_t numSV;
     uint16_t year;
     uint8_t month, day, hour, min, sec;
+    int32_t gSpeed;   // mm/s
+    int32_t headMot;  // heading * 1e-5 deg
 } UBX_NAV_PVT_data_t;
 
 // --- UBX Constants ---

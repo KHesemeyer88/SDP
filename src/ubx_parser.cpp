@@ -115,6 +115,8 @@ ubx_result_t ubx_parse_byte(uint8_t byte) {
                     memcpy(&pvt.height,  &payload[32], 4);
                     memcpy(&pvt.hMSL,    &payload[36], 4);
                     memcpy(&pvt.hAcc,    &payload[40], 4);
+                    memcpy(&pvt.gSpeed,  &payload[60], 4);  // mm/s
+                    memcpy(&pvt.headMot, &payload[84], 4); // heading of motion
 
                     pvt.fixType = payload[20];
                     pvt.flags   = payload[21];

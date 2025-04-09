@@ -69,9 +69,9 @@ static void handlePVT(const UBX_NAV_PVT_data_t* pvt) {
     if (xSemaphoreTake(gnssMutex, 0) == pdTRUE) {
         gnssData.latitude = pvt->lat / 1e7;
         gnssData.longitude = pvt->lon / 1e7;
-        gnssData.speed = 0.0f;
+        gnssData.speed = pvt->gSpeed / 1000.0f;
         gnssData.fixType = pvt->fixType;
-        gnssData.heading = 0.0f;
+        gnssData.heading = pvt->headMot / 1e5;
         gnssData.carrSoln = (pvt->flags >> 6) & 0x03;
         gnssData.hAcc = pvt->hAcc / 10.0;
         gnssData.newDataAvailable = true;
