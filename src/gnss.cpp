@@ -169,11 +169,23 @@ void processGNSSInput() {
     digitalWrite(UBX_CS, LOW);
     delayMicroseconds(1);
 
-    uint8_t buf[200];
-    for (int i = 0; i < sizeof(buf); ++i) {
-        buf[i] = GNSSSPI.transfer(0xFF);
-        ubx_parse_byte(buf[i]);
+    uint8_t b;
+    int consecutiveFFs = 0;
+    int totalBytes = 0;
+
+    while (consecutiveFFs < 50 && totalBytes < 512) {  // hard ceiling to prevent infinite loop
+        b = GNSSSPI.transfer(0xFF);
+        totalBytes++;
+
+        if (b == 0xFF) {
+            consecutiveFFs++;
+        } else {
+            consecutiveFFs = 0;
+        }
+
+        ubx_parse_byte(b);
     }
+
 
     digitalWrite(UBX_CS, HIGH);
     GNSSSPI.endTransaction();
