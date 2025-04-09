@@ -59,7 +59,7 @@ void ControlTask(void *pvParameters) {
                 }
                 
                 // Apply manual control if we're not in autonomous mode
-                if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+                if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                     // Check if we're in autonomous mode
                     //LOG_DEBUG("Checking if we're in autonomous mode");
                     autonomousActive = navStatus.autonomousMode;
@@ -175,7 +175,7 @@ void ControlTask(void *pvParameters) {
         
         // Check navigation status for autonomous control
         NavStatus nav;
-        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
             nav.autonomousMode = navStatus.autonomousMode;
             nav.isPaused = navStatus.isPaused;
             nav.targetPace = navStatus.targetPace;
@@ -205,7 +205,7 @@ void ControlTask(void *pvParameters) {
             currentHeading = gnssShadow.heading;
             
             // Get target data
-            if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+            if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                 targetLat = targetData.targetLat;
                 targetLon = targetData.targetLon;
                 followingWaypoints = targetData.followingWaypoints;
@@ -219,7 +219,7 @@ void ControlTask(void *pvParameters) {
             int throttleValue = calculateThrottle(currentSpeed, nav.targetPace);
             
             // Apply control commands
-            if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+            if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                 steeringServo.write(steeringAngle);
                 escServo.write(throttleValue);
                 xSemaphoreGive(servoMutex);
@@ -230,7 +230,7 @@ void ControlTask(void *pvParameters) {
         }
         else if (nav.autonomousMode && nav.isPaused) {
             // If paused, set motor to neutral but maintain steering
-            if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+            if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                 escServo.write(ESC_NEUTRAL);
                 xSemaphoreGive(servoMutex);
             }
@@ -238,7 +238,7 @@ void ControlTask(void *pvParameters) {
         
         // Safety timeout - stop if no recent commands
         if (currentTime - lastCommandTime > COMMAND_TIMEOUT_MS) {
-            if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+            if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                 escServo.write(ESC_NEUTRAL);
                 steeringServo.write(STEERING_CENTER);
                 xSemaphoreGive(servoMutex);

@@ -138,7 +138,7 @@ bool initializeGNSS() {
     unsigned long start = millis();
     while (millis() - start < 10000) {
         processGNSSInput();
-        if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+        if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
             bool ready = gnssData.fixType >= 3;
             xSemaphoreGive(gnssMutex);
             if (ready) break;
@@ -386,7 +386,7 @@ void GGATask(void *pvParameters) {
     while (true) {
         UBX_NAV_PVT_data_t currentPVT;
         const unsigned long start = millis();
-        if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+        if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
             memcpy(&currentPVT, (const void*)&lastValidPVT, sizeof(UBX_NAV_PVT_data_t));
             xSemaphoreGive(gnssMutex);
         } else {
@@ -402,7 +402,7 @@ void GGATask(void *pvParameters) {
             // No need to transmit it over SPI to the GNSS module.
             //MAY NEED TO REVISIT THIS IF RTK NEVER WORKS
             // Also forward GGA to the NTRIP caster
-            if (xSemaphoreTake(ntripClientMutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+            if (xSemaphoreTake(ntripClientMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                 if (ntripClient.connected()) {
                     ntripClient.print(gga);
                     LOG_DEBUG("GGA forwarded to caster: %s", gga);

@@ -242,7 +242,7 @@ void NavigationTask(void *pvParameters) {
     
     // Initialize time for consistent frequency
     xLastWakeTime = xTaskGetTickCount();
-    
+    LOG_ERROR("NavigationTask started, running at %d Hz", NAV_UPDATE_FREQUENCY);
     // Task loop
     while (true) {
         const unsigned long start = millis();
@@ -256,7 +256,7 @@ void NavigationTask(void *pvParameters) {
         bool isPaused = false;
         
         // Safely get navigation state
-        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(50)) == pdTRUE) {//changed from 5 to 50
+        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {//changed from 5 to 50
             isActive = navStatus.autonomousMode;
             isPaused = navStatus.isPaused;
             xSemaphoreGive(navDataMutex);
@@ -314,7 +314,7 @@ static void processNavigationCommand(NavCommand cmd) {
             LOG_NAV("NAV_CMD_START, %.2f, %.2f, %d", 
                 cmd.start.targetPace, cmd.start.targetDistance, targetData.followingWaypoints);
             // Start navigation to a single waypoint
-            if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                 navStatus.autonomousMode = true;
                 navStatus.isPaused = false;
                 navStatus.targetPace = cmd.start.targetPace;
@@ -328,7 +328,7 @@ static void processNavigationCommand(NavCommand cmd) {
                 LOG_ERROR("processNavigationCommand navDataMutex timeout in START");
             }
             
-            if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                 // Set target to provided coordinates
                 targetData.targetLat = cmd.start.latitude;
                 targetData.targetLon = cmd.start.longitude;
@@ -342,7 +342,7 @@ static void processNavigationCommand(NavCommand cmd) {
             LOG_NAV("NAV_CMD_STOP, %d, %d", 
                 navStatus.autonomousMode, navStatus.isPaused);
             // Stop navigation
-            if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                 navStatus.autonomousMode = false;
                 navStatus.isPaused = false;
                 
@@ -357,7 +357,7 @@ static void processNavigationCommand(NavCommand cmd) {
         case NAV_CMD_PAUSE:
             LOG_NAV("NAV_CMD_PAUSE");
             // Pause navigation without losing progress
-            if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                 navStatus.isPaused = true;
                 
                 // Set status message
@@ -372,24 +372,23 @@ static void processNavigationCommand(NavCommand cmd) {
         
             LOG_NAV("NAV_CMD_RESUME");
             // Resume navigation from paused state
-            if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                 if (navStatus.autonomousMode) {
                     navStatus.isPaused = false;
                     
                     // Set status message
                     snprintf((char*)navStatus.statusMessage, sizeof(((NavStatus*)0)->statusMessage), "Navigation resumed");
                 }
-                else {
-                    LOG_ERROR("processNavigationCommand navDataMutex timeout in RESUME");
-                }
                 xSemaphoreGive(navDataMutex);
+            } else {
+                LOG_ERROR("processNavigationCommand navDataMutex timeout in RESUME");
             }
             break;
             
         case NAV_CMD_RESET_STATS:
         LOG_NAV("NAV_CMD_RESET_STATS");
             // Reset distance and time tracking
-            if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                 navStatus.distanceTraveled = 0.0;
                 navStatus.elapsedTime = 0;
                 navStatus.currentPace = 0.0;
@@ -405,7 +404,7 @@ static void processNavigationCommand(NavCommand cmd) {
             LOG_NAV("NAV_CMD_ADD_WAYPOINT, %.7f, %.7f", 
                 cmd.waypoint.latitude, cmd.waypoint.longitude);
 
-            if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                 //LOG_NAV("waypointMutex taken, current count=%d, max=%d", waypointCount, MAX_WAYPOINTS);
 
                 if (waypointCount < MAX_WAYPOINTS) {
@@ -415,7 +414,7 @@ static void processNavigationCommand(NavCommand cmd) {
 
                     //LOG_NAV("Waypoint added at index %d, new count=%d", waypointCount-1, waypointCount);
                     
-                    if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                    if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                         navStatus.totalWaypoints = waypointCount;
 
                         LOG_NAV("navStatus.totalWaypoints, %d", waypointCount);
@@ -437,10 +436,10 @@ static void processNavigationCommand(NavCommand cmd) {
         case NAV_CMD_CLEAR_WAYPOINTS:
         LOG_NAV("NAV_CMD_CLEAR_WAYPOINTS");
             // Clear all waypoints
-            if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+            if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                 waypointCount = 0;
                 
-                if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
                     navStatus.totalWaypoints = 0;
                     navStatus.currentWaypoint = 0;
                     xSemaphoreGive(navDataMutex);
@@ -701,7 +700,7 @@ NavStatus getNavStatus() {
     //LOG_DEBUG("getNavStatus");
     NavStatus status;
     
-    if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+    if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
         // Copy the volatile status to local variable
         memcpy(&status, (const void*)&navStatus, sizeof(NavStatus));
         xSemaphoreGive(navDataMutex);
