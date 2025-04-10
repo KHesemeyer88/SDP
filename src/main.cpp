@@ -36,7 +36,7 @@ void setup() {
     // Connect to WiFi
     Serial.printf("Connecting to WiFi network: %s\n", ssid);
     Serial.printf("\n");
-    LOG_DEBUG("Connecting to WiFi network: %s", ssid);
+    LOG_ERROR("Connecting to WiFi network: %s", ssid);
     WiFi.begin(ssid, password);
     
     // Wait for connection with timeout
@@ -54,7 +54,7 @@ void setup() {
             WiFi.localIP()[2], WiFi.localIP()[3]);
         Serial.printf("Connected to WiFi: %s, IP: %s", ssid, ipStr);
         Serial.printf("\n");
-        LOG_DEBUG("Connected to WiFi: %s, IP: %s", ssid, ipStr);
+        LOG_ERROR("Connected to WiFi: %s, IP: %s", ssid, ipStr);
     } else {
         Serial.printf("Failed to connect to WiFi. Will retry in RTOS tasks");
         Serial.printf("\n");
@@ -66,7 +66,7 @@ void setup() {
     if (!initNavigation()) {
         LOG_ERROR("Failed to initialize navigation system");
     } else {
-        LOG_DEBUG("Navigation system initialized successfully");
+        LOG_ERROR("Navigation system initialized successfully");
     }
     
     // Initialize RTOS components

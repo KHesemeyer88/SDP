@@ -30,7 +30,7 @@ static int mutexWait = 50;
 
 // Control task function
 void ControlTask(void *pvParameters) {
-    //LOG_DEBUG("ControlTask");
+    LOG_DEBUG("ControlTask begin");
     ControlCommand currentCmd;
     TickType_t xLastWakeTime;
     const TickType_t xFrequency = pdMS_TO_TICKS(1000 / CONTROL_UPDATE_FREQUENCY);
@@ -53,7 +53,7 @@ void ControlTask(void *pvParameters) {
             // Process the command based on type
             if (currentCmd.type == CMD_MANUAL_CONTROL) {
                 // Manual control command received
-                //LOG_DEBUG("Manual control command received");
+                LOG_NAV("Manual control command received");
                 // Update driving state and timestamp
                 drivingState = currentCmd.manual.isDriving;
                 if (drivingState) {
@@ -63,15 +63,15 @@ void ControlTask(void *pvParameters) {
                 // Apply manual control if we're not in autonomous mode
                 if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                     // Check if we're in autonomous mode
-                    //LOG_DEBUG("Checking if we're in autonomous mode");
+                    LOG_DEBUG("Checking if we're in autonomous mode");
                     autonomousActive = navStatus.autonomousMode;
                     xSemaphoreGive(navDataMutex);
                     
                     if (!autonomousActive) {
-                        //LOG_DEBUG("Entering manual control in controlTask");
+                        LOG_DEBUG("Entering manual control in controlTask");
                         // Apply manual control commands to servos
                         if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
-                            //LOG_DEBUG("Received servoMutex");
+                            LOG_DEBUG("Received servoMutex");
                             // Map joystick to servo values
                             int steeringValue = STEERING_CENTER + (currentCmd.manual.steering * STEERING_MAX);
                             
@@ -83,15 +83,15 @@ void ControlTask(void *pvParameters) {
                            // Apply throttle based on joystick position
                             int throttleValue;
                             if (currentCmd.manual.throttle > 0) {
-                                //LOG_DEBUG("Forward throttle value set");
+                                LOG_DEBUG("Forward throttle value set");
                                 // Forward
                                 inReverseMode = false; // Exit reverse mode if forward requested
                                 throttleValue = ESC_NEUTRAL + (currentCmd.manual.throttle * (ESC_MAX_FWD - ESC_NEUTRAL));
                             } else if (currentCmd.manual.throttle < 0) {
-                                //LOG_DEBUG("Neg. throttle detected");
+                                LOG_DEBUG("Neg. throttle detected");
                                 // Reverse - check if we need to start sequence
                                 if (!inReverseMode && !reverseSequenceActive) {
-                                    //LOG_DEBUG("Setting rev. sequence params");
+                                    LOG_DEBUG("Setting rev. sequence params");
                                     reverseSequenceActive = true;
                                     reverseSequenceStep = 0;
                                     reverseSequenceStartTime = currentTime;
@@ -99,14 +99,14 @@ void ControlTask(void *pvParameters) {
                                 } else if (inReverseMode) {
                                     // Already in reverse mode, can apply reverse directly
                                     throttleValue = ESC_NEUTRAL + (currentCmd.manual.throttle * (ESC_NEUTRAL - ESC_MAX_REV));
-                                    //LOG_DEBUG("Reverse mode active: throttle=%.2f, output=%d", currentCmd.manual.throttle, throttleValue);
+                                    LOG_DEBUG("Reverse mode active: throttle=%.2f, output=%d", currentCmd.manual.throttle, throttleValue);
                                 } else {
-                                    //LOG_DEBUG("Let sequence handler control throttle");
+                                    LOG_DEBUG("Let sequence handler control throttle");
                                     // In middle of sequence, let sequence handler control throttle
                                     throttleValue = ESC_NEUTRAL;
                                 }
                             } else {
-                                //LOG_DEBUG("Neutral");
+                                LOG_DEBUG("Neutral");
                                 // Neutral
                                 throttleValue = ESC_NEUTRAL;
                             }
@@ -114,13 +114,13 @@ void ControlTask(void *pvParameters) {
                             // Apply servo commands (ESC only if not in reverse sequence)
                             steeringServo.write(steeringValue);
                             if (!reverseSequenceActive) {
-                                //LOG_DEBUG("Throttle applied: %d", throttleValue);
+                                LOG_DEBUG("Throttle applied: %d", throttleValue);
                                 escServo.write(throttleValue);
                             }
 
                             // Process reverse sequence if active
                             if (reverseSequenceActive) {
-                                //LOG_DEBUG("Entering reverse sequence, case: %d", reverseSequenceStep);
+                                LOG_DEBUG("Entering reverse sequence, case: %d", reverseSequenceStep);
                                 unsigned long elapsedTime = currentTime - reverseSequenceStartTime;
                                 
                                 switch (reverseSequenceStep) {
@@ -128,7 +128,7 @@ void ControlTask(void *pvParameters) {
                                     // it's possible shorter intervals may work as well
                                         escServo.write(ESC_NEUTRAL);
                                         if (elapsedTime >= 50) {
-                                            //LOG_DEBUG("Reverse seq: First neutral complete");
+                                            LOG_DEBUG("Reverse seq: First neutral complete");
                                             reverseSequenceStep = 1;
                                             reverseSequenceStartTime = currentTime;
                                         }
@@ -137,7 +137,7 @@ void ControlTask(void *pvParameters) {
                                     case 1: // First reverse tap
                                         escServo.write(0); //experimenting showed that 0 works most robustly
                                         if (elapsedTime >= 50) {
-                                            //LOG_DEBUG("Reverse seq: First tap complete");
+                                            LOG_DEBUG("Reverse seq: First tap complete");
                                             reverseSequenceStep = 2;
                                             reverseSequenceStartTime = currentTime;
                                         }
@@ -146,14 +146,14 @@ void ControlTask(void *pvParameters) {
                                     case 2: // Second neutral
                                         escServo.write(ESC_NEUTRAL);
                                         if (elapsedTime >= 50) {
-                                            //LOG_DEBUG("Reverse seq: Second neutral complete");
+                                            LOG_DEBUG("Reverse seq: Second neutral complete");
                                             reverseSequenceStep = 3;
                                             reverseSequenceStartTime = currentTime;
                                         }
                                         break;
                                         
                                     case 3: // Complete sequence
-                                        //LOG_DEBUG("Reverse sequence complete - now in reverse mode");
+                                        LOG_DEBUG("Reverse sequence complete - now in reverse mode");
                                         inReverseMode = true;
                                         reverseSequenceActive = false;
                                         // Apply the reverse throttle immediately
@@ -215,7 +215,7 @@ void ControlTask(void *pvParameters) {
                 targetLat = targetData.targetLat;
                 targetLon = targetData.targetLon;
                 followingWaypoints = targetData.followingWaypoints;
-                //LOG_NAV("ControlTask targetLat, targetLon, %.7f, %.7f", targetLat, targetLon);
+                LOG_NAV("ControlTask targetLat, targetLon, %.7f, %.7f", targetLat, targetLon);
                 xSemaphoreGive(waypointMutex);
             } else {
                 LOG_ERROR("ControlTask waypointMutex timeout");
@@ -260,7 +260,7 @@ void ControlTask(void *pvParameters) {
                 LOG_ERROR("ControlTask servoMutex timeout 2");
             }
         }
-        LOG_ERROR("ControlTask time, %lu", millis() - currentTime);
+        LOG_NAV("ControlTask time, %lu", millis() - currentTime);
         // Use vTaskDelayUntil to ensure consistent timing
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
@@ -268,7 +268,7 @@ void ControlTask(void *pvParameters) {
 
 // Calculate steering angle based on current position, target, heading, target pace
 int calculateSteeringAngle(float currentLat, float currentLon, float targetLat, float targetLon, float currentHeading, float targetPace){    
-    //LOG_DEBUG("calculateSteeringAngle");
+    LOG_DEBUG("calculateSteeringAngle");
     // Calculate bearing to target
     float bearing = calculateBearing(currentLat, currentLon, targetLat, targetLon);
     
@@ -312,7 +312,7 @@ int calculateSteeringAngle(float currentLat, float currentLon, float targetLat, 
 
 // Calculate throttle value based on current speed and target pace
 int calculateThrottle(float currentSpeed, float targetPace) {
-    //LOG_DEBUG("calculateThrottle");
+    LOG_DEBUG("calculateThrottle");
     // Only adjust speed if we have a target pace
     if (targetPace <= 0) {
         return ESC_NEUTRAL; // Stop if no target pace

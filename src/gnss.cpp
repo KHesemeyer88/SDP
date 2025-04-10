@@ -41,7 +41,6 @@ static int mutexWait = 50;
 
 // --- Internal SPI helpers ---
 static void ubx_write_packet(const uint8_t* data, size_t len) {
-    //LOG_DEBUG("CS LOW, starting SPI write");
     if (xSemaphoreTake(gnssSpiMutex, pdMS_TO_TICKS(mutexWait)) != pdTRUE) {
         LOG_ERROR("ubx_write_packet gnssSpiMutex timeout");
         return;
@@ -56,7 +55,6 @@ static void ubx_write_packet(const uint8_t* data, size_t len) {
     GNSSSPI.endTransaction();
     
     xSemaphoreGive(gnssSpiMutex);
-    //LOG_DEBUG("SPI write complete, CS HIGH");
 }
 
 static void poll_nav_pvt() {
@@ -81,8 +79,8 @@ static void handlePVT(const UBX_NAV_PVT_data_t* pvt) {
 
         memcpy((void*)&lastValidPVT, (const void*)pvt, sizeof(UBX_NAV_PVT_data_t));
 
-        // LOG_DEBUG("handlePVT() lat: %.7f lon: %.7f fix: %d carrSoln: %d", 
-        //   gnssData.latitude, gnssData.longitude, gnssData.fixType, gnssData.carrSoln);
+        // LOG_NAV("handlePVT() lat: %.7f lon: %.7f fix: %d carrSoln: %d", 
+        //     gnssData.latitude, gnssData.longitude, gnssData.fixType, gnssData.carrSoln);
 
         if (!systemTimeSet && pvt->fixType >= 3) {
             struct tm timeinfo = {0};
@@ -109,20 +107,9 @@ static void handlePVT(const UBX_NAV_PVT_data_t* pvt) {
     //generateGGA(pvt, lastGGA, sizeof(lastGGA));
     unsigned long tCbElapsed = millis() - tCbStart;
     if (tCbElapsed > 0) {
-        LOG_ERROR("GNSS checkCallbacks time, %lu", tCbElapsed);
+        LOG_NAV("GNSS checkCallbacks time, %lu", tCbElapsed);
     }
 }
-
-static void handleACK(uint8_t ack_id) {
-    if (ack_id == 0x01) {
-        lastAckResult = 1;
-        LOG_ERROR("Received UBX-ACK-ACK");
-    } else {
-        lastAckResult = 0;
-        LOG_ERROR("Received UBX-ACK-NAK");
-    }
-}
-
 
 // --- Initialization ---
 bool initializeGNSS() {
@@ -137,7 +124,6 @@ bool initializeGNSS() {
     // Start SPI interface
     LOG_DEBUG("Calling GNSSSPI.begin()");
     GNSSSPI.begin(NAV_SCK_PIN, NAV_MISO_PIN, NAV_MOSI_PIN, UBX_CS);
-    LOG_ERROR("Waiting for first fix before sending VALSET...");
 
     unsigned long start = millis();
     while (millis() - start < 10000) {
@@ -152,7 +138,6 @@ bool initializeGNSS() {
 
     // Register UBX callbacks
     ubx_set_pvt_callback(handlePVT);
-    ubx_set_ack_callback(handleACK);
 
     delay(50);
 
@@ -162,7 +147,7 @@ bool initializeGNSS() {
 
 void processGNSSInput() {
     LOG_DEBUG("Entering processGNSSInput");
-    
+    unsigned long pgiStart = millis();
     if (xSemaphoreTake(gnssSpiMutex, pdMS_TO_TICKS(100)) != pdTRUE) {
         LOG_ERROR("Failed to get SPI mutex in processGNSSInput");
         return;
@@ -198,20 +183,14 @@ void processGNSSInput() {
     
     unsigned long tElapsed = millis() - tStart;
     if (tElapsed > 0) {
-        LOG_ERROR("GNSS checkUblox time, %lu", tElapsed);
+        LOG_NAV("GNSS checkUblox time, %lu", tElapsed);
     }
-
-
-    // for (int i = 0; i < 64; i += 8) {
-    //     LOG_DEBUG("SPI bytes: %02X %02X %02X %02X %02X %02X %02X %02X",
-    //         buf[i], buf[i+1], buf[i+2], buf[i+3],
-    //         buf[i+4], buf[i+5], buf[i+6], buf[i+7]);
-    // }
+    LOG_NAV("processGNSSInputTime, %lu", millis() - pgiStart);
 }
 
 bool processRTKConnection() {
     LOG_DEBUG("processRTKConnection: start");
-    static unsigned long PRCstart = millis();
+    unsigned long PRCstart = millis();
     bool pushedRTCM = false;
     uint8_t rtcmBuf[256]; // adjust if needed
     size_t byteCount = 0;
@@ -254,7 +233,7 @@ bool processRTKConnection() {
 
     digitalWrite(UBX_CS, HIGH);
     GNSSSPI.endTransaction();
-    static unsigned long PRDEnd = millis();
+    unsigned long PRDEnd = millis();
     xSemaphoreGive(gnssSpiMutex);
     LOG_NAV("pushRawData time, %lu", PRDEnd - PRDStart);
     lastReceivedRTCM_ms = millis();
@@ -267,108 +246,9 @@ bool processRTKConnection() {
     return pushedRTCM;
 }
 
-// bool processRTKConnection() {
-//     LOG_DEBUG("Entering processRTKConnection, about to set clientConnected false");
-//     bool clientConnected = false;
-//     bool dataAvailable = false;
-
-//     if (xSemaphoreTake(ntripClientMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
-//         clientConnected = ntripClient.connected();
-//         dataAvailable = clientConnected && ntripClient.available();
-//         if (!dataAvailable)
-//             xSemaphoreGive(ntripClientMutex);
-//     } else {
-//         LOG_ERROR("processRTKConnection ntripClientMutex timeout");
-//     }
-//     LOG_DEBUG("processRTKConnection: connected=%d, available=%d",
-//         clientConnected, dataAvailable);
-
-//     size_t bytesRead = 0;
-    
-//     if (dataAvailable && xSemaphoreTake(gnssSpiMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
-//         unsigned long tPushStart = millis();
-//         GNSSSPI.beginTransaction(SPISettings(UBX_SPI_FREQ, MSBFIRST, SPI_MODE0));
-//         digitalWrite(UBX_CS, LOW);
-//         delayMicroseconds(1);
-//         while (ntripClient.available()) {
-//             uint8_t b = ntripClient.read();
-//             GNSSSPI.transfer(b);
-//         }
-//         digitalWrite(UBX_CS, HIGH);
-//         GNSSSPI.endTransaction();
-//         unsigned long tPushElapsed = millis() - tPushStart;
-//         xSemaphoreGive(gnssSpiMutex);
-//         xSemaphoreGive(ntripClientMutex);
-//         LOG_ERROR("pushRawData time, %lu", tPushElapsed);
-//         lastReceivedRTCM_ms = millis();
-
-//         correctionAge = millis() - lastReceivedRTCM_ms;
-//         if (correctionAge < 5000) rtcmCorrectionStatus = CORR_FRESH;
-//         else if (correctionAge < 30000) rtcmCorrectionStatus = CORR_STALE;
-//         else rtcmCorrectionStatus = CORR_NONE;
-
-//     } else {
-//         LOG_ERROR("processRTKConnection gnssSpiMutex timeout");
-//     }
-//     return clientConnected;
-// }
-
-// bool connectToNTRIP() {
-//     LOG_DEBUG("Entering connectToNTRIP");
-//     if (xSemaphoreTake(ntripClientMutex, pdMS_TO_TICKS(mutexWait)) != pdTRUE){
-//         LOG_ERROR("connectToNTRIP ntripClientMutex timeout");
-//         return false;
-//     }
-
-//     if (ntripClient.connected()) {
-//         xSemaphoreGive(ntripClientMutex);
-//         return true;
-//     }
-
-//     if (!ntripClient.connect(casterHost, casterPort)) {
-//         LOG_ERROR("Failed to connect to caster");
-//         xSemaphoreGive(ntripClientMutex);
-//         return false;
-//     }
-
-//     char auth[128], encoded[200];
-//     snprintf(auth, sizeof(auth), "%s:%s", casterUser, casterUserPW);
-//     encodeBase64(auth, encoded, sizeof(encoded));
-
-//     char request[512];
-//     snprintf(request, sizeof(request),
-//         "GET /%s HTTP/1.0\r\n"
-//         "User-Agent: NTRIP u-blox Client\r\n"
-//         "Accept: */*\r\n"
-//         "Connection: close\r\n"
-//         "Authorization: Basic %s\r\n"
-//         "\r\n",
-//         mountPoint, encoded
-//     );
-//     LOG_ERROR("Entering post-connection part of connectToNTRIP");
-//     ntripClient.write(request, strlen(request));
-//     LOG_DEBUG("Sent NTRIP request to %s:%u", casterHost, casterPort);
-//     delay(500);  // Give time for HTTP response
-
-//     char response[256] = {0};
-//     int idx = 0;
-//     while (ntripClient.available() && idx < sizeof(response) - 1) {
-//         response[idx++] = ntripClient.read();
-//     }
-//     response[idx] = '\0';
-//     LOG_DEBUG("NTRIP HTTP response:\n%s", response);
-
-//     xSemaphoreGive(ntripClientMutex);
-
-//     LOG_DEBUG("NTRIP socket state: connected=%d, available=%d", 
-//         ntripClient.connected(), ntripClient.available());
-
-//     return true;
-// }
-
 bool connectToNTRIP() {
     LOG_DEBUG("connectToNTRIP: starting");
-
+    unsigned long ctnStart = millis();
     // Step 1: Try to acquire the mutex
     if (xSemaphoreTake(ntripClientMutex, pdMS_TO_TICKS(mutexWait)) != pdTRUE) {
         LOG_ERROR("connectToNTRIP ntripClientMutex timeout");
@@ -439,6 +319,7 @@ bool connectToNTRIP() {
               finalStatus, ntripClient.available());
 
     xSemaphoreGive(ntripClientMutex);
+    LOG_NAV("connectToNTRIP time, %lu", millis() - ctnStart);
     return finalStatus;
 }
 
@@ -466,7 +347,7 @@ void GNSSTask(void *pvParameters) {
         }
 
         LOG_DEBUG("GNSSTask stack high water mark: %u", uxTaskGetStackHighWaterMark(NULL));
-        LOG_ERROR("GNSSTask time, %lu", millis() - start);
+        LOG_NAV("GNSSTask time, %lu", millis() - start);
 
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
@@ -476,7 +357,7 @@ void GNSSTask(void *pvParameters) {
 // --- GGA generation ---
 bool generateGGA(const UBX_NAV_PVT_data_t* pvt, char* out, size_t outLen) {
     if (!pvt || !out || outLen < 100) return false;
-
+    unsigned long gggaStart = millis();
     uint32_t lat_deg = abs(pvt->lat / 10000000);
     float lat_min = fabs((pvt->lat / 1e7) - lat_deg) * 60.0;
     uint32_t lon_deg = abs(pvt->lon / 10000000);
@@ -500,13 +381,8 @@ bool generateGGA(const UBX_NAV_PVT_data_t* pvt, char* out, size_t outLen) {
     char cs[6];
     snprintf(cs, sizeof(cs), "*%02X\r\n", checksum);
     strncat(out, cs, outLen - strlen(out) - 1);
-
-    static unsigned long lastLogTime = 0;
-    unsigned long now = millis();
-    if (now - lastLogTime > 3000) {
-        LOG_DEBUG("generateGGA(): %s", out);
-        lastLogTime = now;
-    }
+    
+    LOG_NAV("generateGGA time, %lu", millis() - gggaStart);
 
     return true;
 }
@@ -518,7 +394,7 @@ void GGATask(void *pvParameters) {
 
     while (true) {
         UBX_NAV_PVT_data_t currentPVT;
-        const unsigned long start = millis();
+        const unsigned long ggaTstart = millis();
         if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
             memcpy(&currentPVT, (const void*)&lastValidPVT, sizeof(UBX_NAV_PVT_data_t));
             xSemaphoreGive(gnssMutex);
@@ -539,14 +415,14 @@ void GGATask(void *pvParameters) {
             if (xSemaphoreTake(ntripClientMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                 if (ntripClient.connected()) {
                     ntripClient.print(gga);
-                    LOG_DEBUG("GGA forwarded to caster: %s", gga);
+                    LOG_NAV("GGA forwarded to caster: %s", gga);
                 }
                 xSemaphoreGive(ntripClientMutex);
             } else {
                 LOG_ERROR("GGATask ntripClientMutex timeout");
             }
         }
-        LOG_ERROR("GGATask time, %lu", millis() - start);
+        LOG_NAV("GGATask time, %lu", millis() - ggaTstart);
         vTaskDelayUntil(&lastWakeTime, interval);
     }
 }

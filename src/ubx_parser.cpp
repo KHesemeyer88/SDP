@@ -122,7 +122,7 @@ ubx_result_t ubx_parse_byte(uint8_t byte) {
                     pvt.flags   = payload[21];
                     pvt.numSV   = payload[23];
 
-                    pvt.year    = payload[4]  | (payload[5] << 8);
+                    pvt.year    = payload[4]  | (payload[5] << 8); //CAN WE FIND A WAY TO DO THIS JUST ONCE
                     pvt.month   = payload[6];
                     pvt.day     = payload[7];
                     pvt.hour    = payload[8];
