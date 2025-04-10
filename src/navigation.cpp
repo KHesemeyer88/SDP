@@ -33,6 +33,8 @@ static void updateTargetData();
 static void handleWaypointReached();
 static void initNavStatusStruct(volatile NavStatus* status);
 
+static int mutexWait = 50;
+
 // Define a specific initialization function for NavStatus
 void initNavStatusStruct(volatile NavStatus* status) {
     if (status) {
@@ -103,8 +105,8 @@ bool startNavigation(float targetPace, float targetDistance, float lat, float lo
     cmd.start.longitude = lon;
     
     // Send the command to the navigation task queue
-    if (xQueueSend(navCommandQueue, &cmd, pdMS_TO_TICKS(100)) != pdTRUE) {
-        LOG_ERROR("navCommandQueue fail");
+    if (xQueueSend(navCommandQueue, &cmd, pdMS_TO_TICKS(mutexWait)) != pdTRUE) {
+        LOG_ERROR("startNavigation navCommandQueue timeout");
         return false;
     }
     
@@ -120,13 +122,15 @@ bool startWaypointNavigation(float targetPace, float targetDistance) {
     float firstWaypointLat = 0.0;
     float firstWaypointLon = 0.0;
     
-    if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+    if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
         wpCount = waypointCount;
         if (wpCount > 0) {
             firstWaypointLat = waypoints[0].latitude;
             firstWaypointLon = waypoints[0].longitude;
         }
         xSemaphoreGive(waypointMutex);
+    } else {
+        LOG_ERROR("startWaypointNavigation waypointMutex timeout 1");
     }
     
     if (wpCount == 0) {
@@ -143,22 +147,26 @@ bool startWaypointNavigation(float targetPace, float targetDistance) {
     cmd.start.longitude = firstWaypointLon;
     
     // Set waypoint navigation flags BEFORE sending command
-    if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+    if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
         targetData.followingWaypoints = true;
         LOG_NAV("followingWaypoints to true, %d", waypointCount);
         xSemaphoreGive(waypointMutex);
+    } else {
+        LOG_ERROR("startWaypointNavigation waypointMutex timeout 2");
     }
     
     // Reset current waypoint index with proper mutex protection
-    if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+    if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
         navStatus.currentWaypoint = 0;
         navStatus.totalWaypoints = wpCount;
         xSemaphoreGive(navDataMutex);
+    } else {
+        LOG_ERROR("startWaypointNavigation navDataMutex timeout");
     }
     
     // Send the command to the navigation task queue
     if (xQueueSend(navCommandQueue, &cmd, pdMS_TO_TICKS(100)) != pdTRUE) {
-        LOG_ERROR("navCommandQueue fail in startWaypointNavigation");
+        LOG_ERROR("startWaypointNavigation navCommandQueue timeout");
         return false;
     }
     
@@ -256,7 +264,7 @@ void NavigationTask(void *pvParameters) {
         bool isPaused = false;
         
         // Safely get navigation state
-        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {//changed from 5 to 50
+        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {//changed from 5 to 50
             isActive = navStatus.autonomousMode;
             isPaused = navStatus.isPaused;
             xSemaphoreGive(navDataMutex);
@@ -325,7 +333,7 @@ static void processNavigationCommand(NavCommand cmd) {
                 navStatus.averagePace = 0.0;
                 xSemaphoreGive(navDataMutex);
             } else {
-                LOG_ERROR("processNavigationCommand navDataMutex timeout in START");
+                LOG_ERROR("processNavigationCommand START navDataMutex timeout");
             }
             
             if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
@@ -473,7 +481,7 @@ static void updateNavigationStatus(float lat, float lon, float speed, uint8_t fi
         // Filter out unreasonable jumps (GPS errors)
         if (delta < 10.0 && speed > 0.5) {
             // Update distance traveled with proper mutex protection
-            if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+            if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                 navStatus.distanceTraveled += delta;
                 navStatus.currentPace = speed;
                 
@@ -502,7 +510,7 @@ static void updateNavigationStatus(float lat, float lon, float speed, uint8_t fi
     float targetLat = 0.0;
     float targetLon = 0.0;
     
-    if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+    if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
         targetLat = targetData.targetLat;
         targetLon = targetData.targetLon;
         xSemaphoreGive(waypointMutex);
@@ -512,7 +520,7 @@ static void updateNavigationStatus(float lat, float lon, float speed, uint8_t fi
     
     float distToWaypoint = calculateDistance(lat, lon, targetLat, targetLon);
     
-    if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+    if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
         navStatus.distanceToWaypoint = distToWaypoint;
         xSemaphoreGive(navDataMutex);
     } else {
@@ -532,12 +540,12 @@ static void checkDestinationStatus(float lat, float lon) {
     float distanceTraveled = 0.0;
     
     // Get all necessary data together with proper mutex protection
-    if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+    if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
         targetLat = targetData.targetLat;
         targetLon = targetData.targetLon;
         followingWaypoints = targetData.followingWaypoints;
         
-        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
             targetDistance = navStatus.targetDistance;
             distanceTraveled = navStatus.distanceTraveled;
             
@@ -563,7 +571,7 @@ static void checkDestinationStatus(float lat, float lon) {
     // Check if we've reached target distance - this needs mutex protection
     if (targetDistance > 0 && distanceTraveled >= targetDistance) {
         // Need to take mutex again to update status
-        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
             // Set status to indicate target distance reached
             navStatus.autonomousMode = false;
             navStatus.isPaused = false;
@@ -581,7 +589,7 @@ static void checkDestinationStatus(float lat, float lon) {
         }
         
         // Also need to update waypoint following status
-        if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
             targetData.followingWaypoints = false;
             xSemaphoreGive(waypointMutex);
         } else {
@@ -598,11 +606,11 @@ static void handleWaypointReached() {
     int totalWaypoints = 0;
     
     // First safe retrieval for logging purposes
-    if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+    if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
         followingWaypoints = targetData.followingWaypoints;
         totalWaypoints = waypointCount;
         
-        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
             currentWaypoint = navStatus.currentWaypoint;
             
             // Important diagnostic logging

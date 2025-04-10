@@ -26,6 +26,8 @@ static int lastEscCommand = ESC_MIN_FWD;
 extern Servo steeringServo;
 extern Servo escServo;
 
+static int mutexWait = 50;
+
 // Control task function
 void ControlTask(void *pvParameters) {
     //LOG_DEBUG("ControlTask");
@@ -43,8 +45,8 @@ void ControlTask(void *pvParameters) {
     
     // Task loop
     while (true) {
-        unsigned long currentTime = millis();
         LOG_NAV("ControlTask loop beginning");
+        unsigned long currentTime = millis();
         // Check for manual control commands
         if (xQueueReceive(commandQueue, &currentCmd, 0) == pdTRUE) {
             LOG_NAV("Received command queue");
@@ -59,7 +61,7 @@ void ControlTask(void *pvParameters) {
                 }
                 
                 // Apply manual control if we're not in autonomous mode
-                if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+                if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                     // Check if we're in autonomous mode
                     //LOG_DEBUG("Checking if we're in autonomous mode");
                     autonomousActive = navStatus.autonomousMode;
@@ -68,7 +70,7 @@ void ControlTask(void *pvParameters) {
                     if (!autonomousActive) {
                         //LOG_DEBUG("Entering manual control in controlTask");
                         // Apply manual control commands to servos
-                        if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+                        if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                             //LOG_DEBUG("Received servoMutex");
                             // Map joystick to servo values
                             int steeringValue = STEERING_CENTER + (currentCmd.manual.steering * STEERING_MAX);
@@ -168,14 +170,16 @@ void ControlTask(void *pvParameters) {
                             xSemaphoreGive(servoMutex);
                         }
                     }
+                } else {
+                    LOG_ERROR("ControlTask navDataMutex timeout");
                 }
             }
-            // Add other command types?
+            LOG_NAV("ControlTask commandQueue time, %lu", millis() - currentTime);
         }
         
         // Check navigation status for autonomous control
         NavStatus nav;
-        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
             nav.autonomousMode = navStatus.autonomousMode;
             nav.isPaused = navStatus.isPaused;
             nav.targetPace = navStatus.targetPace;
@@ -190,6 +194,8 @@ void ControlTask(void *pvParameters) {
                 lastAutoMode = nav.autonomousMode;
                 lastPaused = nav.isPaused;
             }
+        } else {
+            LOG_ERROR("ControlTask navDataMutex timeout");
         }
         
         // If we're in autonomous mode and not paused, apply navigation control
@@ -197,7 +203,7 @@ void ControlTask(void *pvParameters) {
             // Get shadow GNSS data
             unsigned long now = millis();
             unsigned long age = now - gnssShadow.gnssFixTime;
-            LOG_NAV("position-control latency time, %lu", age); // keep this line
+            LOG_NAV("position-control latency time, %lu", age); // THIS IS THE KEY METRIC
 
             currentLat = gnssShadow.latitude;
             currentLon = gnssShadow.longitude;
@@ -205,12 +211,14 @@ void ControlTask(void *pvParameters) {
             currentHeading = gnssShadow.heading;
             
             // Get target data
-            if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+            if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                 targetLat = targetData.targetLat;
                 targetLon = targetData.targetLon;
                 followingWaypoints = targetData.followingWaypoints;
-                LOG_NAV("ControlTask targetLat, targetLon, %.7f, %.7f", targetLat, targetLon);
+                //LOG_NAV("ControlTask targetLat, targetLon, %.7f, %.7f", targetLat, targetLon);
                 xSemaphoreGive(waypointMutex);
+            } else {
+                LOG_ERROR("ControlTask waypointMutex timeout");
             }
             
             // Calculate steering angle based on current and target positions
@@ -220,15 +228,19 @@ void ControlTask(void *pvParameters) {
             int throttleValue = calculateThrottle(currentSpeed, nav.targetPace);
             
             // Apply control commands
-            if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+            if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                 LOG_NAV("ControlTask applying steeringAngle and throttleValue, %d, %d", steeringAngle, throttleValue);
                 steeringServo.write(steeringAngle);
                 escServo.write(throttleValue);
                 xSemaphoreGive(servoMutex);
+            } else {
+                LOG_ERROR("ControlTask servoMutex timeout 1");
             }
             
             // Update command timestamp
             lastCommandTime = currentTime;
+
+            LOG_NAV("ControlTask autonomous mode logic complete");
         }
         else if (nav.autonomousMode && nav.isPaused) {
             // If paused, set motor to neutral but maintain steering
@@ -240,10 +252,12 @@ void ControlTask(void *pvParameters) {
         
         // Safety timeout - stop if no recent commands
         if (currentTime - lastCommandTime > COMMAND_TIMEOUT_MS) {
-            if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+            if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                 escServo.write(ESC_NEUTRAL);
                 steeringServo.write(STEERING_CENTER);
                 xSemaphoreGive(servoMutex);
+            } else {
+                LOG_ERROR("ControlTask servoMutex timeout 2");
             }
         }
         LOG_ERROR("ControlTask time, %lu", millis() - currentTime);

@@ -15,6 +15,8 @@ unsigned long lastWSRTKUpdate = 0;
 unsigned long lastWSStatsUpdate = 0;
 static bool wasDisconnected = false;
 
+static int mutexWait = 50;
+
 void initWebSocket() {
     // Set event handler
     ws.onEvent(webSocketEventRTOS);
@@ -165,7 +167,7 @@ void webSocketEventRTOS(AsyncWebSocket *server, AsyncWebSocketClient *client,
                             // Get current position and record as waypoint
 
                             LOG_NAV("command = record");
-                            if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                            if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                                 float lat = gnssData.latitude;
                                 float lon = gnssData.longitude;
                                 xSemaphoreGive(gnssMutex);
@@ -182,7 +184,7 @@ void webSocketEventRTOS(AsyncWebSocket *server, AsyncWebSocketClient *client,
                                     
                                     // Get current waypoint index with proper mutex protection
                                     int currentWaypointIndex = 0;
-                                    if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                                    if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                                         currentWaypointIndex = navStatus.currentWaypoint;
                                         xSemaphoreGive(navDataMutex);
                                     }
@@ -222,7 +224,7 @@ void webSocketEventRTOS(AsyncWebSocket *server, AsyncWebSocketClient *client,
                             response["count"] = count;
                             
                             // Reset current waypoint index in UI
-                            if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                            if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                                 response["currentIndex"] = navStatus.currentWaypoint + 1;
                                 xSemaphoreGive(navDataMutex);
                             } else {
@@ -352,10 +354,12 @@ void WebSocketTask(void *pvParameters) {
         bool isPaused = false;
         
         // Get current navigation mode (using minimal mutex time)
-        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
             isAutonomousActive = navStatus.autonomousMode;
             isPaused = navStatus.isPaused;
             xSemaphoreGive(navDataMutex);
+        } else {
+            LOG_ERROR("WebsocketTask navDataMutex timeout");
         }
         
         // Detect mode change
