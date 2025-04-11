@@ -591,8 +591,8 @@ void sendRTKStatus(AsyncWebSocketClient *client) {
 void sendNavigationStats(AsyncWebSocketClient *client) {
     //LOG_DEBUG("sendNavigationStats");
     // Get current navigation status
-    NavStatus status = getNavStatus();
-    
+    NavStatus status = getNavStatusShadow();
+
     // Create JSON document
     DynamicJsonDocument doc(256);
     doc["type"] = "navstats";

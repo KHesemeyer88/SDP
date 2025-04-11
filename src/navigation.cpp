@@ -33,6 +33,13 @@ static void updateTargetData();
 static void handleWaypointReached();
 static void initNavStatusStruct(volatile NavStatus* status);
 
+static volatile NavStatus navStatusShadow = {0};  // Local to navigation.cpp
+// navigation.cpp
+NavStatus getNavStatusShadow() {
+    return *(NavStatus*)&navStatusShadow;
+}
+
+
 // Define a specific initialization function for NavStatus
 void initNavStatusStruct(volatile NavStatus* status) {
     if (status) {
@@ -485,8 +492,8 @@ static void updateNavigationStatus(float lat, float lon, float speed, uint8_t fi
                     navStatus.averagePace = (navStatus.distanceTraveled / 
                                            (navStatus.elapsedTime / 1000.0));
                 }
-                
                 xSemaphoreGive(navDataMutex);
+                memcpy((void*)&navStatusShadow, (const void*)&navStatus, sizeof(NavStatus));
             } else {
                 LOG_ERROR("updateNavigationStatus navDataMutex timeout 1");
             }
@@ -571,11 +578,10 @@ static void checkDestinationStatus(float lat, float lon) {
             
             // Update status message
             snprintf((char*)navStatus.statusMessage, sizeof(((NavStatus*)0)->statusMessage), "Target distance reached");
-            
+            xSemaphoreGive(navDataMutex);
+            memcpy((void*)&navStatusShadow, (const void*)&navStatus, sizeof(NavStatus));
             LOG_NAV("tgt distance reached, %.2f, %.2f", 
                      targetDistance, distanceTraveled);
-                     
-            xSemaphoreGive(navDataMutex);
         } else {
             LOG_ERROR("checkDestinationStatus navDataMutex timeout 1");
         }
@@ -675,8 +681,8 @@ static void handleWaypointReached() {
 
                 LOG_DEBUG("Single destination reached, stopping navigation");
             }
-            
             xSemaphoreGive(navDataMutex);
+            memcpy((void*)&navStatusShadow, (const void*)&navStatus, sizeof(NavStatus));
         } else {
             LOG_ERROR("handleWaypointReached navDataMutex timeout 1");
         }

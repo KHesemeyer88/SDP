@@ -42,6 +42,8 @@ typedef struct {
     bool destinationReached;  // Whether destination was reached
 } NavStatus;
 
+NavStatus getNavStatusShadow();
+
 // Target data structure (shared between nav and control)
 typedef struct {
     float targetLat;         // Target latitude
