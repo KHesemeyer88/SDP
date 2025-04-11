@@ -29,7 +29,7 @@ extern volatile GNSSData gnssData;
 static void processNavigationCommand(NavCommand cmd);
 static void updateNavigationStatus(float lat, float lon, float speed, uint8_t fixType);
 static void checkDestinationStatus(float lat, float lon);
-static void updateTargetData();
+//static void updateTargetData();
 static void handleWaypointReached();
 static void initNavStatusStruct(volatile NavStatus* status);
 
@@ -302,7 +302,7 @@ void NavigationTask(void *pvParameters) {
                 checkDestinationStatus(currentLat, currentLon);
                 
                 // Update target data
-                updateTargetData();
+                //updateTargetData();
             } else {
                 LOG_ERROR("NAV update skipped due to fixType=%d", fixType);
             }
