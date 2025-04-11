@@ -5,6 +5,7 @@
 #include "logging.h"
 #include "navigation.h"
 #include "gnss.h"
+#include <PID_v1.h>
 
 // Control task variables
 unsigned long lastCommandTime = 0;
@@ -26,6 +27,17 @@ static int lastEscCommand = ESC_MIN_FWD;
 extern Servo steeringServo;
 extern Servo escServo;
 
+// PID control variables
+double pidInput = 0;     // GNSS speed in m/s
+double pidSetpoint = 0;  // targetPace in m/s
+double pidOutput = 0;    // throttle signal to ESC
+
+// Initial tuning values (adjust as needed)
+double Kp = 2.0, Ki = 0.5, Kd = 0.0;
+
+// PID controller instance (DIRECT means output increases when error is positive)
+PID speedPID(&pidInput, &pidOutput, &pidSetpoint, Kp, Ki, Kd, DIRECT);
+
 // Control task function
 void ControlTask(void *pvParameters) {
     //LOG_DEBUG("ControlTask");
@@ -37,7 +49,11 @@ void ControlTask(void *pvParameters) {
     float currentLat, currentLon, currentSpeed, currentHeading;
     float targetLat, targetLon;
     bool autonomousActive, isPaused, followingWaypoints;
-    
+    speedPID.SetMode(AUTOMATIC);
+
+    speedPID.SetOutputLimits(ESC_MIN_FWD, ESC_MAX_FWD);  // Safe range
+    speedPID.SetSampleTime(1000 / CONTROL_UPDATE_FREQUENCY);  // Match task rate
+
     // Initialize time for consistent frequency
     xLastWakeTime = xTaskGetTickCount();
     
@@ -211,8 +227,6 @@ void ControlTask(void *pvParameters) {
                 //         currentLat, currentLon, currentSpeed, currentHeading);
                 // }
                 xSemaphoreGive(gnssMutex);
-                // Make a direct call to get fresh heading: THIS WAS MAYBE CAUSING PROBLEMS
-                //currentHeading = myGPS.getHeading() / 100000.0; // Convert to degrees
             }
             
             // Get target data
@@ -227,8 +241,16 @@ void ControlTask(void *pvParameters) {
             int steeringAngle = calculateSteeringAngle(currentLat, currentLon, targetLat, targetLon, currentHeading, nav.targetPace);
             
             // Calculate throttle value based on pace control
-            int throttleValue = calculateThrottle(currentSpeed, nav.targetPace);
-            
+            //int throttleValue = calculateThrottle(currentSpeed, nav.targetPace); //COMMENTED OUT FOR PID TEST
+            pidInput = currentSpeed;
+            pidSetpoint = nav.targetPace;
+
+            int throttleValue = ESC_NEUTRAL;  // default to neutral just in case
+
+            if (speedPID.Compute()) {
+                throttleValue = (int)pidOutput;
+            }
+
             // Apply control commands
             if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
                 steeringServo.write(steeringAngle);
