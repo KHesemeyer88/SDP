@@ -78,8 +78,8 @@ const char casterHost[] = "macorsrtk.massdot.state.ma.us";
 const char casterUser[] = "KHesemeyer88";
 const char casterUserPW[] = "kN7?6jtG9YiNMgD@";
 const uint16_t casterPort = 32000;
-const char mountPoint[] = "RTCM3MSM_MAGS"; // RTCM 3.2 MSM_MAXX(GNSS) MAGS (Amherst, but maybe change to MABT?)
-//const char mountPoint[] = "RTCM3MSM_MABN"; // Colrain
+//const char mountPoint[] = "RTCM3MSM_MAGS"; // RTCM 3.2 MSM_MAXX(GNSS) MAGS (Amherst, but maybe change to MABT?)
+const char mountPoint[] = "RTCM3MSM_MABN"; // Colrain
 //const char mountPoint[] = "RTCM3MSM_MABT"; // Amherst
 
 // Navigation constants
