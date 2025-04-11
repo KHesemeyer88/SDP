@@ -140,7 +140,7 @@ void initRTOS() {
         NULL,
         GNSS_TASK_PRIORITY,
         &gnssTaskHandle,
-        1  // Run on core 1 for time-sensitive operations
+        0  // Run on core 1 for time-sensitive operations
     );
 
     if (xReturnedGNSS != pdPASS) {
@@ -171,7 +171,7 @@ void initRTOS() {
         NULL,
         GNSS_TASK_PRIORITY,           // same as GNSS
         &ggaTaskHandle,
-        1            // Pin to core 1 to stay with GNSS-related tasks
+        0            // Pin to core 1 to stay with GNSS-related tasks
     );
     
     if (xReturnedGGA != pdPASS) {
