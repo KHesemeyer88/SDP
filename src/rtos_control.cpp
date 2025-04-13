@@ -31,6 +31,10 @@ extern Servo escServo;
 double pidInput = 0;     // GNSS speed in m/s
 double pidSetpoint = 0;  // targetPace in m/s
 double pidOutput = 0;    // throttle signal to ESC
+// For tracking navigation state changes for PID reset
+static bool prevAutonomousMode = false;
+static bool prevPausedState = false;
+static int mutexWait = 50;
 
 // Initial tuning values (adjust as needed)
 double Kp = 2.0, Ki = 0.5, Kd = 0.0;
@@ -75,7 +79,7 @@ void ControlTask(void *pvParameters) {
                 }
                 
                 // Apply manual control if we're not in autonomous mode
-                if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+                if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                     // Check if we're in autonomous mode
                     //LOG_DEBUG("Checking if we're in autonomous mode");
                     autonomousActive = navStatus.autonomousMode;
@@ -84,7 +88,7 @@ void ControlTask(void *pvParameters) {
                     if (!autonomousActive) {
                         //LOG_DEBUG("Entering manual control in controlTask");
                         // Apply manual control commands to servos
-                        if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+                        if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                             //LOG_DEBUG("Received servoMutex");
                             // Map joystick to servo values
                             int steeringValue = STEERING_CENTER + (currentCmd.manual.steering * STEERING_MAX);
@@ -191,7 +195,7 @@ void ControlTask(void *pvParameters) {
         
         // Check navigation status for autonomous control
         NavStatus nav;
-        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
             nav.autonomousMode = navStatus.autonomousMode;
             nav.isPaused = navStatus.isPaused;
             nav.targetPace = navStatus.targetPace;
@@ -199,19 +203,38 @@ void ControlTask(void *pvParameters) {
 
             // Add state transition tracking
             static bool lastAutoMode = false;
-            static bool lastPaused = false;
-            if (nav.autonomousMode != lastAutoMode || nav.isPaused != lastPaused) {
+            static bool lastPausedState = false;
+            if (nav.autonomousMode != lastAutoMode || nav.isPaused != lastPausedState) {
                 LOG_NAV("ControlTask state chg, %d, %d", 
                         nav.autonomousMode, nav.isPaused);
+                
+                // If transitioning from active navigation to stopped/paused
+                if ((!nav.autonomousMode && lastAutoMode) || (nav.isPaused && !lastPausedState)) {
+                    // When navigation stops or pauses, put PID in manual mode
+                    speedPID.SetMode(MANUAL);
+                    pidOutput = ESC_MIN_FWD;    // Reset output to minimum
+                    pidInput = 0;              // Reset input 
+                    cumulativeError = 0;       // Reset your PI control error accumulator
+                    lastEscCommand = ESC_MIN_FWD; // Reset your last ESC command
+                    LOG_NAV("PID controller disabled due to navigation stop/pause");
+                } 
+                // If transitioning from stopped/paused to active navigation
+                else if ((nav.autonomousMode && !lastAutoMode) || (!nav.isPaused && lastPausedState)) {
+                    // When navigation starts or resumes, put PID back in automatic mode
+                    pidOutput = ESC_MIN_FWD;  // Start with minimum throttle
+                    speedPID.SetMode(AUTOMATIC);
+                    LOG_NAV("PID controller enabled due to navigation start/resume");
+                }
+                
                 lastAutoMode = nav.autonomousMode;
-                lastPaused = nav.isPaused;
+                lastPausedState = nav.isPaused;
             }
         }
         
         // If we're in autonomous mode and not paused, apply navigation control
         if (nav.autonomousMode && !nav.isPaused) {
             // Get current GNSS data
-            if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+            if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                 unsigned long now = millis();
                 unsigned long age = now - gnssData.gnssFixTime;
                 LOG_DEBUG("position-control latency time, %lu", age); //THIS IS POSITION - CONTROL LATENCY!!!!
@@ -230,7 +253,7 @@ void ControlTask(void *pvParameters) {
             }
             
             // Get target data
-            if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+            if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                 targetLat = targetData.targetLat;
                 targetLon = targetData.targetLon;
                 followingWaypoints = targetData.followingWaypoints;
@@ -252,7 +275,7 @@ void ControlTask(void *pvParameters) {
             }
 
             // Apply control commands
-            if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+            if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                 steeringServo.write(steeringAngle);
                 escServo.write(throttleValue);
                 xSemaphoreGive(servoMutex);
@@ -263,7 +286,7 @@ void ControlTask(void *pvParameters) {
         }
         else if (nav.autonomousMode && nav.isPaused) {
             // If paused, set motor to neutral but maintain steering
-            if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+            if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                 escServo.write(ESC_NEUTRAL);
                 xSemaphoreGive(servoMutex);
             }
@@ -271,7 +294,7 @@ void ControlTask(void *pvParameters) {
         
         // Safety timeout - stop if no recent commands
         if (currentTime - lastCommandTime > COMMAND_TIMEOUT_MS) {
-            if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+            if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                 escServo.write(ESC_NEUTRAL);
                 steeringServo.write(STEERING_CENTER);
                 xSemaphoreGive(servoMutex);
@@ -301,7 +324,7 @@ int calculateSteeringAngle(float currentLat, float currentLon, float targetLat, 
     
     // Determine max steering angle based on target pace
     int effectiveSteeringMax;
-    if (targetPace > 3.0) {  // High speed threshold (MESS WITH THIS)
+    if (targetPace > 4.0) {  // High speed threshold (MESS WITH THIS)
         effectiveSteeringMax = STEERING_MAX * 0.7;  // XX% of max steering at high speeds
         } else {
             effectiveSteeringMax = STEERING_MAX;  // Full steering at normal speeds

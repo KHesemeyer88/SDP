@@ -24,6 +24,8 @@ unsigned long correctionAge = 0;
 unsigned long lastReceivedRTCM_ms = 0;
 const unsigned long maxTimeBeforeHangup_ms = 10000UL; // 10 seconds timeout
 
+static int mutexWait = 50;
+
 // PVT callback function - updates the gnssData structure with new data
 void pvtCallback(UBX_NAV_PVT_data_t *pvtData) {
     // Take mutex to safely update the shared data
@@ -179,7 +181,7 @@ bool processRTKConnection() {
     unsigned long startTime = millis();
     
     // Step 1: Quick mutex lock just to check status
-    if (xSemaphoreTake(ntripClientMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+    if (xSemaphoreTake(ntripClientMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
         //LOG_DEBUG("ntrip mutex acq time, %lu", millis() - startTime);
         clientConnected = ntripClient.connected();
         //LOG_DEBUG("ntrip client conn., %d", clientConnected);
@@ -362,7 +364,7 @@ bool connectToNTRIP() {
                 
                 // Temporarily release mutex during delay to prevent blocking other tasks
                 xSemaphoreGive(ntripClientMutex);
-                vTaskDelay(pdMS_TO_TICKS(10));
+                vTaskDelay(pdMS_TO_TICKS(mutexWait));
                 if (xSemaphoreTake(ntripClientMutex, portMAX_DELAY) != pdTRUE) {
                     // If we can't get the mutex back, something is wrong
                     return false;
@@ -479,7 +481,7 @@ void GNSSTask(void *pvParameters) {
         
         // Send GNSS data to WebSocket clients if new data is available
         unsigned long dataStartTime = millis();
-        if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(100)) == pdTRUE) {  // 100ms timeout
+        if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {  // 100ms timeout
             //LOG_DEBUG("gnssMutex take time, %lu", millis() - dataStartTime);
             
             if (gnssData.newDataAvailable) {
