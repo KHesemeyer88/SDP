@@ -684,8 +684,8 @@ const char webPage[] PROGMEM = R"rawliteral(
                     case "gps":
                         // Update GPS displays
                         document.getElementById('manual-fix').textContent = data.fix;
-                        document.getElementById('manual-lat').textContent = data.lat || '--';
-                        document.getElementById('manual-lng').textContent = data.lng || '--';
+                        document.getElementById('manual-lat').textContent = data.lat.toFixed(7) || '--';
+                        document.getElementById('manual-lng').textContent = data.lng.toFixed(7) || '--';
                         break;
                         
                     case "rtk":
