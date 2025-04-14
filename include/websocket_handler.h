@@ -27,13 +27,13 @@
 // ------ from esp32
 const uint8_t GNSS_ID = 1;
 //etc... 
-struct GNSS_data {
+struct __attribute__((packed)) GNSS_data {
     uint8_t struct_id = GNSS_ID;
     float lat = 0;
     float lon = 0;
     uint8_t gnss_fix_type;
 };
-struct RTK_status {
+struct __attribute__((packed)) RTK_status {
     uint8_t struct_id = 2;
     uint8_t RTK_correction_status;
     unsigned long correction_age;
@@ -42,21 +42,21 @@ struct RTK_status {
     double h_accuracy;
     uint8_t gnss_fix_type;
 };
-struct Nav_stats {
+struct __attribute__((packed)) Nav_stats {
     uint8_t struct_id = 3;
     float total_distance;
     float current_pace;
     float average_pace;
     unsigned long total_time;
 };
-struct Sensor_data {
+struct __attribute__((packed)) Sensor_data {
     uint8_t struct_id = 4;
     float lidar_left;
     float lidar_front;
     float lidar_right;
     uint8_t object_detected = false;
 };
-struct Waypoint_data {
+struct __attribute__((packed)) Waypoint_data {
     uint8_t struct_id = 5;
     float lat;
     float lon;

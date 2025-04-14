@@ -754,7 +754,7 @@ const char webPage[] PROGMEM = R"rawliteral(
                     type: "navstats",
                     totalDistance: view.getFloat32(1, true),
                     currentPace: view.getFloat32(5, true),
-                    averagePace: view.getUint32(9, true),
+                    averagePace: view.getFloat32(9, true),
                     totalTime: view.getUint32(13, true)
                 };
             case 4: // Sensor_data
