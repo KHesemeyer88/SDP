@@ -72,19 +72,19 @@ struct __attribute__((packed)) Waypoint_data {
 
 // ----- from webpage
 
-struct Recieved_Waypoint {
+struct __attribute__((packed)) Recieved_Waypoint {
     float lon;
     float lat;
 };
 
-struct command_start {
+struct __attribute__((packed)) command_start {
     uint8_t id;
     float target_pace;
     float target_distance;
     float lat = 0;
     float lon;
 };
-struct command_control {
+struct __attribute__((packed)) command_control {
     uint8_t id;
     float joystick_y;
     float joystick_x;
