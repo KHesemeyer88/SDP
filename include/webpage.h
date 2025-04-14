@@ -264,12 +264,12 @@ const char webPage[] PROGMEM = R"rawliteral(
         const targetPace = document.getElementById('target-pace').value;
         const targetDistance = document.getElementById('target-distance').value;
         
-        // Build command object
-        const command = {
-            autonomous: "start",
-            pace: parseFloat(targetPace),
-            distance: parseFloat(targetDistance)
-        };
+
+        const buffer = new ArrayBuffer(17); // 1 byte + 4 + 4 + 4 + 4
+        const view = new DataView(buffer);
+        view.setUint8(0, 2); // offset 0, id 2
+        view.setFloat32(1, parseFloat(targetPace), true); // offset 1
+        view.setFloat32(5, parseFloat(targetDistance), true); // offset 4
         
         // Add coordinates if provided
         if (coordsInput) {
@@ -278,12 +278,11 @@ const char webPage[] PROGMEM = R"rawliteral(
                 showAlert('Please enter valid coordinates or clear input to use recorded waypoint');
                 return;
             }
-            command.lat = parseFloat(coords[0]);
-            command.lng = parseFloat(coords[1]);
+            view.setFloat32(9, parseFloat(coords[0]), true);
+            view.setFloat32(13, parseFloat(coords[1]), true);
         }
-        
-        // Send command via WebSocket
-        ws.send(JSON.stringify(command));
+        ws.send(buffer);
+
         
         // Update UI state
         navigationActive = true;
@@ -305,7 +304,7 @@ const char webPage[] PROGMEM = R"rawliteral(
             return;
         }
         
-        ws.send(JSON.stringify({ autonomous: "pause" }));
+        sendMessage(4);
         navigationPaused = true;
         document.getElementById('start-pause-btn').textContent = 'Resume';
         document.getElementById('start-pause-btn').style.backgroundColor = '#28a745';
@@ -318,7 +317,7 @@ const char webPage[] PROGMEM = R"rawliteral(
             return;
         }
         
-        ws.send(JSON.stringify({ autonomous: "resume" }));
+        sendMessage(5);
         navigationPaused = false;
         document.getElementById('start-pause-btn').textContent = 'Pause';
         document.getElementById('start-pause-btn').style.backgroundColor = '#ffc107';
@@ -331,7 +330,7 @@ const char webPage[] PROGMEM = R"rawliteral(
             return;
         }
         
-        ws.send(JSON.stringify({ autonomous: "stop" }));
+        sendMessage(0);
         
         // Update UI state
         navigationActive = false;
@@ -343,7 +342,7 @@ const char webPage[] PROGMEM = R"rawliteral(
     // Reset tracking data
     function resetTracking() {
         if (wsConnected) {
-            ws.send(JSON.stringify({ tracking: "reset" }));
+            sendMessage(6);
         } else {
             showAlert("WebSocket disconnected. Cannot reset tracking.");
         }
@@ -537,13 +536,13 @@ const char webPage[] PROGMEM = R"rawliteral(
         }
 
         const { normalizedY, normalizedX } = calculateValues();
-        
-        ws.send(JSON.stringify({
-            control: {
-                vertical: normalizedY,
-                horizontal: normalizedX
-            }
-        }));
+
+        const buffer = new ArrayBuffer(9); // 1 byte + 4 + 4
+        const view = new DataView(buffer);
+        view.setUint8(0, 1); // offset 0, id 1
+        view.setFloat32(1, normalizedY, true); // offset 1
+        view.setFloat32(5, normalizedX, true); // offset 4
+        ws.send(buffer);
     }
 
     // Get fusion status from ESP32
@@ -551,27 +550,30 @@ const char webPage[] PROGMEM = R"rawliteral(
         const button = document.getElementById('fusion-status-btn');
         const display = document.getElementById('fusion-status-display');
         const statusSpan = document.getElementById('fusion-status');
+
+        alert("I'll deal with this later...");
+
         
-        button.disabled = true;
-        button.textContent = 'Getting Status...';
-        display.style.display = 'block';
+        // button.disabled = true;
+        // button.textContent = 'Getting Status...';
+        // display.style.display = 'block';
         
         // For fusion status, we'll use HTTP since it requires special handling
-        fetch('/fusionStatus')
-            .then(response => response.json())
-            .then(data => {
-                statusSpan.textContent = data.status;
-                display.style.display = 'block';
-            })
-            .catch(error => {
-                statusSpan.textContent = 'Error getting status';
-                console.error('Error:', error);
-            })
-            .finally(() => {
-                button.disabled = false;
-                button.textContent = 'Get Fusion Status';
-                display.style.display = 'block';
-            });
+        // fetch('/fusionStatus')
+        //     .then(response => response.json())
+        //     .then(data => {
+        //         statusSpan.textContent = data.status;
+        //         display.style.display = 'block';
+        //     })
+        //     .catch(error => {
+        //         statusSpan.textContent = 'Error getting status';
+        //         console.error('Error:', error);
+        //     })
+        //     .finally(() => {
+        //         button.disabled = false;
+        //         button.textContent = 'Get Fusion Status';
+        //         display.style.display = 'block';
+        //     });
     }
 
     // Record waypoint
@@ -585,7 +587,7 @@ const char webPage[] PROGMEM = R"rawliteral(
         button.disabled = true;
         button.textContent = 'Recording WP...';
         
-        ws.send(JSON.stringify({ waypoint: "record" }));
+        sendMessage(1);
         
         // Always re-enable the button after a short delay
         setTimeout(() => {
@@ -605,7 +607,7 @@ const char webPage[] PROGMEM = R"rawliteral(
         button.disabled = true;
         button.textContent = 'Clearing...';
         
-        ws.send(JSON.stringify({ waypoint: "clear" }));
+        sendMessage(2);
         
         // Always re-enable the button after a short delay
         setTimeout(() => {
@@ -630,6 +632,7 @@ const char webPage[] PROGMEM = R"rawliteral(
         
         // Create new WebSocket connection
         ws = new WebSocket(wsUrl);
+        ws.binaryType = "arraybuffer"; // binary data sending
         
         // Set connection timeout
         const connectionTimeout = setTimeout(() => {
@@ -664,7 +667,7 @@ const char webPage[] PROGMEM = R"rawliteral(
         
         ws.onmessage = function(evt) {
             try {
-                const data = JSON.parse(evt.data);
+                const data = parse_websocket_message(evt.data);
                 
                 // Handle different message types
                 switch(data.type) {
@@ -673,9 +676,9 @@ const char webPage[] PROGMEM = R"rawliteral(
                         document.getElementById('sensor-readout').textContent = 
                             `Front: ${data.front} cm | Left: ${data.left} cm | Right: ${data.right} cm`;
                         
-                        if (data.message && data.message !== "") {
-                            showAlert(data.message);
-                        }
+                        // if (data.message && data.message !== "") {
+                        //     showAlert(data.message);
+                        // }
                         break;
                         
                     case "gps":
@@ -708,14 +711,14 @@ const char webPage[] PROGMEM = R"rawliteral(
                         break;
                         
                     case "status":
-                        // Show status message
-                        showAlert(data.message);
+                        // // Show status message
+                        // showAlert(data.message);
                         break;
                         
                     case "error":
-                        // Show error message
-                        console.error("Error received:", data.message);
-                        showAlert(data.message);
+                        // // Show error message
+                        // console.error("Error received:", data.message);
+                        // showAlert(data.message);
                         break;
                 }
             } catch (e) {
@@ -723,6 +726,68 @@ const char webPage[] PROGMEM = R"rawliteral(
             }
         };
     }
+
+
+
+    function parse_websocket_message(buffer) {
+        const view = new DataView(buffer);
+        switch (view.getUint8(0)) {
+            case 1: // GNSS_data
+                return {
+                    type: "gps",
+                    lat: view.getFloat32(1, true),
+                    lng: view.getFloat32(5, true),
+                    fix: view.getUint8(9)
+                };
+            case 2: // RTK_status
+                return {
+                    type: "rtk",
+                    status: view.getUint8(1), // 1 offset for id byte
+                    age: view.getUint32(2 , true),
+                    connected: view.getUint8(6),
+                    carrSoln: view.getUint8(7),
+                    hAcc: view.getFloat64(8 , true),
+                    fixType: view.getUint8(16)
+                };
+            case 3: // Nav_stats
+                return {
+                    type: "navstats",
+                    totalDistance: view.getFloat32(1, true),
+                    currentPace: view.getFloat32(5, true),
+                    averagePace: view.getFloat32(9, true),
+                    totalTime: view.getUint32(13, true)
+                };
+            case 4: // Sensor_data
+                return {
+                    type: "sensors",
+                    left: view.getFloat32(1, true),
+                    front: view.getFloat32(5, true),
+                    right: view.getFloat32(9, true),
+                    //: view.getUint8(16)
+                };
+            case 5: // Waypoint_data
+                return {
+                    type: "waypoint",
+                    lat: view.getFloat32(1, true),
+                    lng: view.getFloat32(5, true),
+                    count: view.getUint8(9)
+                };
+            //case 6: // Auto_mode
+            default:
+                alert("couldn't identify websocket case");
+                break;
+        }
+    }
+
+    function sendMessage(message) {
+        //new Uint8Array(5);
+        const buffer = new ArrayBuffer(1);
+        const view = new DataView(buffer);
+
+        view.setUint8(0, message);
+        ws.send(buffer);
+    }
+
 </script>
 </body>
 </html>

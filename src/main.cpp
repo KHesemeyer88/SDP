@@ -39,6 +39,7 @@ void setup() {
     LOG_DEBUG("Connecting to WiFi network: %s", ssid);
     WiFi.begin(ssid, password);
     
+    
     // Wait for connection with timeout
     int wifiTimeout = 0;
     while (WiFi.status() != WL_CONNECTED && wifiTimeout < 20) {
@@ -52,8 +53,8 @@ void setup() {
         snprintf(ipStr, sizeof(ipStr), "%u.%u.%u.%u",
             WiFi.localIP()[0], WiFi.localIP()[1],
             WiFi.localIP()[2], WiFi.localIP()[3]);
-        Serial.printf("Connected to WiFi: %s, IP: %s", ssid, ipStr);
-        Serial.printf("\n");
+        Serial.printf("Connected to WiFi: %s, IP: %s\n\n", ssid, ipStr);
+        Serial.println(WiFi.localIP());
         LOG_DEBUG("Connected to WiFi: %s, IP: %s", ssid, ipStr);
     } else {
         Serial.printf("Failed to connect to WiFi. Will retry in RTOS tasks");
