@@ -84,7 +84,7 @@ const char mountPoint[] = "RTCM3MSM_MAGS"; // RTCM 3.2 MSM_MAXX(GNSS) MAGS (Amhe
 //const char mountPoint[] = "RTCM3MSM_MABT"; // Amherst
 
 // Navigation constants
-const float WAYPOINT_REACHED_RADIUS = 0.5; //meters
+const float WAYPOINT_REACHED_RADIUS = 2.0; //meters
 const int MAX_WAYPOINTS = 20;
 const int NAV_FREQ = 20;
 
