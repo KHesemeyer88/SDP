@@ -308,13 +308,27 @@ void ControlTask(void *pvParameters) {
                 // Calculate steering angle based on current and target positions
                 int steeringAngle = calculateSteeringAngle(currentLat, currentLon, targetLat, targetLon, currentHeading, nav.targetPace);
                 
-                // Calculate throttle value based on pace control
-                int throttleValue = calculateThrottle(currentSpeed, nav.targetPace);
+                pidInput = currentSpeed;
+                pidSetpoint = nav.targetPace;
+                
+                static int lastThrottleValue = ESC_NEUTRAL;
+                if (speedPID.Compute()) {
+                    lastThrottleValue = (int)pidOutput;
+                }
+
+                steeringAngle = constrain(steeringAngle, STEERING_CENTER - STEERING_MAX, STEERING_CENTER + STEERING_MAX);
+                static unsigned long lastLogTime = 0;
+                unsigned long now = millis();
+                if (now - lastLogTime > 200) {
+                    LOG_NAV("steeringAngle, %d", steeringAngle);
+                    lastLogTime = now;
+                }
+                lastThrottleValue = constrain(lastThrottleValue, ESC_MIN_FWD, ESC_MAX_FWD);
                 
                 // Apply control commands
                 if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
                     steeringServo.write(steeringAngle);
-                    escServo.write(throttleValue);
+                    escServo.write(lastThrottleValue);
                     xSemaphoreGive(servoMutex);
                 }
             }
