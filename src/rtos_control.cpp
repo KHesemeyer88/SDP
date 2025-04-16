@@ -6,6 +6,7 @@
 #include "navigation.h"
 #include "gnss.h"
 #include <PID_v1.h>
+#include "obstacle.h"
 
 // Control task variables
 unsigned long lastCommandTime = 0;
@@ -13,11 +14,21 @@ bool drivingState = false;
 unsigned long lastNonNeutralCommand = 0;
 const unsigned long DRIVING_GRACE_PERIOD = 1500; // 1.5 seconds grace period
 
+
 // For reverse handling
 bool inReverseMode = false;
 bool reverseSequenceActive = false;
 unsigned long reverseSequenceStartTime = 0;
 int reverseSequenceStep = 0;
+
+// For PI control
+static float cumulativeError = 0;
+static int lastEscCommand = ESC_MIN_FWD;
+
+// For resume navigation
+static bool preObstacleActive = false;
+static bool pathRecovery = false;
+static float originalBearing = 0;
 
 // Servo objects
 extern Servo steeringServo;
@@ -248,6 +259,7 @@ void ControlTask(void *pvParameters) {
                         currentLat, currentLon, currentSpeed, currentHeading);
                 }
             }
+
             
             // Get target data
             if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
@@ -256,32 +268,55 @@ void ControlTask(void *pvParameters) {
                 followingWaypoints = targetData.followingWaypoints;
                 xSemaphoreGive(waypointMutex);
             }
-            
-            // Calculate steering angle based on current and target positions
-            int steeringAngle = calculateSteeringAngle(currentLat, currentLon, targetLat, targetLon, currentHeading, nav.targetPace);
-                        
-            // Calculate throttle value based on pace control
-            pidInput = currentSpeed;
-            pidSetpoint = nav.targetPace;
-            
-            static int lastThrottleValue = ESC_NEUTRAL;
-            if (speedPID.Compute()) {
-                lastThrottleValue = (int)pidOutput;
+
+            // Obstacle avoidance
+            bool isObstacleActive = false;
+            if (xSemaphoreTake(obstacleMutex, pdMS_TO_TICKS(50))) {
+                isObstacleActive = obstacleOverride.active;
+                xSemaphoreGive(obstacleMutex);
             }
 
-            steeringAngle = constrain(steeringAngle, STEERING_CENTER - STEERING_MAX, STEERING_CENTER + STEERING_MAX);
-            static unsigned long lastLogTime = 0;
-            unsigned long now = millis();
-            if (now - lastLogTime > 200) {
-                LOG_NAV("steeringAngle, %d", steeringAngle);
-                lastLogTime = now;
-            }
-            lastThrottleValue = constrain(lastThrottleValue, ESC_MIN_FWD, ESC_MAX_FWD);
-            // Apply control commands
-            if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
-                steeringServo.write(steeringAngle);
-                escServo.write(lastThrottleValue);
-                xSemaphoreGive(servoMutex);
+            if (isObstacleActive) {
+                if (!preObstacleActive) {
+                    originalBearing = calculateBearing(currentLat, currentLon, targetLat, targetLon);
+                }
+                preObstacleActive = true;
+
+                // Direct servo control during avoidance
+                if (xSemaphoreTake(obstacleMutex, pdMS_TO_TICKS(50))) {
+                    steeringServo.write(obstacleOverride.overrideSteeringAngle);
+                    escServo.write(obstacleOverride.overrideThrottle);
+                    xSemaphoreGive(obstacleMutex);
+                }
+            
+            } else { // normal navigation 
+                if (pathRecovery) { // once avoidance completed, compare bearing 
+                    float bearingError = originalBearing - currentHeading;
+                    bearingError = (bearingError > 180) ? bearingError - 360 : 
+                                  (bearingError < -180) ? bearingError + 360 : bearingError;
+                    // If bearingError greater than 5 degrees, adjustment needed to go back on track
+                    if (fabs(bearingError) > 5.0) {
+                        int steeringAngle = STEERING_CENTER + (bearingError > 0 ? STEERING_MAX/2 : -STEERING_MAX/2);
+                        steeringServo.write(steeringAngle);
+                    } else {
+                        pathRecovery = false;
+                    }
+                } 
+            
+                preObstacleActive = false;
+                
+                // Calculate steering angle based on current and target positions
+                int steeringAngle = calculateSteeringAngle(currentLat, currentLon, targetLat, targetLon, currentHeading, nav.targetPace);
+                
+                // Calculate throttle value based on pace control
+                int throttleValue = calculateThrottle(currentSpeed, nav.targetPace);
+                
+                // Apply control commands
+                if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+                    steeringServo.write(steeringAngle);
+                    escServo.write(throttleValue);
+                    xSemaphoreGive(servoMutex);
+                }
             }
             
             // Update command timestamp

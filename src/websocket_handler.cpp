@@ -3,6 +3,7 @@
 #include "gnss.h"
 #include "logging.h"
 #include "navigation.h"
+#include <obstacle.h>
 
 // WebSocket instance (defined in http_server.cpp)
 AsyncWebServer webSocketServer(81);
@@ -518,9 +519,9 @@ void sendSensorData(AsyncWebSocketClient *client) {
     // This is placeholder code - you'll need to implement actual sensor reading
 
     Sensor_data my_data;
-    my_data.lidar_front = 100; // Replace with actual sensor values
-    my_data.lidar_left = 100;  // Replace with actual sensor values
-    my_data.lidar_right = 100; // Replace with actual sensor values
+    my_data.lidar_front = lastFrontDist; // Replace with actual sensor values
+    //my_data.lidar_left = 100;  // Replace with actual sensor values
+    //my_data.lidar_right = 100; // Replace with actual sensor values
     
     // Send to clients
     if (client) {

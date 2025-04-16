@@ -6,11 +6,13 @@
 #include "gnss.h"
 #include "logging.h"
 #include "navigation.h"
+#include "obstacle.h"
 
 // Task handles
 TaskHandle_t controlTaskHandle = NULL;
 TaskHandle_t websocketTaskHandle = NULL;
 TaskHandle_t httpServerTaskHandle = NULL;
+TaskHandle_t obstacleTaskHandle = NULL; 
 
 // Mutex for accessing shared resources
 SemaphoreHandle_t servoMutex = NULL;
@@ -157,6 +159,22 @@ void initRTOS() {
         return;
     }
 
+    // create the obstacle task
+    BaseType_t xReturnedObstacle = xTaskCreatePinnedToCore(
+        ObstacleTask,
+        "ObstacleTask",
+        OBSTACLE_TASK_STACK_SIZE,
+        NULL,
+        OBSTACLE_TASK_PRIORITY,
+        &obstacleTaskHandle,
+        0
+    );
+
+    if (xReturnedObstacle != pdPASS) {
+        handleSystemError("Failed to create ObstacleTask", true);
+        return;
+    }
+
     //Create the logging task
     Serial.printf("logQueue address: %p\n", logQueue);
     Serial.printf("\n");
@@ -232,6 +250,12 @@ void cleanupResources(bool cleanupMutexes, bool cleanupQueues, bool cleanupTasks
             httpServerTaskHandle = NULL;
             LOG_DEBUG("logTask deleted");
         }
+
+        if (obstacleTaskHandle != NULL) {
+            vTaskDelete(obstacleTaskHandle);
+            obstacleTaskHandle = NULL;
+            LOG_DEBUG("ObstacleTask deleted");
+        } 
     }
     
     // Clean up queues if requested
