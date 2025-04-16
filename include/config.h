@@ -35,8 +35,8 @@
 #define SONAR_UPDATE_INTERVAL       100
 #define AVOIDANCE_MESSAGE_TIMEOUT   1000
 #define DESTINATION_MESSAGE_TIMEOUT 5000
-#define CONTROL_UPDATE_FREQUENCY    20 
-#define NAV_UPDATE_FREQUENCY        20
+#define CONTROL_UPDATE_FREQUENCY    NAV_FREQ
+#define NAV_UPDATE_FREQUENCY        NAV_FREQ
 
 
 // WebSocket update intervals
@@ -68,11 +68,11 @@ const int TRIM_ANGLE = 2; //car lists left
 // const char* ssid = "RC_Car_Control";
 // const char* password = "12345678";
 // Hotspot:
-const char ssid[] = "Kians iPhone";
-const char password[] = "Dove'sHamster";
+// const char ssid[] = "Kians iPhone";
+// const char password[] = "Dove'sHamster";
 
-// const char ssid[] = "Galaxy XCover FieldPro8858";
-// const char password[] = "bugo4303";
+const char ssid[] = "Galaxy XCover FieldPro8858";
+const char password[] = "bugo4303";
 
 // MaCORS
 const char casterHost[] = "macorsrtk.massdot.state.ma.us"; 
@@ -86,7 +86,7 @@ const char mountPoint[] = "RTCM3MSM_MAGS"; // RTCM 3.2 MSM_MAXX(GNSS) MAGS (Amhe
 // Navigation constants
 const float WAYPOINT_REACHED_RADIUS = 2.0; //meters
 const int MAX_WAYPOINTS = 20;
-const int NAV_FREQ = 20;
+const int NAV_FREQ = 10;
 
 // Sonar filtering
 const int FILTER_SAMPLES = 5;  // Number of samples to average

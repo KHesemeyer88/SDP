@@ -479,24 +479,6 @@ void GNSSTask(void *pvParameters) {
             }
         }
         
-        // Send GNSS data to WebSocket clients if new data is available
-        unsigned long dataStartTime = millis();
-        if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {  // 100ms timeout
-            //LOG_DEBUG("gnssMutex take time, %lu", millis() - dataStartTime);
-            
-            if (gnssData.newDataAvailable) {
-                // Let WebSocket task handle data sending to avoid potential issues
-                //LOG_DEBUG("gnssData.newDataAvailable");
-                gnssData.newDataAvailable = false;
-            }
-            
-            unsigned long mutexHeldTime = millis() - dataStartTime;
-            xSemaphoreGive(gnssMutex);
-            //LOG_DEBUG("gnssMutex hold time, %lu", mutexHeldTime);
-        } else {
-            LOG_ERROR("GNSS task mutex fail");
-        }
-        
         // Log total loop time if significant
         unsigned long loopTime = millis() - loopStartTime;
         if (loopTime > 0) {  // Only log if the loop took a significant amount of time

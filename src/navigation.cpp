@@ -579,8 +579,8 @@ static void handleWaypointReached() {
             currentWaypoint = navStatus.currentWaypoint;
             
             // Important diagnostic logging
-            LOG_NAV("currentWaypoint, totalWaypoints, followingWaypoints, %d, %d, %d", 
-                  currentWaypoint, totalWaypoints, followingWaypoints);
+            // LOG_NAV("currentWaypoint, totalWaypoints, followingWaypoints, %d, %d, %d", 
+            //       currentWaypoint, totalWaypoints, followingWaypoints);
                        
             // Handle waypoint reaching based on mode
             if (followingWaypoints) {
@@ -600,7 +600,7 @@ static void handleWaypointReached() {
                     // Update status message
                     snprintf((char*)navStatus.statusMessage, sizeof(((NavStatus*)0)->statusMessage), "Moving to next waypoint");
 
-                    //LOG_NAV("Moving to next waypoint: %d of %d", currentWaypoint + 1, totalWaypoints);
+                    LOG_NAV("Moving to next waypoint: %d of %d", currentWaypoint + 1, totalWaypoints);
                 } else {
                     // Reset to first waypoint
                     currentWaypoint = 0;
@@ -616,9 +616,9 @@ static void handleWaypointReached() {
                     // Update status message
                     snprintf((char*)navStatus.statusMessage, sizeof(((NavStatus*)0)->statusMessage), "Starting waypoint sequence again");
                     
-                    LOG_NAV("Last waypoint reached, looping back");
-                    //LOG_NAV("Looping back to waypoint 0. targetLat=%.7f, targetLon=%.7f", 
-                    //       waypoints[0].latitude, waypoints[0].longitude);
+                    //LOG_NAV("Last waypoint reached, looping back");
+                    LOG_NAV("Looping back to waypoint 0. targetLat=%.7f, targetLon=%.7f", 
+                          waypoints[0].latitude, waypoints[0].longitude);
                 }
                 
                 // Check if target distance has been reached
@@ -700,7 +700,7 @@ bool addWaypoint(float latitude, float longitude) {
         return false;
     }
     
-    //LOG_NAV("Waypoint command successfully queued");
+    LOG_NAV("Waypoint command successfully queued");
     return true;
 }
 

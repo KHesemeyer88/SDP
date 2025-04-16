@@ -37,7 +37,7 @@ static bool prevPausedState = false;
 static int mutexWait = 50;
 
 // Initial tuning values (adjust as needed)
-double Kp = 4.0, Ki = 0.5, Kd = 0.0;
+double Kp = 3.0, Ki = 1.0, Kd = 0.1;
 
 // PID controller instance (DIRECT means output increases when error is positive)
 PID speedPID(&pidInput, &pidOutput, &pidSetpoint, Kp, Ki, Kd, DIRECT);
@@ -205,8 +205,8 @@ void ControlTask(void *pvParameters) {
             static bool lastAutoMode = false;
             static bool lastPausedState = false;
             if (nav.autonomousMode != lastAutoMode || nav.isPaused != lastPausedState) {
-                LOG_NAV("ControlTask state chg, %d, %d", 
-                        nav.autonomousMode, nav.isPaused);
+                // LOG_NAV("ControlTask state chg, %d, %d", 
+                //         nav.autonomousMode, nav.isPaused);
                 
                 // If transitioning from active navigation to stopped/paused
                 if ((!nav.autonomousMode && lastAutoMode) || (nav.isPaused && !lastPausedState)) {
@@ -216,14 +216,14 @@ void ControlTask(void *pvParameters) {
                     pidInput = 0;              // Reset input 
                     cumulativeError = 0;       // Reset your PI control error accumulator
                     lastEscCommand = ESC_MIN_FWD; // Reset your last ESC command
-                    LOG_NAV("PID controller disabled due to navigation stop/pause");
+                    //LOG_NAV("PID controller disabled due to navigation stop/pause");
                 } 
                 // If transitioning from stopped/paused to active navigation
                 else if ((nav.autonomousMode && !lastAutoMode) || (!nav.isPaused && lastPausedState)) {
                     // When navigation starts or resumes, put PID back in automatic mode
                     pidOutput = ESC_MIN_FWD;  // Start with minimum throttle
                     speedPID.SetMode(AUTOMATIC);
-                    LOG_NAV("PID controller enabled due to navigation start/resume");
+                    //LOG_NAV("PID controller enabled due to navigation start/resume");
                 }
                 
                 lastAutoMode = nav.autonomousMode;
@@ -237,19 +237,21 @@ void ControlTask(void *pvParameters) {
             if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                 unsigned long now = millis();
                 unsigned long age = now - gnssData.gnssFixTime;
-                LOG_DEBUG("position-control latency time, %lu", age); //THIS IS POSITION - CONTROL LATENCY!!!!
+                
                 currentLat = gnssData.latitude;
                 currentLon = gnssData.longitude;
                 currentSpeed = gnssData.speed;
                 currentHeading = gnssData.heading;
-                // Add periodic logging of control values in autonomous mode
-                // static unsigned long lastLocLog = 0;
-                // if (millis() - lastLocLog > 500) {
-                //     lastLocLog = millis();
-                //     LOG_NAV("ControlTask data, %.7f, %.7f, %.2f, %.1f", 
-                //         currentLat, currentLon, currentSpeed, currentHeading);
-                // }
+                
                 xSemaphoreGive(gnssMutex);
+                LOG_DEBUG("position-control latency time, %lu", age); //THIS IS POSITION - CONTROL LATENCY!!!!
+                // Add periodic logging of control values in autonomous mode
+                static unsigned long lastLocLog = 0;
+                if (millis() - lastLocLog > 500) {
+                    lastLocLog = millis();
+                    LOG_NAV("ControlTask data, %.7f, %.7f, %.2f, %.1f", 
+                        currentLat, currentLon, currentSpeed, currentHeading);
+                }
             }
             
             // Get target data
@@ -264,20 +266,18 @@ void ControlTask(void *pvParameters) {
             int steeringAngle = calculateSteeringAngle(currentLat, currentLon, targetLat, targetLon, currentHeading, nav.targetPace);
             
             // Calculate throttle value based on pace control
-            //int throttleValue = calculateThrottle(currentSpeed, nav.targetPace); //COMMENTED OUT FOR PID TEST
             pidInput = currentSpeed;
             pidSetpoint = nav.targetPace;
-
-            int throttleValue = ESC_NEUTRAL;  // default to neutral just in case
-
+            
+            static int lastThrottleValue = ESC_NEUTRAL;
             if (speedPID.Compute()) {
-                throttleValue = (int)pidOutput;
+                lastThrottleValue = (int)pidOutput;
             }
 
             // Apply control commands
             if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                 steeringServo.write(steeringAngle);
-                escServo.write(throttleValue);
+                escServo.write(lastThrottleValue);
                 xSemaphoreGive(servoMutex);
             }
             
@@ -348,58 +348,4 @@ int calculateSteeringAngle(float currentLat, float currentLon, float targetLat, 
                          STEERING_CENTER - effectiveSteeringMax, 
                          STEERING_CENTER + effectiveSteeringMax);
     }
-}
-
-// Calculate throttle value based on current speed and target pace
-int calculateThrottle(float currentSpeed, float targetPace) {
-    //LOG_DEBUG("calculateThrottle");
-    // Only adjust speed if we have a target pace
-    if (targetPace <= 0) {
-        return ESC_NEUTRAL; // Stop if no target pace
-    }
-    
-    // Static variables for PI control
-    static float cumulativeError = 0;
-    static int lastEscCommand = ESC_MIN_FWD;
-    
-    // Calculate pace error
-    float paceError = targetPace - currentSpeed;
-    int adjustmentValue = 0;
-    
-    // Vehicle is stopped or moving very slowly (GPS noise)
-    if (currentSpeed < 0.5) {
-        // Initial push to overcome inertia
-        lastEscCommand = ESC_MIN_FWD + 15;
-        cumulativeError = 0; // Reset integral term
-    }
-    // Normal PI control operation when vehicle is moving
-    else {
-        // Proportional component
-        float pComponent = paceError * 1.5;
-        
-        // Integral component with slower accumulation
-        cumulativeError = constrain(cumulativeError + paceError * 0.03, -3.0, 5.0);
-        
-        // Integral gain
-        float iComponent = cumulativeError * 1.0;
-        
-        // Combined adjustment
-        adjustmentValue = (int)(pComponent + iComponent);
-        
-        // Constrain adjustment to prevent lurching
-        adjustmentValue = constrain(adjustmentValue, -1, 1);
-        
-        // Calculate new ESC value
-        lastEscCommand = lastEscCommand + adjustmentValue;
-    }
-    
-    // Minimum throttle floor based on target pace
-    float minPowerLevel = ESC_MIN_FWD + (targetPace * 10.0);
-    
-    if (currentSpeed > 0.5 && lastEscCommand < minPowerLevel) {
-        lastEscCommand = (int)minPowerLevel;
-    }
-    
-    // Constrain final value
-    return constrain(lastEscCommand, ESC_MIN_FWD, ESC_MAX_FWD);
 }
