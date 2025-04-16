@@ -271,7 +271,7 @@ void ControlTask(void *pvParameters) {
 
             // Obstacle avoidance
             bool isObstacleActive = false;
-            if (xSemaphoreTake(obstacleMutex, pdMS_TO_TICKS(50))) {
+            if (xSemaphoreTake(obstacleMutex, pdMS_TO_TICKS(mutexWait))) {
                 isObstacleActive = obstacleOverride.active;
                 xSemaphoreGive(obstacleMutex);
             }
@@ -283,7 +283,7 @@ void ControlTask(void *pvParameters) {
                 preObstacleActive = true;
 
                 // Direct servo control during avoidance
-                if (xSemaphoreTake(obstacleMutex, pdMS_TO_TICKS(50))) {
+                if (xSemaphoreTake(obstacleMutex, pdMS_TO_TICKS(mutexWait))) {
                     steeringServo.write(obstacleOverride.overrideSteeringAngle);
                     escServo.write(obstacleOverride.overrideThrottle);
                     xSemaphoreGive(obstacleMutex);
@@ -326,7 +326,7 @@ void ControlTask(void *pvParameters) {
                 lastThrottleValue = constrain(lastThrottleValue, ESC_MIN_FWD, ESC_MAX_FWD);
                 
                 // Apply control commands
-                if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(5)) == pdTRUE) {
+                if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                     steeringServo.write(steeringAngle);
                     escServo.write(lastThrottleValue);
                     xSemaphoreGive(servoMutex);
