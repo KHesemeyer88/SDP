@@ -14,6 +14,7 @@
 #define CONTROL_TASK_PRIORITY       10
 #define NAV_TASK_PRIORITY           9
 #define GNSS_TASK_PRIORITY          8
+#define OBSTACLE_TASK_PRIORITY      8
 #define WEBSOCKET_TASK_PRIORITY     7
 #define HTTP_SERVER_TASK_PRIORITY   6
 #define LOG_TASK_PRIORITY           2
@@ -25,6 +26,7 @@
 #define HTTP_SERVER_TASK_STACK_SIZE 8192
 #define LOG_TASK_STACK_SIZE         4096
 #define GNSS_TASK_STACK_SIZE        8192
+#define OBSTACLE_TASK_STACK_SIZE    2048
 
 // HTTP server task handle
 extern TaskHandle_t httpServerTaskHandle;
@@ -65,6 +67,7 @@ struct ControlCommand {
 // Task handles
 extern TaskHandle_t controlTaskHandle;
 extern TaskHandle_t websocketTaskHandle;
+extern TaskHandle_t obstacleTaskHandle;
 
 // Mutex for accessing shared resources
 extern SemaphoreHandle_t servoMutex;

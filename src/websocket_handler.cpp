@@ -3,6 +3,7 @@
 #include "gnss.h"
 #include "logging.h"
 #include "navigation.h"
+#include <obstacle.h>
 
 // WebSocket instance (defined in http_server.cpp)
 AsyncWebServer webSocketServer(81);
@@ -568,9 +569,9 @@ void sendSensorData(AsyncWebSocketClient *client) {
     // This is placeholder code - you'll need to implement actual sensor reading
     DynamicJsonDocument doc(256);
     doc["type"] = "sensors";
-    doc["front"] = 100; // Replace with actual sensor values
-    doc["left"] = 100;  // Replace with actual sensor values
-    doc["right"] = 100; // Replace with actual sensor values
+    doc["front"] = lastFrontDist; // Replace with actual sensor values
+    //doc["left"] = 100;  // Replace with actual sensor values
+    //doc["right"] = 100; // Replace with actual sensor values
     
     // Serialize JSON
     String jsonString;
