@@ -19,10 +19,6 @@ bool reverseSequenceActive = false;
 unsigned long reverseSequenceStartTime = 0;
 int reverseSequenceStep = 0;
 
-// For PI control
-static float cumulativeError = 0;
-static int lastEscCommand = ESC_MIN_FWD;
-
 // Servo objects
 extern Servo steeringServo;
 extern Servo escServo;
@@ -31,6 +27,7 @@ extern Servo escServo;
 double pidInput = 0;     // GNSS speed in m/s
 double pidSetpoint = 0;  // targetPace in m/s
 double pidOutput = 0;    // throttle signal to ESC
+
 // For tracking navigation state changes for PID reset
 static bool prevAutonomousMode = false;
 static bool prevPausedState = false;
@@ -214,8 +211,6 @@ void ControlTask(void *pvParameters) {
                     speedPID.SetMode(MANUAL);
                     pidOutput = ESC_MIN_FWD;    // Reset output to minimum
                     pidInput = 0;              // Reset input 
-                    cumulativeError = 0;       // Reset your PI control error accumulator
-                    lastEscCommand = ESC_MIN_FWD; // Reset your last ESC command
                     //LOG_NAV("PID controller disabled due to navigation stop/pause");
                 } 
                 // If transitioning from stopped/paused to active navigation
@@ -264,7 +259,7 @@ void ControlTask(void *pvParameters) {
             
             // Calculate steering angle based on current and target positions
             int steeringAngle = calculateSteeringAngle(currentLat, currentLon, targetLat, targetLon, currentHeading, nav.targetPace);
-            
+                        
             // Calculate throttle value based on pace control
             pidInput = currentSpeed;
             pidSetpoint = nav.targetPace;
@@ -274,6 +269,14 @@ void ControlTask(void *pvParameters) {
                 lastThrottleValue = (int)pidOutput;
             }
 
+            steeringAngle = constrain(steeringAngle, STEERING_CENTER - STEERING_MAX, STEERING_CENTER + STEERING_MAX);
+            static unsigned long lastLogTime = 0;
+            unsigned long now = millis();
+            if (now - lastLogTime > 200) {
+                LOG_NAV("steeringAngle, %d", steeringAngle);
+                lastLogTime = now;
+            }
+            lastThrottleValue = constrain(lastThrottleValue, ESC_MIN_FWD, ESC_MAX_FWD);
             // Apply control commands
             if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                 steeringServo.write(steeringAngle);
@@ -288,6 +291,7 @@ void ControlTask(void *pvParameters) {
             // If paused, set motor to neutral but maintain steering
             if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                 escServo.write(ESC_NEUTRAL);
+                steeringServo.write(STEERING_CENTER + TRIM_ANGLE);
                 xSemaphoreGive(servoMutex);
             }
         }
@@ -296,7 +300,7 @@ void ControlTask(void *pvParameters) {
         if (currentTime - lastCommandTime > COMMAND_TIMEOUT_MS) {
             if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                 escServo.write(ESC_NEUTRAL);
-                steeringServo.write(STEERING_CENTER);
+                steeringServo.write(STEERING_CENTER + TRIM_ANGLE);
                 xSemaphoreGive(servoMutex);
             }
         }
@@ -307,45 +311,31 @@ void ControlTask(void *pvParameters) {
 }
 
 // Calculate steering angle based on current position, target, heading, target pace
-int calculateSteeringAngle(float currentLat, float currentLon, float targetLat, float targetLon, float currentHeading, float targetPace){    
-    //LOG_DEBUG("calculateSteeringAngle");
-    // Calculate bearing to target
+int calculateSteeringAngle(float currentLat, float currentLon, float targetLat, float targetLon, float currentHeading, float targetPace) {
     float bearing = calculateBearing(currentLat, currentLon, targetLat, targetLon);
-    
-    // Calculate heading error (difference between bearing and current heading)
     float headingError = bearing - currentHeading;
-    
+
     // Normalize heading error to -180 to 180 range
     if (headingError > 180) headingError -= 360;
     if (headingError < -180) headingError += 360;
-    
-    // Determine correction factor based on GNSS quality
-    float correctionFactor = 0.35; // Default value
-    
-    // Determine max steering angle based on target pace
-    int effectiveSteeringMax;
-    if (targetPace > 4.0) {  // High speed threshold (MESS WITH THIS)
-        effectiveSteeringMax = STEERING_MAX * 0.7;  // XX% of max steering at high speeds
-        } else {
-            effectiveSteeringMax = STEERING_MAX;  // Full steering at normal speeds
-        }
 
-    // For large errors (> 45°), use full steering capability
-    if (abs(headingError) > 45.0) {
-        // Apply maximum steering in the appropriate direction
-        return (headingError > 0) ? 
-                STEERING_CENTER + STEERING_MAX : 
-                STEERING_CENTER - STEERING_MAX;
-    } 
-    // For moderate to small errors, use proportional control
-    else {
-        // Linear scaling for smooth transition to maximum steering
-        float scaleFactor = correctionFactor * (45.0 / STEERING_MAX);
-        int steeringAngle = STEERING_CENTER + (headingError * scaleFactor);
-        
-        // Apply steering limits
-        return constrain(steeringAngle, 
-                         STEERING_CENTER - effectiveSteeringMax, 
-                         STEERING_CENTER + effectiveSteeringMax);
+    static unsigned long lastLogTime = 0;
+    unsigned long now = millis();
+    if (now - lastLogTime > 200) {
+        LOG_NAV("headingError, %.0f", headingError);
+        lastLogTime = now;
     }
+
+    float correctionFactor = 0.6;
+
+    // Determine max steering angle based on target pace
+    int effectiveSteeringMax = (targetPace > 4.0) ? STEERING_MAX * 0.7 : STEERING_MAX;
+
+    // Final angle with trim
+    int steeringAngle = STEERING_CENTER + TRIM_ANGLE + round(correctionFactor * headingError);
+
+    // Clamp to effective limits
+    return constrain(steeringAngle,
+                     STEERING_CENTER - effectiveSteeringMax,
+                     STEERING_CENTER + effectiveSteeringMax);
 }

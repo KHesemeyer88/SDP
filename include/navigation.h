@@ -113,6 +113,7 @@ NavStatus getNavStatus();
 
 // Helper calculations
 float calculateBearing(float lat1, float lon1, float lat2, float lon2);
+float calculateSteeringError(float currentLat, float currentLon, float targetLat, float targetLon, float currentHeading);
 float calculateDistance(float lat1, float lon1, float lat2, float lon2);
 
 // Steering and throttle calculation functions
