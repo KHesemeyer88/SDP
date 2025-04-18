@@ -104,35 +104,80 @@ bool initializeGNSS() {
     delay(100);
     
     // Use SPI to begin communication with GPS module - note reduced frequency for stability
-    if (!myGPS.begin(GNSSSPI, NAV_CS_PIN, NAV_SPI_FREQUENCY)) {  // 4MHz instead of 20MHz
+    if (!myGPS.begin(GNSSSPI, NAV_CS_PIN, NAV_SPI_FREQUENCY)) {  
         LOG_ERROR("u-blox GNSS not detected over SPI. Check wiring.");
         return false;
     }
     
     LOG_DEBUG("GNSS module found over SPI!");
     
-    // Configure SPI port to output UBX (critical)
-    myGPS.setSPIOutput(COM_TYPE_UBX | COM_TYPE_NMEA | COM_TYPE_RTCM3);
-    myGPS.setSPIInput(COM_TYPE_UBX | COM_TYPE_RTCM3);
-
-    
-    myGPS.setNavigationFrequency(NAV_FREQ);
-    myGPS.setDGNSSConfiguration(SFE_UBLOX_DGNSS_MODE_FIXED);
-    myGPS.setMainTalkerID(SFE_UBLOX_MAIN_TALKER_ID_GP);
-    myGPS.setNMEAGPGGAcallbackPtr(&pushGPGGA);
-    
-    // Use SPI-specific message configuration
-    myGPS.setVal8(UBLOX_CFG_MSGOUT_NMEA_ID_GGA_SPI, 20);
-    
-    // Enable the callback for PVT messages
-    myGPS.setAutoPVTcallbackPtr(&pvtCallback);
-    
-    // Disable sensor fusion
-    if (!myGPS.setVal8(UBLOX_CFG_SFCORE_USE_SF, 0)) {
-        LOG_ERROR("Failed to disable sensor fusion.");
+    // All configuration first, while UBX input is still accepted
+    if (!myGPS.setNavigationFrequency(NAV_FREQ)) {
+        LOG_ERROR("Failed to set NAV FREQ, %d", NAV_FREQ);
     } else {
-        LOG_DEBUG("IMU sensor fusion disabled.");
+        LOG_DEBUG("set NAV FREQ, %d", NAV_FREQ);
     }
+
+    if (!myGPS.setVal8(UBLOX_CFG_NAVSPG_DYNMODEL, 3)) {
+        LOG_ERROR("Failed to set dynamic model");
+    } else {
+        LOG_DEBUG("set DYNMODEL, %d", 3);
+    }
+
+    if (!myGPS.setVal8(UBLOX_CFG_SFCORE_USE_SF, 0)) {
+        LOG_ERROR("Failed to disable sensor fusion");
+    } else {
+        LOG_DEBUG("Sensor fusion disabled");
+    }
+
+    if (!myGPS.setVal8(UBLOX_CFG_MSGOUT_UBX_NAV_PVT_SPI, NAV_FREQ)) {
+        LOG_ERROR("Failed to enable UBX-NAV-PVT output");
+    } else {
+        LOG_DEBUG("set UBX_NAV_PVT rate to NAV FREQ, %d", NAV_FREQ);
+    }
+
+    if (!myGPS.setVal8(UBLOX_CFG_MSGOUT_NMEA_ID_GGA_SPI, 1)) {  // reasonable rate
+        LOG_ERROR("Failed to enable GGA output");
+    } else {
+        LOG_DEBUG("set GGA output rate to, %d", 1);
+    }
+
+    if (!myGPS.setNMEAGPGGAcallbackPtr(&pushGPGGA)) {
+        LOG_ERROR("Failed to set GGA callback");
+    } else {
+        LOG_DEBUG("set GGA callback successfuly");
+    }
+
+    if (!myGPS.setAutoPVTcallbackPtr(&pvtCallback)) {
+        LOG_ERROR("Failed to set PVT callback");
+    } else {
+        LOG_DEBUG("set PVT callback successfully");
+    }
+
+    uint8_t dynModel = 0;
+    if (myGPS.getVal8(UBLOX_CFG_NAVSPG_DYNMODEL, &dynModel)) {
+        LOG_DEBUG("Confirmed DYNMODEL = %d", dynModel);
+    } else {
+        LOG_ERROR("Failed to read back DYNMODEL");
+    }
+
+    uint8_t ggaRate = 0;
+    if (myGPS.getVal8(UBLOX_CFG_MSGOUT_NMEA_ID_GGA_SPI, &ggaRate)) {
+        LOG_DEBUG("Confirmed GGA rate = %d", ggaRate);
+    } else {
+        LOG_ERROR("Failed to read GGA output rate");
+    }
+
+    uint8_t pvtRate = 0;
+    if (myGPS.getVal8(UBLOX_CFG_MSGOUT_UBX_NAV_PVT_SPI, &pvtRate)) {
+        LOG_DEBUG("Confirmed NAV-PVT output rate = %d", pvtRate);
+    } else {
+        LOG_ERROR("Failed to read PVT output rate");
+    }
+
+    // Only now restrict input/output
+    myGPS.setSPIInput(COM_TYPE_RTCM3);
+    myGPS.setSPIOutput(COM_TYPE_UBX);
     
     return true;
 }

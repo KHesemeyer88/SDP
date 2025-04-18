@@ -28,7 +28,7 @@
 #define NAV_SCK_PIN   14    // SCLK (Serial Clock)
 #define NAV_INT_PIN   26    // Interrupt pin
 #define NAV_RST_PIN   27    // Reset pin
-#define NAV_SPI_FREQUENCY 4000000  // 20 MHz SPI frequency - drop down if unstable
+#define NAV_SPI_FREQUENCY 5000000  // SPI frequency - drop down if unstable
 
 // Timing constants
 #define COMMAND_TIMEOUT_MS          500
