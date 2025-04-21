@@ -125,9 +125,9 @@ bool initializeGNSS() {
     if (!myGPS.setVal8(UBLOX_CFG_MSGOUT_NMEA_ID_GGA_SPI, 20)) {
         LOG_ERROR("Failed to set NMEA GGA rate");
     }
-    if (!myGPS.setVal8(UBLOX_CFG_NAVSPG_DYNMODEL, 3)) {
-        LOG_ERROR("Failed to set DYNMODEL");
-    }
+    // if (!myGPS.setVal8(UBLOX_CFG_NAVSPG_DYNMODEL, 3)) {
+    //     LOG_ERROR("Failed to set DYNMODEL");
+    // }
     
     
     // Enable the callback for PVT messages
