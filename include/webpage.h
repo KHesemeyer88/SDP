@@ -123,7 +123,7 @@ const char webPage[] PROGMEM = R"rawliteral(
 
         <div id="manual-control">
             <div id="sensor-readout" style="font-size: 14px; margin-bottom: 10px; font-family: monospace;">
-                Front: -- cm | Left: -- cm | Right: -- cm
+                Front: -- cm
             </div>
             <canvas id="joystick" width="300" height="300"></canvas>
         </div>
@@ -674,7 +674,7 @@ const char webPage[] PROGMEM = R"rawliteral(
                     case "sensors":
                         // Update sensor displays
                         document.getElementById('sensor-readout').textContent = 
-                            `Front: ${data.front} cm | Left: ${data.left} cm | Right: ${data.right} cm`;
+                            `Front: ${data.front} cm`;
                         
                         // if (data.message && data.message !== "") {
                         //     showAlert(data.message);
@@ -760,9 +760,7 @@ const char webPage[] PROGMEM = R"rawliteral(
             case 4: // Sensor_data
                 return {
                     type: "sensors",
-                    left: view.getFloat32(1, true),
                     front: view.getFloat32(5, true),
-                    right: view.getFloat32(9, true),
                     //: view.getUint8(16)
                 };
             case 5: // Waypoint_data

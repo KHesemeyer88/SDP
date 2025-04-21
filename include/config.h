@@ -50,7 +50,7 @@ const int STEERING_PIN = 5;   // GPIO5 for steering servo
 const int ESC_PIN = 23;       // GPIO23 for ESC control
 
 // Sonar thresholds (cm)
-const int FRONT_STOP_THRESHOLD = 200; // in cm
+const int FRONT_STOP_THRESHOLD = 300; // in cm
 //const int SIDE_AVOID_THRESHOLD = 50;
 
 // Traxxas XL-2.5 ESC & servo values. Note ESC takes angles like a servo, but converts them to speed
@@ -71,11 +71,11 @@ const int TRIM_ANGLE = 2;       //car lists left
 // const char ssid[] = "Kians iPhone";
 // const char password[] = "Dove'sHamster";
 
-//const char ssid[] = "Galaxy XCover FieldPro8858";
-//const char password[] = "bugo4303";
+const char ssid[] = "Galaxy XCover FieldPro8858";
+const char password[] = "bugo4303";
 
-const char ssid[] = "chewchewchew";
-const char password[] = "03092738Ss";
+// const char ssid[] = "chewchewchew";
+// const char password[] = "03092738Ss";
 
 // MaCORS
 const char casterHost[] = "macorsrtk.massdot.state.ma.us"; 

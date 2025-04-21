@@ -45,7 +45,7 @@ static bool prevPausedState = false;
 static int mutexWait = 50;
 
 // Initial tuning values (adjust as needed)
-double Kp = 3.0, Ki = 1.0, Kd = 0.1;
+double Kp = 3.0, Ki = 1.2, Kd = 1.5;
 
 // PID controller instance (DIRECT means output increases when error is positive)
 PID speedPID(&pidInput, &pidOutput, &pidSetpoint, Kp, Ki, Kd, DIRECT);

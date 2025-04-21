@@ -117,12 +117,18 @@ bool initializeGNSS() {
 
     
     myGPS.setNavigationFrequency(NAV_FREQ);
-    myGPS.setDGNSSConfiguration(SFE_UBLOX_DGNSS_MODE_FIXED);
+    //myGPS.setDGNSSConfiguration(SFE_UBLOX_DGNSS_MODE_FIXED);
     myGPS.setMainTalkerID(SFE_UBLOX_MAIN_TALKER_ID_GP);
     myGPS.setNMEAGPGGAcallbackPtr(&pushGPGGA);
     
     // Use SPI-specific message configuration
-    myGPS.setVal8(UBLOX_CFG_MSGOUT_NMEA_ID_GGA_SPI, 20);
+    if (!myGPS.setVal8(UBLOX_CFG_MSGOUT_NMEA_ID_GGA_SPI, 20)) {
+        LOG_ERROR("Failed to set NMEA GGA rate");
+    }
+    if (!myGPS.setVal8(UBLOX_CFG_NAVSPG_DYNMODEL, 3)) {
+        LOG_ERROR("Failed to set DYNMODEL");
+    }
+    
     
     // Enable the callback for PVT messages
     myGPS.setAutoPVTcallbackPtr(&pvtCallback);
