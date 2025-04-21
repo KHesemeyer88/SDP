@@ -45,7 +45,7 @@ static bool prevPausedState = false;
 static int mutexWait = 50;
 
 // Initial tuning values (adjust as needed)
-double Kp = 3.0, Ki = 1.2, Kd = 1.7;
+double Kp = 6.0, Ki = 1.2, Kd = 1.0;
 
 // PID controller instance (DIRECT means output increases when error is positive)
 PID speedPID(&pidInput, &pidOutput, &pidSetpoint, Kp, Ki, Kd, DIRECT);
@@ -296,42 +296,43 @@ void ControlTask(void *pvParameters) {
                                   (bearingError < -180) ? bearingError + 360 : bearingError;
                     // If bearingError greater than 5 degrees, adjustment needed to go back on track
                     if (fabs(bearingError) > 5.0) {
-                        int steeringAngle = STEERING_CENTER + (bearingError > 0 ? STEERING_MAX/2 : -STEERING_MAX/2);
+                        int steeringAngle = STEERING_CENTER + (bearingError > 0 ? STEERING_MAX : -STEERING_MAX);
                         steeringServo.write(steeringAngle);
                     } else {
                         pathRecovery = false;
                     }
-                } 
+                } else {
+                    preObstacleActive = false;
+                    
+                    // Calculate steering angle based on current and target positions
+                    int steeringAngle = calculateSteeringAngle(currentLat, currentLon, targetLat, targetLon, currentHeading, nav.targetPace);
+                    
+                    pidInput = currentSpeed;
+                    pidSetpoint = nav.targetPace;
+                    
+                    static int lastThrottleValue = ESC_NEUTRAL;
+                    if (speedPID.Compute()) {
+                        lastThrottleValue = (int)pidOutput;
+                    }
+    
+                    steeringAngle = constrain(steeringAngle, STEERING_CENTER - STEERING_MAX, STEERING_CENTER + STEERING_MAX);
+                    static unsigned long lastLogTime = 0;
+                    unsigned long now = millis();
+                    if (now - lastLogTime > 200) {
+                        LOG_NAV("steeringAngle, %d", steeringAngle);
+                        lastLogTime = now;
+                    }
+                    lastThrottleValue = constrain(lastThrottleValue, ESC_MIN_FWD, ESC_MAX_FWD);
+                    
+                    // Apply control commands
+                    if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
+                        steeringServo.write(steeringAngle);
+                        escServo.write(lastThrottleValue);
+                        xSemaphoreGive(servoMutex);
+                    }
+                }
             
-                preObstacleActive = false;
-                
-                // Calculate steering angle based on current and target positions
-                int steeringAngle = calculateSteeringAngle(currentLat, currentLon, targetLat, targetLon, currentHeading, nav.targetPace);
-                
-                pidInput = currentSpeed;
-                pidSetpoint = nav.targetPace;
-                
-                static int lastThrottleValue = ESC_NEUTRAL;
-                if (speedPID.Compute()) {
-                    lastThrottleValue = (int)pidOutput;
-                }
-
-                steeringAngle = constrain(steeringAngle, STEERING_CENTER - STEERING_MAX, STEERING_CENTER + STEERING_MAX);
-                static unsigned long lastLogTime = 0;
-                unsigned long now = millis();
-                if (now - lastLogTime > 200) {
-                    LOG_NAV("steeringAngle, %d", steeringAngle);
-                    lastLogTime = now;
-                }
-                lastThrottleValue = constrain(lastThrottleValue, ESC_MIN_FWD, ESC_MAX_FWD);
-                
-                // Apply control commands
-                if (xSemaphoreTake(servoMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
-                    steeringServo.write(steeringAngle);
-                    escServo.write(lastThrottleValue);
-                    xSemaphoreGive(servoMutex);
-                }
-            }
+            } 
             
             // Update command timestamp
             lastCommandTime = currentTime;

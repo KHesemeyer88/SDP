@@ -19,7 +19,7 @@ static int readIndex = 0;
 // initialized to a safe value.
 float lastFrontDist = 500;
 static uint32_t exitDelay = 0;
-const uint32_t exitDelay_end = 150; // in ms
+const uint32_t exitDelay_end = 75; // in ms
 
 // Global obstacle override structure.
 ObstacleOverride obstacleOverride = { false, STEERING_CENTER, ESC_NEUTRAL };
