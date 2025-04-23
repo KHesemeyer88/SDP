@@ -45,7 +45,7 @@ static bool prevPausedState = false;
 static int mutexWait = 50;
 
 // Initial tuning values (adjust as needed)
-double Kp = 6.0, Ki = 1.2, Kd = 0;
+double Kp = 5.0, Ki = 2.5, Kd = 1.0;
 
 // PID controller instance (DIRECT means output increases when error is positive)
 PID speedPID(&pidInput, &pidOutput, &pidSetpoint, Kp, Ki, Kd, DIRECT);
@@ -260,42 +260,6 @@ void ControlTask(void *pvParameters) {
                 }
             }
 
-            // STALL DEBUG BLOCK
-            static bool speedStalled = false;
-            static unsigned long stallStartTime = 0;
-
-            if (currentSpeed <= 0.5) {
-                if (!speedStalled) {
-                    stallStartTime = millis();
-                    speedStalled = true;
-                } else if (millis() - stallStartTime > 50) {  // persistent zero speed for >300ms
-                    // Trigger big dump
-                    LOG_ERROR("=== SPEED STALL DETECTED ===");
-                    LOG_ERROR("Time: %lu", millis());
-                    LOG_ERROR("currentLat: %.7f", currentLat);
-                    LOG_ERROR("currentLon: %.7f", currentLon);
-                    LOG_ERROR("heading: %.1f", currentHeading);
-                    LOG_ERROR("targetLat: %.7f", targetLat);
-                    LOG_ERROR("targetLon: %.7f", targetLon);
-                    LOG_ERROR("headingError: %.1f", calculateBearing(currentLat, currentLon, targetLat, targetLon) - currentHeading);
-                    LOG_ERROR("pidSetpoint: %.2f", pidSetpoint);
-                    LOG_ERROR("pidInput: %.2f", pidInput);
-                    LOG_ERROR("pidOutput: %.2f", pidOutput);
-                    LOG_ERROR("autonomousActive: %d", nav.autonomousMode);
-                    LOG_ERROR("isPaused: %d", nav.isPaused);
-                    LOG_ERROR("RTK status: %d", rtcmCorrectionStatus);
-                    LOG_ERROR("Fix type: %d", gnssData.fixType);
-                    LOG_ERROR("carrSoln: %d", gnssData.carrSoln);
-                    LOG_ERROR("hAcc: %.2f", gnssData.hAcc);
-                    LOG_ERROR("=== END DEBUG DUMP ===");
-
-                    // Only trigger once until speed recovers
-                    speedStalled = false;  // comment out if you want to log every 300ms during stall
-                }
-            } else {
-                speedStalled = false; // reset if speed rises
-            }
-
             // Get target data
             if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(mutexWait)) == pdTRUE) {
                 targetLat = targetData.targetLat;
@@ -354,7 +318,7 @@ void ControlTask(void *pvParameters) {
                     static unsigned long lastLogTime = 0;
                     unsigned long now = millis();
                     if (now - lastLogTime > 200) {
-                        LOG_NAV("steeringAngle, %d", steeringAngle);
+                        //LOG_NAV("steeringAngle, %d", steeringAngle);
                         lastLogTime = now;
                     }
                     lastThrottleValue = constrain(lastThrottleValue, ESC_MIN_FWD, ESC_MAX_FWD);
@@ -389,7 +353,7 @@ void ControlTask(void *pvParameters) {
                 xSemaphoreGive(servoMutex);
             }
         }
-        LOG_DEBUG("ControlTask time, %lu", millis() - currentTime);
+        //LOG_DEBUG("ControlTask time, %lu", millis() - currentTime);
         // Use vTaskDelayUntil to ensure consistent timing
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
@@ -407,7 +371,7 @@ int calculateSteeringAngle(float currentLat, float currentLon, float targetLat, 
     static unsigned long lastLogTime = 0;
     unsigned long now = millis();
     if (now - lastLogTime > 200) {
-        LOG_NAV("headingError, %.0f", headingError);
+        //LOG_NAV("headingError, %.0f", headingError);
         lastLogTime = now;
     }
 

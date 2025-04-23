@@ -209,7 +209,7 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
                     startNavigation(targetPace, targetDistance, latitude, longitude);
                 } else if (getWaypointCount() > 0) {
                     // Start navigation using waypoints
-                    startWaypointNavigation(targetPace, targetDistance);
+                    startWaypointNavigation(targetPace - 0.5, targetDistance);
                 } else {
                     // No coordinates or waypoints - send error
                     sendErrorMessage("No destination specified. Please enter coordinates or record waypoints.");

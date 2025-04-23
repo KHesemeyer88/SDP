@@ -115,7 +115,6 @@ bool initializeGNSS() {
     myGPS.setSPIOutput(COM_TYPE_UBX | COM_TYPE_NMEA | COM_TYPE_RTCM3);
     myGPS.setSPIInput(COM_TYPE_UBX | COM_TYPE_RTCM3);
 
-    
     myGPS.setNavigationFrequency(NAV_FREQ);
     //myGPS.setDGNSSConfiguration(SFE_UBLOX_DGNSS_MODE_FIXED);
     myGPS.setMainTalkerID(SFE_UBLOX_MAIN_TALKER_ID_GP);
@@ -488,7 +487,7 @@ void GNSSTask(void *pvParameters) {
         // Log total loop time if significant
         unsigned long loopTime = millis() - loopStartTime;
         if (loopTime > 0) {  // Only log if the loop took a significant amount of time
-            LOG_DEBUG("GNSSTask time, %lu", loopTime);
+            //LOG_DEBUG("GNSSTask time, %lu", loopTime);
         }
         
         // Tie task frequency to NAV_FREQ
