@@ -87,7 +87,7 @@ const uint16_t casterPort = 32000;
 const char mountPoint[] = "RTCM3MSM_MABT"; // Amherst
 
 // Navigation constants
-const float WAYPOINT_REACHED_RADIUS = 2.0; //meters
+const float WAYPOINT_REACHED_RADIUS = 1.0; //meters
 const int MAX_WAYPOINTS = 20;
 const int NAV_FREQ = 20;
 
