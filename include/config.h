@@ -1,8 +1,16 @@
 #include <Arduino.h>
 #include <ESP32Servo.h>
 #include <WiFi.h>
-#include <AsyncTCP.h>
-#include <ESPAsyncWebServer.h>
+
+#include <HTTPSServer.hpp>
+#include <SSLCert.hpp>
+#include <HTTPRequest.hpp>
+#include <HTTPResponse.hpp>
+#include <ResourceNode.hpp>
+#include <WebsocketHandler.hpp>
+#include <sstream>
+#include <vector>
+
 #include <SparkFun_u-blox_GNSS_v3.h>
 #include "base64.h" //Built-in ESP32 library
 #include <WiFiClient.h>
@@ -68,14 +76,19 @@ const int TRIM_ANGLE = 2;       //car lists left
 // const char* ssid = "RC_Car_Control";
 // const char* password = "12345678";
 // Hotspot:
-// const char ssid[] = "Kians iPhone";
-// const char password[] = "Dove'sHamster";
+const char ssid[] = "Kians iPhone";
+const char password[] = "Dove'sHamster";
 
-const char ssid[] = "Galaxy XCover FieldPro8858";
-const char password[] = "bugo4303";
+// const char ssid[] = "Galaxy XCover FieldPro8858";
+// const char password[] = "bugo4303";
 
 // const char ssid[] = "chewchewchew";
 // const char password[] = "03092738Ss";
+
+// const char ssid[] = "Kians iPhone";
+// const char password[] = "Dove'sHamster";
+// const char ssid2[] = "Galaxy XCover FieldPro8858";
+// const char password2[] = "bugo4303";
 
 // MaCORS
 const char casterHost[] = "macorsrtk.massdot.state.ma.us"; 
@@ -85,6 +98,64 @@ const uint16_t casterPort = 32000;
 //const char mountPoint[] = "RTCM3MSM_MAGS"; // RTCM 3.2 MSM_MAXX(GNSS) MAGS (Amherst, but maybe change to MABT?)
 //const char mountPoint[] = "RTCM3MSM_MABN"; // Colrain
 const char mountPoint[] = "RTCM3MSM_MABT"; // Amherst
+
+
+// Certs
+const char server_cert[] PROGMEM = R"rawliteral(
+-----BEGIN CERTIFICATE-----
+MIIDlzCCAn+gAwIBAgIUMeHTVt74QOrix3eoUydY0ig/+VkwDQYJKoZIhvcNAQEL
+BQAwWzELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM
+GEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDEUMBIGA1UEAwwLMTcyLjIwLjEwLjIw
+HhcNMjUwNDIyMjAxNjQyWhcNMjYwNDIyMjAxNjQyWjBbMQswCQYDVQQGEwJBVTET
+MBEGA1UECAwKU29tZS1TdGF0ZTEhMB8GA1UECgwYSW50ZXJuZXQgV2lkZ2l0cyBQ
+dHkgTHRkMRQwEgYDVQQDDAsxNzIuMjAuMTAuMjCCASIwDQYJKoZIhvcNAQEBBQAD
+ggEPADCCAQoCggEBANJcGIQUpIVv3/Yr+ktUkujJNNkhxJC8Ghuy5bsYUTtj5Rmz
+PFn/adAADx8o1Y+zh64SWZeak3y+f9/xtoJSAjG7/HSvlFXCYayMzV/FMejPrvd7
+K+XC07hdREI1e3Tufoz362uI/bJ7csL8K+nbq0ZUZheCw/sIjSsillhWVQw3weh7
+iDI3Zx2ZQADKvqIMZ+Ww1HGap/2N2ZczzREKJBFrm90V0X/Dpx4JmW4MSlDYnLak
+UbmqIZMMBdzkHPS0LBBdiSHN+B5ox0bIXCtyOyY+qPX+2dEkGtwvyHUFktTw4fXF
+I0rREepKPYVIVuBgN4Oh+gfLoob4wFzUVJzwrM0CAwEAAaNTMFEwHQYDVR0OBBYE
+FNyC81nZmNrPc7q48X9bCc+mTHvDMB8GA1UdIwQYMBaAFNyC81nZmNrPc7q48X9b
+Cc+mTHvDMA8GA1UdEwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAMKd+Wnk
+mE2HF/jlR++Jixv7kLFmEOPPzItgCx+A0cf+WP5BeCDwIGalYeoJzuU4T3395IzH
+NfkaeKFIbqptgzKMGPCNXmS23LgIqwMWxI5FTzEoa2AqfHzVDqInmqo7hZmwKmHE
+hhfodjrWBMxnpCHNLw+tgPTMV/Xesfk6IU/kYpQFt3aV2rXon6qQsopk34UgOLQr
+CBGIJSvrP0cSGuU66nmaC7ay8pkBtOoiTFhKgjS4jDLgJ6/Em2texfVhEnEa7MAM
+M5ZkScOyjypPNyMdk2/MyZ57BNiIIdWUMaVFXemHghQTv3rLRe2E5SsAbH5/uDga
+wKe85aR10oS6WS4=
+-----END CERTIFICATE-----
+)rawliteral";
+    
+const char server_key[] PROGMEM = R"rawliteral(
+-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQDSXBiEFKSFb9/2
+K/pLVJLoyTTZIcSQvBobsuW7GFE7Y+UZszxZ/2nQAA8fKNWPs4euElmXmpN8vn/f
+8baCUgIxu/x0r5RVwmGsjM1fxTHoz673eyvlwtO4XURCNXt07n6M9+triP2ye3LC
+/Cvp26tGVGYXgsP7CI0rIpZYVlUMN8Hoe4gyN2cdmUAAyr6iDGflsNRxmqf9jdmX
+M80RCiQRa5vdFdF/w6ceCZluDEpQ2Jy2pFG5qiGTDAXc5Bz0tCwQXYkhzfgeaMdG
+yFwrcjsmPqj1/tnRJBrcL8h1BZLU8OH1xSNK0RHqSj2FSFbgYDeDofoHy6KG+MBc
+1FSc8KzNAgMBAAECggEAAPctGmVFzSnBocYdG3nZgRFo4sqp0Czm9/PIzWwGoxJP
+cNivKKhMJzofMf/nSnNBG06B0GJtu6sJaSHdI4Rf4A6I77ZZmX4rqYL1K9WkPnWn
+z5kijxub+34jKFkraC0Bpsh9xCZt845JPEiOHXTeDyprNjCPtt6gT5rFdpDWDdVH
+fhdl/MX3adp4zYE7XWjc992zYMyBnea4/mZGUC9rKyLKTrpXxY4l4OcTdiFE+E/7
+jbEuqe/iZHPys9bKOg66LxWd54diD5D1aBbDm+apQ3ODil+7Xr+nF7pm6scNLd6t
+D8U7qmYpy9nY5m9GmA7AwzpN8UBq4zwBfm43qnB1sQKBgQDyrq3IkKPAt4SfjElA
+6kQ9hWizSz9hM1P/YBhnDEGfEnSneganqYZlTG1NoiD6B16YJvgYSIoKVrpDzS32
+snFZ9+sKTnzbuKtFp5XslBX8Q9Lh0tYfcI5+LnVxw7s49DGsf3E8cFtsGCHH+tAu
+DI89FDs8m23NDaByHDyXu6yC3QKBgQDd51VPP38KgvaYSjmJ/NKE/e48u9/ymm3a
+6Yv0gG/pImSZXEK21UTVyz3L1xyTiXuInINVnMM/Vdx1L56QkXjE0HdcX0F9m/PS
+Gs2E/VFRRhtjArAZLAnThZiMh9dvYjDEq4ebUubrgaNCE2/jNYQDGYCAc4G/MVKU
+ZFtVC4LasQKBgAFqHz0yCqJO74j2il7Efs1U/707zQzF/dFZQAspuSAyPVfUkEFd
+7Zidj22KamLKtDRy1bNeiN9yjfdjNMdhVuPNXCNdPcESHH11cpxEaLRluM70KadZ
+QptdrfWRzH+SfM+ilohhp0bEBT5jKd9610Ll4UqDJWqyj6Lao0fHIkRJAoGARB/5
+ONMtlXSPcEGZWJudpeavdUXYgwqWH1cD+JRVxyUf7VU9xhPDhj9XQXVQ+JqEqnQi
+fe4aox8hB3kPHSMMCKBXhKxZ1s5CFIbWAbYjeOglEEiK969ldOLW6o3pvfBPOJHQ
+mAbjjfnGvUpqVz7ewHTb1pOfiasCxzvoLjvSeIECgYEAzwaYAxlosmO4Laon1qyd
+mTnA1Nz5GK1OLGoTRu5D+Y0gIWVZl1Fi1L/WmykC5UBWZmpYqLcvo8JKbXvTYoOk
+nrjO5z6x4MIFfvDP/HsiqmQ25F9YGyOJzOhs9KuZpIbdJ6+yaRTaEwKr5VhZwro1
+5WjlZ91HUD0PA9YIaigogDk=
+-----END PRIVATE KEY-----
+)rawliteral";
 
 // Navigation constants
 const float WAYPOINT_REACHED_RADIUS = 2.0; //meters

@@ -30,7 +30,7 @@ void ControlTask(void *pvParameters);
 
 // Initialize all RTOS components
 void initRTOS() {
-    LOG_DEBUG("STARTING initRTOS");
+    //LOG_DEBUG("STARTING initRTOS");
     
     // Create mutex for servo access
     servoMutex = xSemaphoreCreateMutex();
@@ -78,7 +78,7 @@ void initRTOS() {
     steeringServo.write(STEERING_CENTER);
     delay(100);
     
-    LOG_DEBUG("Servos initialized");
+    //LOG_DEBUG("Servos initialized");
     
     // Create tasks
     BaseType_t xReturned = xTaskCreatePinnedToCore(
@@ -176,37 +176,37 @@ void initRTOS() {
     }
 
     //Create the logging task
-    Serial.printf("logQueue address: %p\n", logQueue);
+    //Serial.printf("logQueue address: %p\n", logQueue);
     Serial.printf("\n");
-    BaseType_t xReturnedLog = xTaskCreatePinnedToCore(
-        logTask,
-        "LogTask",
-        LOG_TASK_STACK_SIZE,
-        NULL,
-        LOG_TASK_PRIORITY,
-        &logTaskHandle,
-        0 // Run on core 0
-    );
+    // BaseType_t xReturnedLog = xTaskCreatePinnedToCore(
+    //     logTask,
+    //     "LogTask",
+    //     //LOG_TASK_STACK_SIZE,
+    //     NULL,
+    //     //LOG_TASK_PRIORITY,
+    //     //&logTaskHandle,
+    //     //0 // Run on core 0
+    // );
 
-    if (xReturnedLog != pdPASS) {
-        handleSystemError("Failed to create LogTask", true);
-        return;
-    }
+    // if (xReturnedLog != pdPASS) {
+    //     handleSystemError("Failed to create LogTask", true);
+    //     return;
+    // }
 
     Serial.printf("RTOS tasks created");
     Serial.printf("\n");
-    LOG_DEBUG("RTOS tasks created");
+    //LOG_DEBUG("RTOS tasks created");
 }
 
 // Add to a utilities or system header file
 void handleSystemError(const char* errorMsg, bool restartSystem) {
-    LOG_ERROR("SYSTEM ERROR: %s", errorMsg);
+    //LOG_ERROR("SYSTEM ERROR: %s", errorMsg);
     
     // Clean up all resources
     cleanupResources(true, true, true);
     
     if (restartSystem) {
-        LOG_ERROR("System will restart in 3 seconds");
+        //LOG_ERROR("System will restart in 3 seconds");
         vTaskDelay(pdMS_TO_TICKS(3000));
         ESP.restart();
     }
@@ -218,43 +218,43 @@ void cleanupResources(bool cleanupMutexes, bool cleanupQueues, bool cleanupTasks
         if (controlTaskHandle != NULL) {
             vTaskDelete(controlTaskHandle);
             controlTaskHandle = NULL;
-            LOG_DEBUG("ControlTask deleted");
+            //LOG_DEBUG("ControlTask deleted");
         }
 
         if (navTaskHandle != NULL) {
             vTaskDelete(navTaskHandle);
             navTaskHandle = NULL;
-            LOG_DEBUG("NavigationTask deleted");
+            //LOG_DEBUG("NavigationTask deleted");
         }
         
         if (gnssTaskHandle != NULL) {
             vTaskDelete(gnssTaskHandle);
             gnssTaskHandle = NULL;
-            LOG_DEBUG("GNSSTask deleted");
+            //LOG_DEBUG("GNSSTask deleted");
         }
 
         if (websocketTaskHandle != NULL) {
             vTaskDelete(websocketTaskHandle);
             websocketTaskHandle = NULL;
-            LOG_DEBUG("WebSocketTask deleted");
+            //LOG_DEBUG("WebSocketTask deleted");
         }
 
         if (httpServerTaskHandle != NULL) {
             vTaskDelete(httpServerTaskHandle);
             httpServerTaskHandle = NULL;
-            LOG_DEBUG("httpServerTask deleted");
+            //LOG_DEBUG("httpServerTask deleted");
         }
 
-        if (logTaskHandle != NULL) {
-            vTaskDelete(logTaskHandle);
-            httpServerTaskHandle = NULL;
-            LOG_DEBUG("logTask deleted");
-        }
+        // if (logTaskHandle != NULL) {
+        //     vTaskDelete(logTaskHandle);
+        //     httpServerTaskHandle = NULL;
+        //     //LOG_DEBUG("logTask deleted");
+        // }
 
         if (obstacleTaskHandle != NULL) {
             vTaskDelete(obstacleTaskHandle);
             obstacleTaskHandle = NULL;
-            LOG_DEBUG("ObstacleTask deleted");
+            //LOG_DEBUG("ObstacleTask deleted");
         } 
     }
     
@@ -263,20 +263,20 @@ void cleanupResources(bool cleanupMutexes, bool cleanupQueues, bool cleanupTasks
         if (commandQueue != NULL) {
             vQueueDelete(commandQueue);
             commandQueue = NULL;
-            LOG_DEBUG("Command queue deleted");
+            //LOG_DEBUG("Command queue deleted");
         }
         
         if (navCommandQueue != NULL) {
             vQueueDelete(navCommandQueue);
             navCommandQueue = NULL;
-            LOG_DEBUG("Nav command queue deleted");
+            //LOG_DEBUG("Nav command queue deleted");
         }
         
-        if (logQueue != NULL) {
-            LOG_DEBUG("Log queue deleted");
-            vQueueDelete(logQueue);
-            logQueue = NULL;
-        }
+        // if (logQueue != NULL) {
+        //     //LOG_DEBUG("Log queue deleted");
+        //     vQueueDelete(logQueue);
+        //     logQueue = NULL;
+        // }
     }
     
     // Clean up mutexes if requested
@@ -284,37 +284,37 @@ void cleanupResources(bool cleanupMutexes, bool cleanupQueues, bool cleanupTasks
         if (servoMutex != NULL) {
             vSemaphoreDelete(servoMutex);
             servoMutex = NULL;
-            LOG_DEBUG("Servo mutex deleted");
+            //LOG_DEBUG("Servo mutex deleted");
         }
         
         if (gnssMutex != NULL) {
             vSemaphoreDelete(gnssMutex);
             gnssMutex = NULL;
-            LOG_DEBUG("GNSS mutex deleted");
+            //LOG_DEBUG("GNSS mutex deleted");
         }
         
         if (ntripClientMutex != NULL) {
             vSemaphoreDelete(ntripClientMutex);
             ntripClientMutex = NULL;
-            LOG_DEBUG("NTRIP client mutex deleted");
+            //LOG_DEBUG("NTRIP client mutex deleted");
         }
         
         if (navDataMutex != NULL) {
             vSemaphoreDelete(navDataMutex);
             navDataMutex = NULL;
-            LOG_DEBUG("Nav data mutex deleted");
+            //LOG_DEBUG("Nav data mutex deleted");
         }
         
         if (waypointMutex != NULL) {
             vSemaphoreDelete(waypointMutex);
             waypointMutex = NULL;
-            LOG_DEBUG("Waypoint mutex deleted");
+            //LOG_DEBUG("Waypoint mutex deleted");
         }
         
-        if (logFileMutex != NULL) {
-            vSemaphoreDelete(logFileMutex);
-            logFileMutex = NULL;
-            LOG_DEBUG("Log file mutex deleted");
-        }
+        // if (logFileMutex != NULL) {
+        //     vSemaphoreDelete(logFileMutex);
+        //     logFileMutex = NULL;
+        //     //LOG_DEBUG("Log file mutex deleted");
+        // }
     }
 }

@@ -7,7 +7,7 @@
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
 #include "esp_task_wdt.h"
-#include "http_server.h"
+#include "https_and_ws.h"
 #include <ESP32Servo.h>
 
 // Task priorities (1-24, higher number = higher priority)

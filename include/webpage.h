@@ -137,6 +137,11 @@ const char webPage[] PROGMEM = R"rawliteral(
             <p>Fix Status: <span id="manual-fix">No Fix</span></p>
             <p>Latitude: <span id="manual-lat">--</span></p>
             <p>Longitude: <span id="manual-lng">--</span></p>
+
+            <p>phone lat: <span id="lat_phone">none</span></p>
+            <p>phone lon: <span id="lon_phone">none</span></p>
+            <p>speed: <span id="speed_phone">none</span></p>
+
             <p id="waypoint-count" style="margin-top: 10px;">Waypoints: 0/20</p>
             <p id="recorded-waypoint-display" style="margin-top: 10px; display: none;">Latest WP: <span id="recorded-waypoint">--</span></p>
             
@@ -267,7 +272,7 @@ const char webPage[] PROGMEM = R"rawliteral(
 
         const buffer = new ArrayBuffer(17); // 1 byte + 4 + 4 + 4 + 4
         const view = new DataView(buffer);
-        view.setUint8(0, 2); // offset 0, id 2
+        view.setUint8(0, 249); // offset 0, id 249
         view.setFloat32(1, parseFloat(targetPace), true); // offset 1
         view.setFloat32(5, parseFloat(targetDistance), true); // offset 4
         
@@ -475,7 +480,41 @@ const char webPage[] PROGMEM = R"rawliteral(
     document.addEventListener('DOMContentLoaded', function() {
         initWebSocket();
         drawJoystick();
+
+        // Continuous location updates
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(geolocation_success, geolocation_error, {
+                enableHighAccuracy: true, // Optional: to get more accurate GPS data
+                maximumAge: 10000,        // Time in milliseconds before the position is considered outdated
+                timeout: 5000             // Timeout if the position cannot be obtained within this time
+            });
+        } else {
+            alert("Geolocation not supported by browser.");
+        }
     });
+
+    function geolocation_error(err) { 
+        alert(`ERROR(${err.code}): ${err.message}`);
+    }
+
+    function geolocation_success(position) {
+        document.getElementById("lat_phone").innerText = position.coords.latitude;
+        document.getElementById("lon_phone").innerText = position.coords.longitude;
+        document.getElementById("speed_phone").innerText = position.coords.speed || 0.0 + " m/s";
+        //document.getElementById("").innerText = `More or less ${position.coords.accuracy} meters.`;
+
+        const buffer = new ArrayBuffer(13);
+        const view = new DataView(buffer);
+        view.setUint8(0, 250); // offset 0, id 250
+        view.setFloat32(1, position.coords.latitude, true);
+        view.setFloat32(5, position.coords.longitude, true);
+        view.setFloat32(9, position.coords.speed || 0.0, true);
+
+        //if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(buffer);
+        //}
+    }
+
 
     // Handle mouse movement for joystick
     function handleMouseMove(e) {
@@ -539,7 +578,7 @@ const char webPage[] PROGMEM = R"rawliteral(
 
         const buffer = new ArrayBuffer(9); // 1 byte + 4 + 4
         const view = new DataView(buffer);
-        view.setUint8(0, 1); // offset 0, id 1
+        view.setUint8(0, 248); // offset 0, id 248
         view.setFloat32(1, normalizedY, true); // offset 1
         view.setFloat32(5, normalizedX, true); // offset 4
         ws.send(buffer);
@@ -620,9 +659,7 @@ const char webPage[] PROGMEM = R"rawliteral(
     function initWebSocket() {
         // Get current location host and use it to build WebSocket URL
         const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${wsProtocol}//${window.location.hostname}:81`;
-        
-        console.log(`Connecting to WebSocket at ${wsUrl}`);
+        const wsUrl = `${wsProtocol}//${window.location.hostname}/ws`;
         
         // Clear any existing reconnect interval
         if (reconnectInterval) {
@@ -644,6 +681,7 @@ const char webPage[] PROGMEM = R"rawliteral(
         
         // WebSocket event handlers
         ws.onopen = function(evt) {
+            alert('WebSocket connected');
             console.log('WebSocket connected');
             wsConnected = true;
             clearTimeout(connectionTimeout);
@@ -770,7 +808,6 @@ const char webPage[] PROGMEM = R"rawliteral(
                     lng: view.getFloat32(5, true),
                     count: view.getUint8(9)
                 };
-            //case 6: // Auto_mode
             default:
                 alert("couldn't identify websocket case");
                 break;
