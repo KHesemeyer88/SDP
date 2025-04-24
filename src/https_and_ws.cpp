@@ -220,8 +220,22 @@ void GNSSWebSocketHandler::onMessage(WebsocketInputStreambuf* input) {
 
         if (is) {
             my_phone_position = data;
-            Serial.printf("[PHONE] lat=%.6f, lon=%.6f, speed=%.2f\n", data.phone_lat, data.phone_lon, data.phone_speed);
+            //Serial.printf("[PHONE] lat=%.6f, lon=%.6f, speed=%.2f\n", data.phone_lat, data.phone_lon, data.phone_speed);
         }
+
+
+        // float user_to_car_distance = calculateDistance(my_phone_position.phone_lat, my_phone_position.phone_lon, my_gnss_data.lat, my_gnss_data.lon);
+
+        // sendShutOffData();
+        // if (user_to_car_distance > 10) {
+        //     int timer = 0;
+
+        //     //LOG_NAV("User is too far from the car, distance: %.2f m", user_to_car_distance);
+        //     // Send alert to user
+        //     sendErrorMessage("You are too far from the car. Please return to the vehicle.");
+        // } else {
+        //     //LOG_NAV("User is within range, distance: %.2f m", user_to_car_distance);
+        // }
     }
 }
 
@@ -554,6 +568,15 @@ void sendSensorData() {
     // Send to clients
     for (auto* client : activeClients) {
         client->sendSENSORBinary();
+    }
+}
+
+void sendShutOffData() {
+    float user_to_car_distance = calculateDistance(my_phone_position.phone_lat, my_phone_position.phone_lon, my_gnss_data.lat, my_gnss_data.lon);
+    
+    while (user_to_car_distance > 10) {
+
+
     }
 }
 

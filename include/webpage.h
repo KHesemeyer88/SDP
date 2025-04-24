@@ -137,14 +137,24 @@ const char webPage[] PROGMEM = R"rawliteral(
             <p>Fix Status: <span id="manual-fix">No Fix</span></p>
             <p>Latitude: <span id="manual-lat">--</span></p>
             <p>Longitude: <span id="manual-lng">--</span></p>
-
-            <p>phone lat: <span id="lat_phone">none</span></p>
-            <p>phone lon: <span id="lon_phone">none</span></p>
-            <p>speed: <span id="speed_phone">none</span></p>
-
             <p id="waypoint-count" style="margin-top: 10px;">Waypoints: 0/20</p>
             <p id="recorded-waypoint-display" style="margin-top: 10px; display: none;">Latest WP: <span id="recorded-waypoint">--</span></p>
             
+
+            <div style="flex: 1; min-width: 250px; max-width: 350px;">
+                <div id="phone_div" style="background: #f0f0f0; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
+                    <p>phone lat: <span id="lat_phone">none</span></p>
+                    <p>phone lon: <span id="lon_phone">none</span></p>
+                    <!-- <p>speed: <span id="speed_phone">none</span></p> 
+                    <button style="background-color: #28a745;" id="shut_off" >Distance to car: </span></p>
+                    -->
+
+                    <p>Distance to car: <span id="shut_off">none</span></p>
+                    <p><span id="shut_off_indicator"></span></p>
+                </div>
+            </div>
+
+
             <!-- RTK status panel moved from autonomous section -->
             <div id="rtk-status-panel" style="margin-top: 20px; background: #f0f0f0; padding: 10px; border-radius: 8px; text-align: center;">
                 <p>Correction Status: <span id="rtk-correction-status">Unknown</span></p>
@@ -493,14 +503,32 @@ const char webPage[] PROGMEM = R"rawliteral(
         }
     });
 
+    function calculateDistance(lat1, lon1, lat2, lon2) {
+        const R = 6371; // Earth radius in kilometers
+        const toRad = (angle) => (Math.PI / 180) * angle;
+
+        const dLat = toRad(lat2 - lat1);
+        const dLon = toRad(lon2 - lon1);
+        const newLat1 = toRad(lat1);
+        const newLat2 = toRad(lat2);
+
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(newLat1) * Math.cos(newLat2) *
+                    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+        const distance = R * c;
+        return distance * 1000.0;
+    }
+
     function geolocation_error(err) { 
         alert(`ERROR(${err.code}): ${err.message}`);
     }
 
     function geolocation_success(position) {
-        document.getElementById("lat_phone").innerText = position.coords.latitude;
-        document.getElementById("lon_phone").innerText = position.coords.longitude;
-        document.getElementById("speed_phone").innerText = position.coords.speed || 0.0 + " m/s";
+        document.getElementById("lat_phone").innerText = position.coords.latitude.toFixed(7);
+        document.getElementById("lon_phone").innerText = position.coords.longitude.toFixed(7);
+        //document.getElementById("speed_phone").innerText = position.coords.speed || 0.0 + " m/s";
         //document.getElementById("").innerText = `More or less ${position.coords.accuracy} meters.`;
 
         const buffer = new ArrayBuffer(13);
@@ -724,8 +752,19 @@ const char webPage[] PROGMEM = R"rawliteral(
                         document.getElementById('manual-fix').textContent = data.fix;
                         document.getElementById('manual-lat').textContent = data.lat.toFixed(7) || '--';
                         document.getElementById('manual-lng').textContent = data.lng.toFixed(7) || '--';
+
+                        var user_car_distnace = calculateDistance(data.lat, data.lng, parseFloat(document.getElementById("lat_phone").innerText), parseFloat(document.getElementById("lon_phone").innerText));
+                        document.getElementById("shut_off").innerText = user_car_distnace.toFixed(1) + " m";
+                        document.getElementById("phone_div").style.backgroundColor = "#28a745";
+                        document.getElementById("shut_off_indicator").innerText = "";;
+
+                        if (user_car_distnace > 10) {
+                            document.getElementById("shut_off_indicator").innerText = "User too far,\n stopping car...";;
+                            document.getElementById("phone_div").style.backgroundColor = "#dc3545";
+                            //sendMessage(); //stop car, handle on esp32 side in case ws drop? Stop when no wifi too
+                        }
                         break;
-                        
+
                     case "rtk":
                         // Update RTK status
                         updateRTKDisplay(data);
