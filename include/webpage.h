@@ -38,7 +38,7 @@ const char webPage[] PROGMEM = R"rawliteral(
         .mode-switch button {
             padding: 10px 20px;
             font-size: 18px;
-            margin: 0 10px;
+            margin: 10px 10px;
             border: none;
             border-radius: 4px;
             cursor: pointer;
@@ -119,6 +119,7 @@ const char webPage[] PROGMEM = R"rawliteral(
         <div class="mode-switch">
             <button id="manual-btn" class="active" onclick="switchMode('manual')">Manual</button>
             <button id="auto-btn" class="inactive" onclick="switchMode('autonomous')">Autonomous</button>
+            <button id="demo_day-btn" class="inactive" onclick="switchMode('demo')" style="width:200px">Demo Day</button>
         </div>
 
         <div id="manual-control">
@@ -178,11 +179,21 @@ const char webPage[] PROGMEM = R"rawliteral(
                     </div>
                 </div>
             </div>
-                        
+
             <div id="avoidance-alert" style="display: none; margin-top: 10px; padding: 10px; background-color: #ffc107; border-radius: 4px;"></div>
             <h3>Input Coords</h3>
             <input type="text" id="coords-input" class="coordinate-input" placeholder="Coordinates (e.g. 42.637088, -72.729328)">
-        </div>        
+        </div>
+
+        <div id="demo_day-control" style="display: none">
+            
+
+            <img src="lib\marcus_triangle.png" alt="marcus triangle loop">
+            <img src="../lib/marcus_triangle.png" alt="marcus triangle loop">
+            <img src="C:\Users\aflyi\Documents\2025Spring\SDP\lib\marcus_triangle.png" alt="marcus triangle loop">
+
+
+        </div>
     </div>
 
 <script>
@@ -226,15 +237,28 @@ const char webPage[] PROGMEM = R"rawliteral(
         if (mode === 'manual') {
             document.getElementById('manual-control').style.display = 'flex';
             document.getElementById('autonomous-control').style.display = 'none';
+            document.getElementById('demo_day-control').style.dispaly = 'none';
             document.getElementById('manual-btn').className = 'active';
             document.getElementById('auto-btn').className = 'inactive';
+            document.getElementById('demo_day-btn').className = 'inactive';
             document.getElementById('manual-gps-data').style.display = 'block';
+            stopAutonomousMode();
+        } else if (mode === 'demo') {
+            document.getElementById('manual-control').style.display = 'none';
+            document.getElementById('autonomous-control').style.display = 'none';
+            document.getElementById('demo_day-control').style.dispaly = block;
+            document.getElementById('manual-btn').className = 'inactive';
+            document.getElementById('auto-btn').className = 'inactive';
+            document.getElementById('demo_day-btn').className = 'active';
+            document.getElementById('manual-gps-data').style.display = 'none';
             stopAutonomousMode();
         } else {
             document.getElementById('manual-control').style.display = 'none';
             document.getElementById('autonomous-control').style.display = 'block';
+            document.getElementById('demo_day-control').style.dispaly = 'none';
             document.getElementById('manual-btn').className = 'inactive';
             document.getElementById('auto-btn').className = 'active';
+            document.getElementById('demo_day-btn').className = 'inactive';
             document.getElementById('manual-gps-data').style.display = 'none';
         }
     }
