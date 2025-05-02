@@ -283,6 +283,7 @@ const char webPage[] PROGMEM = R"rawliteral(
             document.getElementById('demo_day-btn').className = 'active';
             document.getElementById('manual-gps-data').style.display = 'none';
             stopAutonomousMode();
+            console.log("demo");
 
             // request csv route list
             sendMessage(3);
@@ -645,7 +646,7 @@ const char webPage[] PROGMEM = R"rawliteral(
         // Send route name to ESP32
         const buffer = new ArrayBuffer(1 + routeName.length);
         const view = new DataView(buffer);
-        view.setUint8(0, 3); // offset 0, id 3
+        view.setUint8(0, 250); // offset 0, id 250
         for (let i = 0; i < routeName.length; i++) {
             view.setUint8(i + 1, routeName.charCodeAt(i));
         }
@@ -880,8 +881,8 @@ const char webPage[] PROGMEM = R"rawliteral(
                     lng: view.getFloat32(5, true),
                     count: view.getUint8(9)
                 };
-            case 6: // route list
-                console.log("route list received");
+            // case 6: // route list
+            //     console.log("route list received");
                 // const dropdown = document.getElementById("route-dropdown");
                 // dropdown.innerHTML = "";
 
