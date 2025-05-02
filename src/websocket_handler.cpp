@@ -4,6 +4,8 @@
 #include "logging.h"
 #include "navigation.h"
 #include <obstacle.h>
+#include "logging.h"
+
 
 // WebSocket instance (defined in http_server.cpp)
 AsyncWebServer webSocketServer(81);
@@ -17,6 +19,8 @@ unsigned long lastWSGPSUpdate = 0;
 unsigned long lastWSRTKUpdate = 0;
 unsigned long lastWSStatsUpdate = 0;
 static bool wasDisconnected = false;
+
+char currentRouteName[32] = "demo_route";
 
 void initWebSocket() {
     // Set event handler
@@ -34,6 +38,7 @@ void initWebSocket() {
 // WebSocket event handler for RTOS
 void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventType type, void *arg, uint8_t *data, size_t len) {
     //LOG_DEBUG("webSocketEventRTOS");
+    Serial.println("wsEventHandler");
     switch (type) {
         case WS_EVT_CONNECT:
             // Client connected
@@ -41,6 +46,7 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
             // LOG_DEBUG("WebSocket client #%u connected from %d.%d.%d.%d", client->id(), ip[0], ip[1], ip[2], ip[3]);
             
             // // Send initial data to the newly connected client
+            //Serial.println("connect");
             sendGPSData();
             sendRTKStatus();
             break;
@@ -49,9 +55,42 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
             //LOG_DEBUG("WebSocket client #%u disconnected", client->id());
             break;
         case WS_EVT_DATA:
+            //Serial.println("esp ws recieved data");
             // ----- handle messages -----
             if (len == sizeof(uint8_t)) { // binary size matches uint, its a MESSAGE
                 switch (*data) {
+                    case MESSAGE_REQUEST_ROUTE_LIST: {
+                        // auto routeList = getRouteFileNames();  // std::vector<String>
+                        // size_t totalSize = 1;  // 1 byte header
+                    
+                        // // Calculate total message size
+                        // for (const auto& name : routeList) {
+                        //     totalSize += 1 + name.length();  // 1 byte for length + name chars
+                        // }
+                    
+                        // uint8_t* buffer = (uint8_t*)malloc(totalSize);
+                        // if (!buffer) return;
+                    
+                        // size_t offset = 0;
+                        // buffer[offset++] = 6;  // MESSAGE_ROUTE_LIST
+                    
+                        // for (const auto& name : routeList) {
+                        //     uint8_t len = std::min((size_t)31, name.length());
+                        //     buffer[offset++] = len;
+                        //     memcpy(&buffer[offset], name.c_str(), len);
+                        //     offset += len;
+                        // }
+                
+
+                        Serial.println("send route list");
+                        // if (client) {
+                        //     client->binary(buffer, totalSize);
+                        // } else {
+                        //     ws.binaryAll(buffer, totalSize);
+                        // }
+                        // free(buffer);
+                        break;
+                    }
                     case MESSAGE_STOP: {
                         // Stop autonomous navigation
                         LOG_NAV("Stop command received");
@@ -162,6 +201,11 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
                     //          (float)doc["control"]["horizontal"]);
 
                 // Create command struct to send to the control task
+                if (the_message.id != COMMAND_CONTROL) {
+                    // go to else statement
+                    break;
+                }
+
                 ControlCommand cmd;
                 cmd.type = CMD_MANUAL_CONTROL;
                 
@@ -192,6 +236,10 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
                 command_start the_message;
                 memcpy(&the_message, data, sizeof(the_message));
                 
+                if (the_message.id != COMMAND_START) {
+                    // go to else statement
+                    break;
+                }
                 float targetPace = the_message.target_pace;
                 float targetDistance = the_message.target_distance;
                 
@@ -214,6 +262,44 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
                     // No coordinates or waypoints - send error
                     sendErrorMessage("No destination specified. Please enter coordinates or record waypoints.");
                 }
+            } else if (data[0] == ROUTE_NAME && len > 1 && len < 32) { // the route name
+                Serial.println("route name");
+                // Get current position and record as waypoint
+                memcpy(currentRouteName, &data[1], len - 1);
+                currentRouteName[len - 1] = '\0'; // null-terminate
+                LOG_DEBUG("Received route name: %s", currentRouteName);
+
+                if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                    float lat = gnssData.latitude;
+                    float lon = gnssData.longitude;
+                    xSemaphoreGive(gnssMutex);
+                    
+                    // Add waypoint using current position
+                    if (addWaypoint(lat, lon)) {
+                        vTaskDelay(pdMS_TO_TICKS(50));
+                        
+                        // Get waypoint count with proper protection
+                        int count = getWaypointCount();
+                        //LOG_NAV("addWaypoint() succeeded, getWaypointCount() returned %d", count);
+                        
+                        // Get current waypoint index with proper mutex protection
+                        int currentWaypointIndex = 0;
+                        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                            currentWaypointIndex = navStatus.currentWaypoint;
+                            xSemaphoreGive(navDataMutex);
+                        }
+                        
+                        saveWaypointToNamedRoute(currentRouteName, lat, lon, 8, 8/*carrSoln, fixType*/);
+
+                        Waypoint_data response_message;
+                        response_message.count = count;
+                        response_message.lat = lat;
+                        response_message.lon = lon;
+                        
+                        ws.binaryAll((uint8_t*)&response_message, sizeof(response_message));
+                    }
+                }                  
+                break;
             }
             break;
         case WS_EVT_PONG:

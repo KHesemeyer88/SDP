@@ -8,6 +8,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "config.h"
+#include <vector>
 
 enum LogLevel {
     LOG_NONE,       // No logging at all
@@ -38,12 +39,17 @@ bool initLogging();
 void logTask(void *pvParameters);
 bool logMessage(LogLevel level, const char* format, ...);
 void closeLogging();
+std::vector<String> getRouteFileNames();
 
 // Helper macros for easier logging
 #define LOG_DEBUG(fmt, ...) logMessage(LOG_DEBUG, fmt, ##__VA_ARGS__)
 #define LOG_ERROR(fmt, ...) logMessage(LOG_ERROR, fmt, ##__VA_ARGS__)
 #define LOG_PERF(fmt, ...) logMessage(LOG_PERF, fmt, ##__VA_ARGS__)
 #define LOG_NAV(fmt, ...) logMessage(LOG_NAV_STATE, fmt, ##__VA_ARGS__)
+
+// Save a waypoint to a named route file on SD
+bool saveWaypointToNamedRoute(const char* routeName, float lat, float lon, int rtkStatus, int fixType);
+
 
 const char* logLevelToString(LogLevel level);
 

@@ -68,6 +68,16 @@ const char webPage[] PROGMEM = R"rawliteral(
         #autonomous-control {
             display: none;
         }
+        #demo_day-control {
+            display: none;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-top: 20px;
+            width: 80%;
+            text-align: center;
+        }
         #manual-control {
             display: flex;
             flex-direction: column;
@@ -119,7 +129,7 @@ const char webPage[] PROGMEM = R"rawliteral(
         <div class="mode-switch">
             <button id="manual-btn" class="active" onclick="switchMode('manual')">Manual</button>
             <button id="auto-btn" class="inactive" onclick="switchMode('autonomous')">Autonomous</button>
-            <button id="demo_day-btn" class="inactive" onclick="switchMode('demo')" style="width:200px">Demo Day</button>
+            <button id="demo_day-btn" class="inactive" onclick="switchMode('demo')" style="width:200px">Saved Routes</button>
         </div>
 
         <div id="manual-control">
@@ -131,6 +141,9 @@ const char webPage[] PROGMEM = R"rawliteral(
 
         <!-- Move this RTK status panel from autonomous-control to manual-gps-data section -->
         <div id="manual-gps-data" style="margin-top: 20px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
+            <h3>Route Creation</h3>
+            <input type="text" id="route_name" class="coordinate-input" placeholder="Enter name to create route">
+
             <div style="display: flex; gap: 10px; justify-content: center;">
                 <button id="record-waypoint-btn" class="submit-btn" style="background-color: #28a745;" onclick="recordWaypoint()">Record WP</button>
                 <button id="clear-waypoint-btn" class="submit-btn" style="background-color: #dc3545;" onclick="clearWaypoints()">Clear WP</button>
@@ -185,14 +198,32 @@ const char webPage[] PROGMEM = R"rawliteral(
             <input type="text" id="coords-input" class="coordinate-input" placeholder="Coordinates (e.g. 42.637088, -72.729328)">
         </div>
 
-        <div id="demo_day-control" style="display: none">
+        <div id="demo_day-control">
+
+            <!--
+            <h3>Pre-programmed Routes</h3>
+            <button onclick="route_select('1')" class="submit-btn">Route 1:</button>
+            <br></br>
+            <img src="/marcus_triangle.png" alt="marcus triangle loop" width="300" height="300">
             
+            <br></br><br></br>
 
-            <img src="lib\marcus_triangle.png" alt="marcus triangle loop">
-            <img src="../lib/marcus_triangle.png" alt="marcus triangle loop">
-            <img src="C:\Users\aflyi\Documents\2025Spring\SDP\lib\marcus_triangle.png" alt="marcus triangle loop">
+            <button onclick="route_select('2')" class="submit-btn">Route 2:</button>
+            <br></br>
+            <img src="/marcus_triangle.png" alt="marcus triangle loop" width="300" height="300">
+
+            <h3>Custom Routes</h3>
+            <button onclick="route_select('id')" class="submit-btn">Route name</button>
+
+            --->
+
+            <h3>Custom Routes</h3>
+            <select id="route-dropdown" class="coordinate-input"></select>
+            <button onclick="startSelectedRoute()" class="submit-btn">Start</button>
 
 
+
+    
         </div>
     </div>
 
@@ -237,7 +268,7 @@ const char webPage[] PROGMEM = R"rawliteral(
         if (mode === 'manual') {
             document.getElementById('manual-control').style.display = 'flex';
             document.getElementById('autonomous-control').style.display = 'none';
-            document.getElementById('demo_day-control').style.dispaly = 'none';
+            document.getElementById('demo_day-control').style.display = 'none';
             document.getElementById('manual-btn').className = 'active';
             document.getElementById('auto-btn').className = 'inactive';
             document.getElementById('demo_day-btn').className = 'inactive';
@@ -245,17 +276,21 @@ const char webPage[] PROGMEM = R"rawliteral(
             stopAutonomousMode();
         } else if (mode === 'demo') {
             document.getElementById('manual-control').style.display = 'none';
-            document.getElementById('autonomous-control').style.display = 'none';
-            document.getElementById('demo_day-control').style.dispaly = block;
+            document.getElementById('autonomous-control').style.display = 'block';
+            document.getElementById('demo_day-control').style.display = 'block';
             document.getElementById('manual-btn').className = 'inactive';
             document.getElementById('auto-btn').className = 'inactive';
             document.getElementById('demo_day-btn').className = 'active';
             document.getElementById('manual-gps-data').style.display = 'none';
             stopAutonomousMode();
+
+            // request csv route list
+            sendMessage(3);
+            document.getElementById("route-dropdown").innerHTML = ""; // Clear existing options
         } else {
             document.getElementById('manual-control').style.display = 'none';
             document.getElementById('autonomous-control').style.display = 'block';
-            document.getElementById('demo_day-control').style.dispaly = 'none';
+            document.getElementById('demo_day-control').style.display = 'none';
             document.getElementById('manual-btn').className = 'inactive';
             document.getElementById('auto-btn').className = 'active';
             document.getElementById('demo_day-btn').className = 'inactive';
@@ -575,7 +610,7 @@ const char webPage[] PROGMEM = R"rawliteral(
         const display = document.getElementById('fusion-status-display');
         const statusSpan = document.getElementById('fusion-status');
 
-        alert("I'll deal with this later...");
+        //alert("I'll deal with this later...");
 
         
         // button.disabled = true;
@@ -600,6 +635,23 @@ const char webPage[] PROGMEM = R"rawliteral(
         //     });
     }
 
+    function startSelectedRoute() {
+        const routeName = document.getElementById("route-dropdown").value;
+        if (!routeName) {
+            showAlert("Please select a route");
+            return;
+        }
+
+        // Send route name to ESP32
+        const buffer = new ArrayBuffer(1 + routeName.length);
+        const view = new DataView(buffer);
+        view.setUint8(0, 3); // offset 0, id 3
+        for (let i = 0; i < routeName.length; i++) {
+            view.setUint8(i + 1, routeName.charCodeAt(i));
+        }
+        ws.send(buffer);
+    }
+
     // Record waypoint
     function recordWaypoint() {
         if (!wsConnected) {
@@ -610,8 +662,25 @@ const char webPage[] PROGMEM = R"rawliteral(
         const button = document.getElementById('record-waypoint-btn');
         button.disabled = true;
         button.textContent = 'Recording WP...';
-        
-        sendMessage(1);
+
+        const name = document.getElementById('route_name').value.trim();
+        if (name) {
+            // If a name is provided, send it to the ESP32
+            const buffer = new ArrayBuffer(1 + name.length); // 1 byte for id + name length
+            const view = new DataView(buffer);
+            view.setUint8(0, 3); // offset 0, id 3
+            for (let i = 0; i < name.length; i++) {
+                view.setUint8(i + 1, name.charCodeAt(i)); // offset i
+            }
+            ws.send(buffer);
+
+            console.log("route name sent: " + name);
+            //sendMessage(7);
+            //console.log("route WP");    
+        } else {
+            sendMessage(1);
+            console.log("normal WP");
+        }
         
         // Always re-enable the button after a short delay
         setTimeout(() => {
@@ -690,7 +759,21 @@ const char webPage[] PROGMEM = R"rawliteral(
         };
         
         ws.onmessage = function(evt) {
-            try {
+            console.log("onmessage");
+            // if (typeof evt.data === "string") {
+            //     console.log("route");
+            //     if (evt.data.startsWith("routes:[")) {
+            //         const json = JSON.parse(evt.data.replace("routes:", ""));
+            //         const dropdown = document.getElementById("route-dropdown");
+            //         dropdown.innerHTML = "";
+
+            //         json.forEach(name => {
+            //             const option = document.createElement("option");
+            //             option.value = name;
+            //             option.textContent = name;
+            //             dropdown.appendChild(option);
+            //         });
+            //     }
                 const data = parse_websocket_message(evt.data);
                 
                 // Handle different message types
@@ -745,9 +828,7 @@ const char webPage[] PROGMEM = R"rawliteral(
                         // showAlert(data.message);
                         break;
                 }
-            } catch (e) {
-                console.error('Error parsing WebSocket message:', e);
-            }
+           // }
         };
     }
 
@@ -757,6 +838,7 @@ const char webPage[] PROGMEM = R"rawliteral(
         const view = new DataView(buffer);
         switch (view.getUint8(0)) {
             case 1: // GNSS_data
+                console.log(GNSS_data);
                 return {
                     type: "gps",
                     lat: view.getFloat32(1, true),
@@ -764,6 +846,7 @@ const char webPage[] PROGMEM = R"rawliteral(
                     fix: view.getUint8(9)
                 };
             case 2: // RTK_status
+                console.log(RTK_status);
                 return {
                     type: "rtk",
                     status: view.getUint8(1), // 1 offset for id byte
@@ -774,6 +857,7 @@ const char webPage[] PROGMEM = R"rawliteral(
                     fixType: view.getUint8(16)
                 };
             case 3: // Nav_stats
+                console.log(Nav_stats);
                 return {
                     type: "navstats",
                     totalDistance: view.getFloat32(1, true),
@@ -782,19 +866,40 @@ const char webPage[] PROGMEM = R"rawliteral(
                     totalTime: view.getUint32(13, true)
                 };
             case 4: // Sensor_data
+                console.log(Sensor_data);
                 return {
                     type: "sensors",
                     front: view.getFloat32(5, true),
                     //: view.getUint8(16)
                 };
             case 5: // Waypoint_data
+                console.log(Waypoint_data);
                 return {
                     type: "waypoint",
                     lat: view.getFloat32(1, true),
                     lng: view.getFloat32(5, true),
                     count: view.getUint8(9)
                 };
-            //case 6: // Auto_mode
+            case 6: // route list
+                console.log("route list received");
+                // const dropdown = document.getElementById("route-dropdown");
+                // dropdown.innerHTML = "";
+
+                // let offset = 1;
+                // while (offset < view.byteLength) {
+                //     const nameLen = view.getUint8(offset++);
+                //     let name = "";
+                //     for (let i = 0; i < nameLen; i++) {
+                //         name += String.fromCharCode(view.getUint8(offset++));
+                //     }
+
+                //     const option = document.createElement("option");
+                //     option.value = name;
+                //     option.textContent = name;
+                //     console.log(option);
+                //     dropdown.appendChild(option);
+                // }
+                // return { type: "route_list" }
             default:
                 alert("couldn't identify websocket case");
                 break;

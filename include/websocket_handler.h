@@ -94,13 +94,18 @@ struct __attribute__((packed)) command_control {
 const uint8_t MESSAGE_STOP = 0;
 const uint8_t MESSAGE_RECORD = 1;
 const uint8_t MESSAGE_CLEAR = 2;
-//const uint8_t MESSAGE_START = 3;
+const uint8_t MESSAGE_REQUEST_ROUTE_LIST = 3;
 const uint8_t MESSAGE_PAUSE = 4;
 const uint8_t MESSAGE_RESUME = 5;
 const uint8_t MESSAGE_RESET = 6;
+// const uint8_t MESSAGE_START_ROUTE_RECORDING = 7;
+// const uint8_t MESSAGE_RECORD_ROUTE_WAYPOINT = 7;
+// const uint8_t MESSAGE_STOP_ROUTE_RECORDING = 9;
+
 
 const uint8_t COMMAND_START = 2;
 const uint8_t COMMAND_CONTROL = 1;
+#define ROUTE_NAME 3
 
 
 //          ws.sendMessage(1);
