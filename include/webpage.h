@@ -370,15 +370,15 @@ const char webPage[] PROGMEM = R"rawliteral(
         const buffer = new ArrayBuffer(1 + 4 + 4 + routeName.length);
         const view = new DataView(buffer);
         view.setUint8(0, 249); // START_ROUTE_NAME offset 0, id 249
-        view.setFloat32(1, pace, true);
-        view.setFloat32(5, distance, true);
+        view.setFloat32(1, targetPace, true);
+        view.setFloat32(5, targetDistance, true);
         for (let i = 0; i < routeName.length; i++) {
             view.setUint8(9 + i, routeName.charCodeAt(i)); // offset i + 9 bytes before
         }
 
         ws.send(buffer);
         console.log("Sending route name:", routeName);
-        console.log(`Sent route: ${routeName} with pace=${pace} m/s, distance=${distance} m`);
+        console.log(`Sent route: ${routeName} with pace=${targetPace} m/s, distance=${targetDistance} m`);
         
 
         // Update UI state

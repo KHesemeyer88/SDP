@@ -280,6 +280,7 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
                 size_t nameLen = len - 9;
                 memcpy(selectedRoute, &data[9], nameLen);
                 selectedRoute[nameLen] = '\0';
+                LOG_ERROR("HERERERER");
                 LOG_ERROR("Start route request: %s (pace=%.2f, dist=%.2f)", selectedRoute, pace, distance);
                 
                 
