@@ -232,9 +232,13 @@ const char webPage[] PROGMEM = R"rawliteral(
             <select id="route-dropdown" class="coordinate-input"></select>
             <!---<button onclick="startSelectedRoute()" class="submit-btn">Start</button>--->
 
+            <br></br>
+            <button onclick="reinitSD()" class="submit-btn" style="background-color: #ff6600;">Reconnect SD Card</button>
+
+
             <h3>Predefined Routes</h3>
             <p>Marcus Triangle:</p>
-            <!-- <img src="/marcus_triangle.png" alt="marcus triangle loop" width="300" height="300"> --->
+            <img src="/marcus_triangle.png" alt="marcus triangle loop" width="300" height="300">
          </div>
     </div>
 
@@ -273,6 +277,17 @@ const char webPage[] PROGMEM = R"rawliteral(
         ctx.fillStyle = '#444';
         ctx.fill();
     }
+
+    function reinitSD() {
+        if (!wsConnected) {
+            showAlert("WebSocket disconnected. Cannot reinit SD.");
+            return;
+        }
+
+        sendMessage(251);  // MESSAGE_REINIT_SD
+        showAlert("Reinitializing SD card...");
+    }
+
 
     // Mode switching
     function switchMode(mode) {

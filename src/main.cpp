@@ -59,10 +59,10 @@ void setup() {
     //pio run --target uploadfs
     // uploads data images to SPIFFS
     // SPIFFS is used for web pages and other static files
-    // if (!SPIFFS.begin(true)) {
-    //     Serial.println("SPIFFS mount failed");
-    //     return;
-    // }
+    if (!SPIFFS.begin(true)) {
+        Serial.println("SPIFFS mount failed");
+        return;
+    }
 
     initWebSocket();
 

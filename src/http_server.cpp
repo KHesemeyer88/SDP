@@ -18,7 +18,7 @@ void initHttpServer() {
         request->send(200, "text/html", webPage);
     });
 
-    //server.serveStatic("marcus_triangle.png", SPIFFS, "/marcus_triangle.png");
+    server.serveStatic("marcus_triangle.png", SPIFFS, "/marcus_triangle.png");
     //server.serveStatic("/", SPIFFS, "/");
 
 
@@ -51,6 +51,8 @@ void HttpServerTask(void *pvParameters) {
     
     // Initialize server routes and start the server
     initHttpServer();
+
+    delay(2000);
     
     // Initialize logging system
     if (initLogging()) {
@@ -63,7 +65,7 @@ void HttpServerTask(void *pvParameters) {
     
     // Task loop - AsyncWebServer doesn't need polling, but we keep
     // the task alive for future expansion and proper task management
-    for (;;) {        
+    for (;;) {
         // Task heartbeat
         vTaskDelay(pdMS_TO_TICKS(1000));
     }

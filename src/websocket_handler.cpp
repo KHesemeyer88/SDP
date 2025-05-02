@@ -54,6 +54,15 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
             // ----- handle messages -----
             if (len == sizeof(uint8_t)) { // binary size matches uint, its a MESSAGE
                 switch (*data) {
+                    case MESSAGE_REINIT_SD: {
+                        bool success = initLogging();  // re-attempt SD setup
+                        if (success) {
+                            sendStatusMessage("SD card reinitialized successfully");
+                        } else {
+                            sendErrorMessage("Failed to reinitialize SD card");
+                        }
+                        break;
+                    }
                     case MESSAGE_REQUEST_ROUTE_LIST: {
                         auto routes = getRouteFileNames();  // std::vector<String>
 
