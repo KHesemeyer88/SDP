@@ -263,10 +263,36 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
                 }
                 break;
             } else if (data[0] == START_ROUTE_NAME && len > 1 && len < 32) {
-                // LOG_ERROR("Received start route name: %s", &data[1]);
-                // LOG_ERROR("Received start route name2: %s", &data[1]);
-                LOG_ERROR("route name");
+                LOG_ERROR("Start route name: %s", &data[1]);
+                char selectedRoute[32];
+                memcpy(selectedRoute, &data[1], len - 1);
+                selectedRoute[len - 1] = '\0';
                 
+                LOG_NAV("Start route request: %s", selectedRoute);
+                
+                // Load lat/lon from file
+                float lats[MAX_WAYPOINTS];
+                float lons[MAX_WAYPOINTS];
+                int count = loadRouteWaypoints(lats, lons, MAX_WAYPOINTS, selectedRoute);
+                
+                if (count > 0) {
+                    clearWaypoints();
+                
+                    for (int i = 0; i < count; ++i) {
+                        bool success = addWaypoint(lats[i], lons[i]);
+                        if (!success) {
+                            LOG_ERROR("Failed to add waypoint %d", i);
+                            sendErrorMessage("Too many waypoints. Route partially loaded.");
+                            break;
+                        }
+                    }
+                
+                    // Start navigation with default parameters
+                    startWaypointNavigation(1.0, 0);  // target pace = 1.0 m/s, no distance limit
+                    sendStatusMessage("Started route: " + String(selectedRoute));
+                } else {
+                    sendErrorMessage("Route not found or empty: " + String(selectedRoute));
+                }                
             }
             break;
         case WS_EVT_PONG:

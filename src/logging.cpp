@@ -254,6 +254,30 @@ std::vector<String> getRouteFileNames() {
     return routeNames;
 }
 
+int loadRouteWaypoints(float* lats, float* lons, int maxPoints, const char* routeName) {
+    String path = "/routes/" + String(routeName) + ".csv";
+    File f = SD.open(path);
+    if (!f) return 0;
+
+    int count = 0;
+    while (f.available() && count < maxPoints) {
+        String line = f.readStringUntil('\n');
+        line.trim();
+        if (line.length() == 0 || line.startsWith("latitude")) continue;
+
+        int comma1 = line.indexOf(',');
+        int comma2 = line.indexOf(',', comma1 + 1);
+        if (comma1 == -1 || comma2 == -1) continue;
+
+        lats[count] = line.substring(0, comma1).toFloat();
+        lons[count] = line.substring(comma1 + 1, comma2).toFloat();
+        count++;
+    }
+    f.close();
+    return count;
+}
+
+
 // Close the logging system
 void closeLogging() {
     if (currentLogLevel == LOG_NONE) return;

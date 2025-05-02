@@ -200,6 +200,7 @@ const char webPage[] PROGMEM = R"rawliteral(
         
         
         <div id="demo_day-control">
+            <!---
             <div style="margin-top: 5px; display: flex; flex-wrap: wrap; justify-content: center; gap: 5px;">
                 <div style="flex: 1; min-width: 250px; max-width: 350px;">
                     <div style="margin-bottom: 5px;">
@@ -225,7 +226,8 @@ const char webPage[] PROGMEM = R"rawliteral(
             </div>
                         
             <div id="avoidance-alert" style="display: none; margin-top: 10px; padding: 10px; background-color: #ffc107; border-radius: 4px;"></div>
-
+            --->
+            
             <h3>Custom Routes</h3>
             <select id="route-dropdown" class="coordinate-input"></select>
             <!---<button onclick="startSelectedRoute()" class="submit-btn">Start</button>--->
@@ -286,7 +288,7 @@ const char webPage[] PROGMEM = R"rawliteral(
         } else if (mode === 'demo') {
             document.getElementById('manual-control').style.display = 'none';
             document.getElementById('manual-gps-data').style.display = 'none';
-            document.getElementById('autonomous-control').style.display = 'none';
+            document.getElementById('autonomous-control').style.display = 'block';
             document.getElementById('demo_day-control').style.display = 'block';
             document.getElementById('manual-btn').className = 'inactive';
             document.getElementById('auto-btn').className = 'inactive';
@@ -309,20 +311,16 @@ const char webPage[] PROGMEM = R"rawliteral(
     // Toggle between start and pause
     function toggleStartPause() {
         if (document.getElementById('demo_day-btn').className == 'active') {
-            const routeName = document.getElementById("route-dropdown").value;
-            if (!routeName) {
-                showAlert("Please select a route");
-                return;
+            if (!navigationActive) {
+                // Start navigation
+                startAutonomousMode_Routes();
+            } else if (navigationPaused) {
+                // Resume navigation
+                resumeNavigation();
+            } else {
+                // Pause navigation
+                pauseNavigation();
             }
-
-            // Send route name to ESP32
-            const buffer = new ArrayBuffer(1 + routeName.length);
-            const view = new DataView(buffer);
-            view.setUint8(0, 249); // offset 0, id 249
-            for (let i = 0; i < routeName.length; i++) {
-                view.setUint8(i + 1, routeName.charCodeAt(i)); // offset i + 1
-            }
-            console.log("Sending route name:", routeName);
             return;
         }
 
@@ -336,6 +334,41 @@ const char webPage[] PROGMEM = R"rawliteral(
             // Pause navigation
             pauseNavigation();
         }
+    }
+
+    function startAutonomousMode_Routes() {
+        if (!wsConnected) {
+            showAlert("WebSocket disconnected. Cannot start autonomous mode.");
+            return;
+        }
+
+        const routeName = document.getElementById("route-dropdown").value;
+        if (!routeName) {
+            showAlert("Please select a route");
+            return;
+        }
+
+        // Send route name to ESP32
+        const buffer = new ArrayBuffer(1 + routeName.length);
+        const view = new DataView(buffer);
+        view.setUint8(0, 249); // offset 0, id 249
+        for (let i = 0; i < routeName.length; i++) {
+            view.setUint8(i + 1, routeName.charCodeAt(i)); // offset i + 1
+        }
+        console.log("Sending route name:", routeName);
+        ws.send(buffer);
+
+        // Update UI state
+        navigationActive = true;
+        navigationPaused = false;
+        document.getElementById('start-pause-btn').textContent = 'Pause';
+        document.getElementById('start-pause-btn').style.backgroundColor = '#ffc107';
+
+        // Reset UI elements
+        document.getElementById('total-distance').textContent = '0.0';
+        document.getElementById('current-pace').textContent = '0.0';
+        document.getElementById('average-pace').textContent = '0.0';
+        document.getElementById('elapsed-time').textContent = '00:00:00';
     }
 
     // Start autonomous navigation
