@@ -24,20 +24,14 @@ void setup() {
     Serial.printf("\n\nRC Car starting up with FreeRTOS...");
     Serial.printf("\n");
     
-    // Initialize logging system
-    if (initLogging()) {
-        //LOG_DEBUG("logging init");
-    } else {
-        Serial.printf("logging init fail");
-        Serial.printf("\n");
-    }
+    
 
-    LOG_ERROR("SYSTEM RESTART DETECTED - this message should appear only once after power-up");
+    //LOG_ERROR("SYSTEM RESTART DETECTED - this message should appear only once after power-up");
     
     // Connect to WiFi
     Serial.printf("Connecting to WiFi network: %s\n", ssid);
     Serial.printf("\n");
-    LOG_DEBUG("Connecting to WiFi network: %s", ssid);
+    //LOG_DEBUG("Connecting to WiFi network: %s", ssid);
     WiFi.begin(ssid, password);
     
     
@@ -54,11 +48,11 @@ void setup() {
             WiFi.localIP()[2], WiFi.localIP()[3]);
         Serial.printf("Connected to WiFi: %s, IP: %s\n\n", ssid, ipStr);
         Serial.println(WiFi.localIP());
-        LOG_DEBUG("Connected to WiFi: %s, IP: %s", ssid, ipStr);
+        //LOG_DEBUG("Connected to WiFi: %s, IP: %s", ssid, ipStr);
     } else {
         Serial.printf("Failed to connect to WiFi. Will retry in RTOS tasks");
         Serial.printf("\n");
-        LOG_ERROR("Failed to connect to WiFi. Will retry in RTOS tasks");
+        //LOG_ERROR("Failed to connect to WiFi. Will retry in RTOS tasks");
     }
     
     // platformio -> quick access -> new terminal
@@ -73,9 +67,9 @@ void setup() {
     initWebSocket();
 
     if (!initNavigation()) {
-        LOG_ERROR("Failed to initialize navigation system");
+        //LOG_ERROR("Failed to initialize navigation system");
     } else {
-        LOG_DEBUG("Navigation system initialized successfully");
+        //LOG_DEBUG("Navigation system initialized successfully");
     }
     
     // Initialize RTOS components

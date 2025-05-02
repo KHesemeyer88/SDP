@@ -52,6 +52,15 @@ void HttpServerTask(void *pvParameters) {
     // Initialize server routes and start the server
     initHttpServer();
     
+    // Initialize logging system
+    if (initLogging()) {
+        //LOG_DEBUG("logging init");
+    } else {
+        Serial.printf("logging init fail");
+        Serial.printf("\n");
+    }
+
+    
     // Task loop - AsyncWebServer doesn't need polling, but we keep
     // the task alive for future expansion and proper task management
     for (;;) {        
