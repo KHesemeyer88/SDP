@@ -219,7 +219,7 @@ const char webPage[] PROGMEM = R"rawliteral(
 
             <h3>Custom Routes</h3>
             <select id="route-dropdown" class="coordinate-input"></select>
-            <button onclick="startSelectedRoute()" class="submit-btn">Start</button>
+            <!-- <button onclick="startSelectedRoute()" class="submit-btn">Start</button> --->
 
 
 
@@ -838,7 +838,7 @@ const char webPage[] PROGMEM = R"rawliteral(
         const view = new DataView(buffer);
         switch (view.getUint8(0)) {
             case 1: // GNSS_data
-                console.log(GNSS_data);
+                console.log("GNSS_data");
                 return {
                     type: "gps",
                     lat: view.getFloat32(1, true),
@@ -846,7 +846,7 @@ const char webPage[] PROGMEM = R"rawliteral(
                     fix: view.getUint8(9)
                 };
             case 2: // RTK_status
-                console.log(RTK_status);
+                console.log("RTK_status");
                 return {
                     type: "rtk",
                     status: view.getUint8(1), // 1 offset for id byte
@@ -857,7 +857,7 @@ const char webPage[] PROGMEM = R"rawliteral(
                     fixType: view.getUint8(16)
                 };
             case 3: // Nav_stats
-                console.log(Nav_stats);
+                console.log("Nav_stats");
                 return {
                     type: "navstats",
                     totalDistance: view.getFloat32(1, true),
@@ -866,14 +866,14 @@ const char webPage[] PROGMEM = R"rawliteral(
                     totalTime: view.getUint32(13, true)
                 };
             case 4: // Sensor_data
-                console.log(Sensor_data);
+                console.log("Sensor_data");
                 return {
                     type: "sensors",
                     front: view.getFloat32(5, true),
                     //: view.getUint8(16)
                 };
             case 5: // Waypoint_data
-                console.log(Waypoint_data);
+                console.log("Waypoint_data");
                 return {
                     type: "waypoint",
                     lat: view.getFloat32(1, true),

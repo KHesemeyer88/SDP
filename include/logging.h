@@ -39,7 +39,6 @@ bool initLogging();
 void logTask(void *pvParameters);
 bool logMessage(LogLevel level, const char* format, ...);
 void closeLogging();
-std::vector<String> getRouteFileNames();
 
 // Helper macros for easier logging
 #define LOG_DEBUG(fmt, ...) logMessage(LOG_DEBUG, fmt, ##__VA_ARGS__)
@@ -49,6 +48,8 @@ std::vector<String> getRouteFileNames();
 
 // Save a waypoint to a named route file on SD
 bool saveWaypointToNamedRoute(const char* routeName, float lat, float lon, int rtkStatus, int fixType);
+// Get a list of route file names from the SD card
+std::vector<String> getRouteFileNames();
 
 
 const char* logLevelToString(LogLevel level);
