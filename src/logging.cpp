@@ -32,6 +32,11 @@ bool initLogging() {
         Serial.printf("\n");
         return true; // Logging disabled
     } 
+
+    // fix brownout? no
+    delay(1000);
+    vTaskDelay(pdMS_TO_TICKS(100));
+
     // Configure SPI for SD card
     static SPIClass sdSPI(VSPI);
     sdSPI.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
