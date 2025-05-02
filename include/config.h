@@ -69,7 +69,7 @@ const int TRIM_ANGLE = 2;       //car lists left
 // const char* password = "12345678";
 // Hotspot:
 const char ssid[] = "pacercar";
-const char password[] = "1234";
+const char password[] = "12345678";
 
 // const char ssid[] = "Kians iPhone";
 // const char password[] = "Dove'sHamster";
