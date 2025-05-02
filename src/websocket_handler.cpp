@@ -263,8 +263,9 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
                 }
                 break;
             } else if (data[0] == START_ROUTE_NAME && len > 1 && len < 32) {
-                LOG_ERROR("Received start route name: %s", &data[1]);
-                LOG_ERROR("Received start route name2: %s", &data[1]);
+                // LOG_ERROR("Received start route name: %s", &data[1]);
+                // LOG_ERROR("Received start route name2: %s", &data[1]);
+                LOG_ERROR("route name");
                 
             }
             break;

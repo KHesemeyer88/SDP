@@ -232,7 +232,7 @@ const char webPage[] PROGMEM = R"rawliteral(
 
             <h3>Predefined Routes</h3>
             <p>Marcus Triangle:</p>
-            <img src="/marcus_triangle.png" alt="marcus triangle loop" width="300" height="300">
+            <!-- <img src="/marcus_triangle.png" alt="marcus triangle loop" width="300" height="300"> --->
          </div>
     </div>
 
@@ -308,7 +308,7 @@ const char webPage[] PROGMEM = R"rawliteral(
 
     // Toggle between start and pause
     function toggleStartPause() {
-        if (document.getElementByID('demo_day-btn').className == 'active') {
+        if (document.getElementById('demo_day-btn').className == 'active') {
             const routeName = document.getElementById("route-dropdown").value;
             if (!routeName) {
                 showAlert("Please select a route");
@@ -322,7 +322,7 @@ const char webPage[] PROGMEM = R"rawliteral(
             for (let i = 0; i < routeName.length; i++) {
                 view.setUint8(i + 1, routeName.charCodeAt(i)); // offset i + 1
             }
-
+            console.log("Sending route name:", routeName);
             return;
         }
 

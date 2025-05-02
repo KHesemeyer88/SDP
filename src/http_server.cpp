@@ -18,7 +18,7 @@ void initHttpServer() {
         request->send(200, "text/html", webPage);
     });
 
-    server.serveStatic("marcus_triangle.png", SPIFFS, "/marcus_triangle.png");
+    //server.serveStatic("marcus_triangle.png", SPIFFS, "/marcus_triangle.png");
     //server.serveStatic("/", SPIFFS, "/");
 
 
