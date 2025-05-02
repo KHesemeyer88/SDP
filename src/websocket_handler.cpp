@@ -18,6 +18,8 @@ unsigned long lastWSRTKUpdate = 0;
 unsigned long lastWSStatsUpdate = 0;
 static bool wasDisconnected = false;
 
+char currentRouteName[32] = "demo_route";
+
 void initWebSocket() {
     // Set event handler
     ws.onEvent(webSocketEventHandler);
@@ -155,6 +157,11 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
             } else if (len == sizeof(command_control)){ // Handle control messages (manual driving), binary size matches control struct
                 command_control the_message;
                 memcpy(&the_message, data, sizeof(the_message)); //copy binary data into struct
+
+                if (the_message.id != COMMAND_CONTROL) {
+                    // go to else statement
+                    break;
+                }
                 //Serial.printf("Received command: type=%u value=%.2f\n", my_webpage_data.something, my_webpage_data.something);
                     //if (doc.containsKey("control")) {
                     // LOG_DEBUG("Received control command: v=%f, h=%f", 
@@ -191,6 +198,11 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
                 // Get parameters
                 command_start the_message;
                 memcpy(&the_message, data, sizeof(the_message));
+
+                if (the_message.id != COMMAND_START) {
+                    // go to else statement
+                    break;
+                }
                 
                 float targetPace = the_message.target_pace;
                 float targetDistance = the_message.target_distance;
@@ -214,6 +226,44 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
                     // No coordinates or waypoints - send error
                     sendErrorMessage("No destination specified. Please enter coordinates or record waypoints.");
                 }
+            } else if (data[0] == ROUTE_NAME && len > 1 && len < 32) {
+                Serial.println("route name");
+                // Get current position and record as waypoint
+                memcpy(currentRouteName, &data[1], len - 1);
+                currentRouteName[len - 1] = '\0'; // null-terminate
+                LOG_DEBUG("Received route name: %s", currentRouteName);
+
+                if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                    float lat = gnssData.latitude;
+                    float lon = gnssData.longitude;
+                    xSemaphoreGive(gnssMutex);
+                    
+                    // Add waypoint using current position
+                    if (addWaypoint(lat, lon)) {
+                        vTaskDelay(pdMS_TO_TICKS(50));
+                        
+                        // Get waypoint count with proper protection
+                        int count = getWaypointCount();
+                        //LOG_NAV("addWaypoint() succeeded, getWaypointCount() returned %d", count);
+                        
+                        // Get current waypoint index with proper mutex protection
+                        int currentWaypointIndex = 0;
+                        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                            currentWaypointIndex = navStatus.currentWaypoint;
+                            xSemaphoreGive(navDataMutex);
+                        }
+                        
+                        saveWaypointToNamedRoute(currentRouteName, lat, lon, 8, 8/*carrSoln, fixType*/);
+
+                        Waypoint_data response_message;
+                        response_message.count = count;
+                        response_message.lat = lat;
+                        response_message.lon = lon;
+                        
+                        ws.binaryAll((uint8_t*)&response_message, sizeof(response_message));
+                    }
+                }
+                break;
             }
             break;
         case WS_EVT_PONG:

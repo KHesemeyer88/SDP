@@ -38,7 +38,7 @@ const char webPage[] PROGMEM = R"rawliteral(
         .mode-switch button {
             padding: 10px 20px;
             font-size: 18px;
-            margin: 0 10px;
+            margin: 10px 10px;
             border: none;
             border-radius: 4px;
             cursor: pointer;
@@ -67,6 +67,16 @@ const char webPage[] PROGMEM = R"rawliteral(
         }
         #autonomous-control {
             display: none;
+        }
+        #demo_day-control {
+            display: none;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-top: 20px;
+            width: 80%;
+            text-align: center;
         }
         #manual-control {
             display: flex;
@@ -119,6 +129,7 @@ const char webPage[] PROGMEM = R"rawliteral(
         <div class="mode-switch">
             <button id="manual-btn" class="active" onclick="switchMode('manual')">Manual</button>
             <button id="auto-btn" class="inactive" onclick="switchMode('autonomous')">Autonomous</button>
+            <button id="demo_day-btn" class="inactive" onclick="switchMode('demo')" style="width:200px">Saved Routes</button>
         </div>
 
         <div id="manual-control">
@@ -130,6 +141,9 @@ const char webPage[] PROGMEM = R"rawliteral(
 
         <!-- Move this RTK status panel from autonomous-control to manual-gps-data section -->
         <div id="manual-gps-data" style="margin-top: 20px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
+            <h3>Route Creation</h3>
+            <input type="text" id="route_name" class="coordinate-input" placeholder="Enter name to create route">
+
             <div style="display: flex; gap: 10px; justify-content: center;">
                 <button id="record-waypoint-btn" class="submit-btn" style="background-color: #28a745;" onclick="recordWaypoint()">Record WP</button>
                 <button id="clear-waypoint-btn" class="submit-btn" style="background-color: #dc3545;" onclick="clearWaypoints()">Clear WP</button>
@@ -182,7 +196,15 @@ const char webPage[] PROGMEM = R"rawliteral(
             <div id="avoidance-alert" style="display: none; margin-top: 10px; padding: 10px; background-color: #ffc107; border-radius: 4px;"></div>
             <h3>Input Coords</h3>
             <input type="text" id="coords-input" class="coordinate-input" placeholder="Coordinates (e.g. 42.637088, -72.729328)">
-        </div>        
+        </div>   
+        
+        
+        <div id="demo_day-control">
+
+            <h3>Custom Routes</h3>
+            <select id="route-dropdown" class="coordinate-input"></select>
+            <!---<button onclick="startSelectedRoute()" class="submit-btn">Start</button>--->
+         </div>
     </div>
 
 <script>
@@ -225,17 +247,30 @@ const char webPage[] PROGMEM = R"rawliteral(
     function switchMode(mode) {
         if (mode === 'manual') {
             document.getElementById('manual-control').style.display = 'flex';
+            document.getElementById('manual-gps-data').style.display = 'block';
             document.getElementById('autonomous-control').style.display = 'none';
+            document.getElementById('demo_day-control').style.display = 'none';
             document.getElementById('manual-btn').className = 'active';
             document.getElementById('auto-btn').className = 'inactive';
-            document.getElementById('manual-gps-data').style.display = 'block';
+            document.getElementById('demo_day-btn').className = 'inactive';
+            stopAutonomousMode();
+        } else if (mode === 'demo') {
+            document.getElementById('manual-control').style.display = 'none';
+            document.getElementById('manual-gps-data').style.display = 'none';
+            document.getElementById('autonomous-control').style.display = 'block';
+            document.getElementById('demo_day-control').style.display = 'block';
+            document.getElementById('manual-btn').className = 'inactive';
+            document.getElementById('auto-btn').className = 'inactive';
+            document.getElementById('demo_day-btn').className = 'active';
             stopAutonomousMode();
         } else {
             document.getElementById('manual-control').style.display = 'none';
+            document.getElementById('manual-gps-data').style.display = 'none';
             document.getElementById('autonomous-control').style.display = 'block';
+            document.getElementById('demo_day-control').style.display = 'none';
             document.getElementById('manual-btn').className = 'inactive';
             document.getElementById('auto-btn').className = 'active';
-            document.getElementById('manual-gps-data').style.display = 'none';
+            document.getElementById('demo_day-btn').className = 'inactive';
         }
     }
 
@@ -587,7 +622,22 @@ const char webPage[] PROGMEM = R"rawliteral(
         button.disabled = true;
         button.textContent = 'Recording WP...';
         
-        sendMessage(1);
+        // send route name, if there is one, otherwise normal WP
+        const name = document.getElementById('route_name').value.trim();
+        if (name) {
+            // If a name is provided, send it to the ESP32
+            const buffer = new ArrayBuffer(1 + name.length); // 1 byte for id + name length
+            const view = new DataView(buffer);
+            view.setUint8(0, 250); // offset 0, id 250
+            for (let i = 0; i < name.length; i++) {
+                view.setUint8(i + 1, name.charCodeAt(i)); // offset i
+            }
+            ws.send(buffer);
+            console.log("route name sent: " + name);
+        } else {
+            sendMessage(1);
+            console.log("normal WP");
+        }
         
         // Always re-enable the button after a short delay
         setTimeout(() => {

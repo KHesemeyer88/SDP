@@ -99,8 +99,9 @@ const uint8_t MESSAGE_PAUSE = 4;
 const uint8_t MESSAGE_RESUME = 5;
 const uint8_t MESSAGE_RESET = 6;
 
-const uint8_t COMMAND_START = 2;
 const uint8_t COMMAND_CONTROL = 1;
+const uint8_t COMMAND_START = 2;
+#define ROUTE_NAME 250
 
 
 //          ws.sendMessage(1);

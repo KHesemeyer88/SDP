@@ -68,11 +68,14 @@ const int TRIM_ANGLE = 2;       //car lists left
 // const char* ssid = "RC_Car_Control";
 // const char* password = "12345678";
 // Hotspot:
-// const char ssid[] = "Kians iPhone";
-// const char password[] = "Dove'sHamster";
+// const char ssid[] = "pacercar";
+// const char password[] = "1234";
 
-const char ssid[] = "Galaxy XCover FieldPro8858";
-const char password[] = "bugo4303";
+const char ssid[] = "Kians iPhone";
+const char password[] = "Dove'sHamster";
+
+// const char ssid[] = "Galaxy XCover FieldPro8858";
+// const char password[] = "bugo4303";
 
 // const char ssid[] = "chewchewchew";
 // const char password[] = "03092738Ss";
