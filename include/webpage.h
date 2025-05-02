@@ -200,10 +200,39 @@ const char webPage[] PROGMEM = R"rawliteral(
         
         
         <div id="demo_day-control">
+            <div style="margin-top: 5px; display: flex; flex-wrap: wrap; justify-content: center; gap: 5px;">
+                <div style="flex: 1; min-width: 250px; max-width: 350px;">
+                    <div style="margin-bottom: 5px;">
+                        <label for="target-pace">Pace (m/s):</label>
+                        <input type="number" id="target-pace" class="coordinate-input" value="0" min="0" step="0.1" style="width: 80px;">
+                    </div>
+                    <div style="margin-bottom: 5px;">
+                        <label for="target-distance">Distance (m):</label>
+                        <input type="number" id="target-distance" class="coordinate-input" value="0" min="0" style="width: 80px;">
+                    </div>
+                    <button id="start-pause-btn" class="submit-btn" onclick="toggleStartPause()">Start</button>
+                    <button id="stop-btn" class="submit-btn" style="background-color: #dc3545;" onclick="stopAutonomousMode()">Stop</button>
+                    <button id="reset-tracking-btn" class="submit-btn" style="background-color: #ffc107;" onclick="resetTracking()">Reset Tracking</button>
+                </div>
+                <div style="flex: 1; min-width: 250px; max-width: 350px;">
+                    <div style="background: #f0f0f0; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
+                        <p>Distance: <span id="total-distance">0.0</span> m</p>
+                        <p>Instantaneous Pace: <span id="current-pace">0.0</span> m/s</p>
+                        <p>Average Pace: <span id="average-pace">0.0</span> m/s</p>
+                        <p>Time: <span id="elapsed-time">00:00:00</span></p>
+                    </div>
+                </div>
+            </div>
+                        
+            <div id="avoidance-alert" style="display: none; margin-top: 10px; padding: 10px; background-color: #ffc107; border-radius: 4px;"></div>
 
             <h3>Custom Routes</h3>
             <select id="route-dropdown" class="coordinate-input"></select>
             <!---<button onclick="startSelectedRoute()" class="submit-btn">Start</button>--->
+
+            <h3>Predefined Routes</h3>
+            <p>Marcus Triangle:</p>
+            <img src="/marcus_triangle.png" alt="marcus triangle loop" width="300" height="300">
          </div>
     </div>
 
@@ -257,7 +286,7 @@ const char webPage[] PROGMEM = R"rawliteral(
         } else if (mode === 'demo') {
             document.getElementById('manual-control').style.display = 'none';
             document.getElementById('manual-gps-data').style.display = 'none';
-            document.getElementById('autonomous-control').style.display = 'block';
+            document.getElementById('autonomous-control').style.display = 'none';
             document.getElementById('demo_day-control').style.display = 'block';
             document.getElementById('manual-btn').className = 'inactive';
             document.getElementById('auto-btn').className = 'inactive';
@@ -279,6 +308,24 @@ const char webPage[] PROGMEM = R"rawliteral(
 
     // Toggle between start and pause
     function toggleStartPause() {
+        if (document.getElementByID('demo_day-btn').className == 'active') {
+            const routeName = document.getElementById("route-dropdown").value;
+            if (!routeName) {
+                showAlert("Please select a route");
+                return;
+            }
+
+            // Send route name to ESP32
+            const buffer = new ArrayBuffer(1 + routeName.length);
+            const view = new DataView(buffer);
+            view.setUint8(0, 249); // offset 0, id 249
+            for (let i = 0; i < routeName.length; i++) {
+                view.setUint8(i + 1, routeName.charCodeAt(i)); // offset i + 1
+            }
+
+            return;
+        }
+
         if (!navigationActive) {
             // Start navigation
             startAutonomousMode();
@@ -589,7 +636,7 @@ const char webPage[] PROGMEM = R"rawliteral(
         const display = document.getElementById('fusion-status-display');
         const statusSpan = document.getElementById('fusion-status');
 
-        alert("I'll deal with this later...");
+        //alert("I'll deal with this later...");
 
         
         // button.disabled = true;

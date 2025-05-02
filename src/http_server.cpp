@@ -4,6 +4,8 @@
 #include "logging.h"
 #include "websocket_handler.h"
 #include "gnss.h"
+#include "SPIFFS.h"
+
 
 // HTTP server instance on port 80
 AsyncWebServer server(80);
@@ -15,6 +17,11 @@ void initHttpServer() {
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
         request->send(200, "text/html", webPage);
     });
+
+    server.serveStatic("marcus_triangle.png", SPIFFS, "/marcus_triangle.png");
+    //server.serveStatic("/", SPIFFS, "/");
+
+
     
     // Fusion status endpoint
     // server.on("/fusionStatus", HTTP_GET, [](AsyncWebServerRequest *request) {

@@ -6,6 +6,7 @@
 #include "logging.h"
 #include "navigation.h"
 #include "websocket_handler.h"
+#include "SPIFFS.h"
 
 // Definition for ntripClient (declared as extern in config.h)
 WiFiClient ntripClient;
@@ -60,6 +61,15 @@ void setup() {
         LOG_ERROR("Failed to connect to WiFi. Will retry in RTOS tasks");
     }
     
+    // platformio -> quick access -> new terminal
+    //pio run --target uploadfs
+    // uploads data images to SPIFFS
+    // SPIFFS is used for web pages and other static files
+    if (!SPIFFS.begin(true)) {
+        Serial.println("SPIFFS mount failed");
+        return;
+    }
+
     initWebSocket();
 
     if (!initNavigation()) {

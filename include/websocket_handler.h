@@ -102,6 +102,7 @@ const uint8_t MESSAGE_RESET = 6;
 const uint8_t COMMAND_CONTROL = 1;
 const uint8_t COMMAND_START = 2;
 #define ROUTE_NAME 250
+#define START_ROUTE_NAME 249
 
 
 

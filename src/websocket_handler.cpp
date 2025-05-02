@@ -207,7 +207,7 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
                     }
                 }
             } else if (len == sizeof(command_start)) { // Handle autonomous navigation commands
-                // Start autonomous navigation                            
+                // Start autonomous navigation
                 // Get parameters
                 command_start the_message;
                 memcpy(&the_message, data, sizeof(the_message));
@@ -240,7 +240,6 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
                     sendErrorMessage("No destination specified. Please enter coordinates or record waypoints.");
                 }
             } else if (data[0] == ROUTE_NAME && len > 1 && len < 32) {
-                Serial.println("route name");
                 // Get current position and record as waypoint
                 memcpy(currentRouteName, &data[1], len - 1);
                 currentRouteName[len - 1] = '\0'; // null-terminate
@@ -251,32 +250,22 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
                     float lon = gnssData.longitude;
                     xSemaphoreGive(gnssMutex);
                     
-                    // Add waypoint using current position
-                    if (addWaypoint(lat, lon)) {
-                        vTaskDelay(pdMS_TO_TICKS(50));
-                        
-                        // Get waypoint count with proper protection
-                        int count = getWaypointCount();
-                        //LOG_NAV("addWaypoint() succeeded, getWaypointCount() returned %d", count);
-                        
-                        // Get current waypoint index with proper mutex protection
-                        int currentWaypointIndex = 0;
-                        if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
-                            currentWaypointIndex = navStatus.currentWaypoint;
-                            xSemaphoreGive(navDataMutex);
-                        }
-                        
-                        saveWaypointToNamedRoute(currentRouteName, lat, lon, 8, 8/*carrSoln, fixType*/);
+                    vTaskDelay(pdMS_TO_TICKS(50));
+                    
+                    saveWaypointToNamedRoute(currentRouteName, lat, lon, 8, 8/*carrSoln, fixType*/);
 
-                        Waypoint_data response_message;
-                        response_message.count = count;
-                        response_message.lat = lat;
-                        response_message.lon = lon;
-                        
-                        ws.binaryAll((uint8_t*)&response_message, sizeof(response_message));
-                    }
+                    Waypoint_data response_message;
+                    response_message.count = 0;
+                    response_message.lat = lat;
+                    response_message.lon = lon;
+                    
+                    ws.binaryAll((uint8_t*)&response_message, sizeof(response_message));
                 }
                 break;
+            } else if (data[0] == START_ROUTE_NAME && len > 1 && len < 32) {
+                LOG_ERROR("Received start route name: %s", &data[1]);
+                LOG_ERROR("Received start route name2: %s", &data[1]);
+                
             }
             break;
         case WS_EVT_PONG:
