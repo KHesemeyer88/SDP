@@ -50,5 +50,7 @@ const char* logLevelToString(LogLevel level);
 
 // Save a waypoint to a named route file on SD
 bool saveWaypointToNamedRoute(const char* routeName, float lat, float lon, int rtkStatus, int fixType);
+// Get a list of route file names from the SD card
+std::vector<String> getRouteFileNames();
 
 #endif // LOGGING_H

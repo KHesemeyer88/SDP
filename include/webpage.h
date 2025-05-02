@@ -263,6 +263,9 @@ const char webPage[] PROGMEM = R"rawliteral(
             document.getElementById('auto-btn').className = 'inactive';
             document.getElementById('demo_day-btn').className = 'active';
             stopAutonomousMode();
+
+            sendMessage(3);
+            document.getElementById("route-dropdown").innerHTML = ""; // Clear existing options
         } else {
             document.getElementById('manual-control').style.display = 'none';
             document.getElementById('manual-gps-data').style.display = 'none';
@@ -716,6 +719,24 @@ const char webPage[] PROGMEM = R"rawliteral(
         };
         
         ws.onmessage = function(evt) {
+            if (typeof evt.data === "string") {
+                // Handle text messages
+                if (evt.data.startsWith("routes:[")) {
+                    const jsonText = evt.data.slice(7); // remove "routes:"
+                    const routeArray = JSON.parse(jsonText);
+                    const dropdown = document.getElementById("route-dropdown");
+                    dropdown.innerHTML = "";
+
+                    routeArray.forEach(route => {
+                        const option = document.createElement("option");
+                        option.value = route;
+                        option.textContent = route;
+                        dropdown.appendChild(option);
+                    });
+                }
+                return;
+            }
+
             try {
                 const data = parse_websocket_message(evt.data);
                 

@@ -54,6 +54,19 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
             // ----- handle messages -----
             if (len == sizeof(uint8_t)) { // binary size matches uint, its a MESSAGE
                 switch (*data) {
+                    case MESSAGE_REQUEST_ROUTE_LIST: {
+                        auto routes = getRouteFileNames();  // std::vector<String>
+
+                        String payload = "routes:[";
+                        for (size_t i = 0; i < routes.size(); ++i) {
+                            payload += "\"" + routes[i] + "\"";
+                            if (i < routes.size() - 1) payload += ",";
+                        }
+                        payload += "]";
+                    
+                        ws.textAll(payload);
+                        break;
+                    }
                     case MESSAGE_STOP: {
                         // Stop autonomous navigation
                         LOG_NAV("Stop command received");

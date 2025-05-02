@@ -226,6 +226,34 @@ bool saveWaypointToNamedRoute(const char* routeName, float lat, float lon, int r
     return true;
 }
 
+std::vector<String> getRouteFileNames() {
+    std::vector<String> routeNames;
+
+    File dir = SD.open("/routes");
+    if (!dir || !dir.isDirectory()) {
+        Serial.println("getRouteFileNames: Failed to open /routes directory");
+        return routeNames;
+    }
+
+    while (true) {
+        File entry = dir.openNextFile();
+        if (!entry) break;
+
+        if (!entry.isDirectory()) {
+            String name = entry.name();  // "/routes/demo.csv"
+            if (name.endsWith(".csv")) {
+                name.replace("/routes/", "");
+                name.replace(".csv", "");
+                routeNames.push_back(name);
+            }
+        }
+        entry.close();
+    }
+
+    dir.close();
+    return routeNames;
+}
+
 // Close the logging system
 void closeLogging() {
     if (currentLogLevel == LOG_NONE) return;
