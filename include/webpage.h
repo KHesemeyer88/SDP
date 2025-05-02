@@ -291,6 +291,8 @@ const char webPage[] PROGMEM = R"rawliteral(
 
     // Mode switching
     function switchMode(mode) {
+        stopAutonomousMode();
+
         if (mode === 'manual') {
             document.getElementById('manual-control').style.display = 'flex';
             document.getElementById('manual-gps-data').style.display = 'block';
@@ -299,7 +301,6 @@ const char webPage[] PROGMEM = R"rawliteral(
             document.getElementById('manual-btn').className = 'active';
             document.getElementById('auto-btn').className = 'inactive';
             document.getElementById('demo_day-btn').className = 'inactive';
-            stopAutonomousMode();
         } else if (mode === 'demo') {
             document.getElementById('manual-control').style.display = 'none';
             document.getElementById('manual-gps-data').style.display = 'none';
@@ -308,7 +309,6 @@ const char webPage[] PROGMEM = R"rawliteral(
             document.getElementById('manual-btn').className = 'inactive';
             document.getElementById('auto-btn').className = 'inactive';
             document.getElementById('demo_day-btn').className = 'active';
-            stopAutonomousMode();
 
             sendMessage(3);
             document.getElementById("route-dropdown").innerHTML = ""; // Clear existing options

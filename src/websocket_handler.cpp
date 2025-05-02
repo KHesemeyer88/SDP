@@ -297,8 +297,25 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
                             break;
                         }
                     }
-                    startWaypointNavigation(pace, distance);
-                    sendStatusMessage("Started route: " + String(selectedRoute));
+
+                    if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                        targetData.followingWaypoints = true;
+                        LOG_NAV("Set followingWaypoints=true for route");
+                        xSemaphoreGive(waypointMutex);
+                    }
+                    
+                    if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                        navStatus.currentWaypoint = 0;
+                        navStatus.totalWaypoints = count;
+                        xSemaphoreGive(navDataMutex);
+                    }
+                    
+                    if (!startWaypointNavigation(pace - 0.5, distance)) {
+                        sendErrorMessage("Failed to start waypoint navigation");
+                    } else {
+                        sendStatusMessage("Started route: " + String(selectedRoute));
+                    }
+
                 } else {
                     sendErrorMessage("Route not found or empty: " + String(selectedRoute));
                 }
