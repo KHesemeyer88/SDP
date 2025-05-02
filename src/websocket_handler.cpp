@@ -262,37 +262,36 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
                     ws.binaryAll((uint8_t*)&response_message, sizeof(response_message));
                 }
                 break;
-            } else if (data[0] == START_ROUTE_NAME && len > 1 && len < 32) {
-                LOG_ERROR("Start route name: %s", &data[1]);
+            } else if (data[0] == START_ROUTE_NAME && len > 1 + 4 + 4 && len < 1 + 4 + 4 + 32) {
+                float pace, distance;
+                memcpy(&pace, &data[1], sizeof(float));
+                memcpy(&distance, &data[5], sizeof(float));
+
                 char selectedRoute[32];
-                memcpy(selectedRoute, &data[1], len - 1);
-                selectedRoute[len - 1] = '\0';
+                size_t nameLen = len - 9;
+                memcpy(selectedRoute, &data[9], nameLen);
+                selectedRoute[nameLen] = '\0';
+                LOG_ERROR("Start route request: %s (pace=%.2f, dist=%.2f)", selectedRoute, pace, distance);
                 
-                LOG_NAV("Start route request: %s", selectedRoute);
                 
                 // Load lat/lon from file
                 float lats[MAX_WAYPOINTS];
                 float lons[MAX_WAYPOINTS];
-                int count = loadRouteWaypoints(lats, lons, MAX_WAYPOINTS, selectedRoute);
+                int count = loadRouteWaypoints(lats, lons, MAX_WAYPOINTS, selectedRoute);            
                 
                 if (count > 0) {
                     clearWaypoints();
-                
                     for (int i = 0; i < count; ++i) {
-                        bool success = addWaypoint(lats[i], lons[i]);
-                        if (!success) {
-                            LOG_ERROR("Failed to add waypoint %d", i);
+                        if (!addWaypoint(lats[i], lons[i])) {
                             sendErrorMessage("Too many waypoints. Route partially loaded.");
                             break;
                         }
                     }
-                
-                    // Start navigation with default parameters
-                    startWaypointNavigation(1.0, 0);  // target pace = 1.0 m/s, no distance limit
+                    startWaypointNavigation(pace, distance);
                     sendStatusMessage("Started route: " + String(selectedRoute));
                 } else {
                     sendErrorMessage("Route not found or empty: " + String(selectedRoute));
-                }                
+                }
             }
             break;
         case WS_EVT_PONG:

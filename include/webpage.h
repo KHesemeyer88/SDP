@@ -348,15 +348,23 @@ const char webPage[] PROGMEM = R"rawliteral(
             return;
         }
 
-        // Send route name to ESP32
-        const buffer = new ArrayBuffer(1 + routeName.length);
+        const targetPace = document.getElementById('target-pace').value;
+        const targetDistance = document.getElementById('target-distance').value;
+
+        // Send route name to ESP32 & pace & distance
+        const buffer = new ArrayBuffer(1 + 4 + 4 + routeName.length);
         const view = new DataView(buffer);
-        view.setUint8(0, 249); // offset 0, id 249
+        view.setUint8(0, 249); // START_ROUTE_NAME offset 0, id 249
+        view.setFloat32(1, pace, true);
+        view.setFloat32(5, distance, true);
         for (let i = 0; i < routeName.length; i++) {
-            view.setUint8(i + 1, routeName.charCodeAt(i)); // offset i + 1
+            view.setUint8(9 + i, routeName.charCodeAt(i)); // offset i + 9 bytes before
         }
-        console.log("Sending route name:", routeName);
+
         ws.send(buffer);
+        console.log("Sending route name:", routeName);
+        console.log(`Sent route: ${routeName} with pace=${pace} m/s, distance=${distance} m`);
+        
 
         // Update UI state
         navigationActive = true;
