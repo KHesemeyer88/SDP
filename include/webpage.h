@@ -38,7 +38,7 @@ const char webPage[] PROGMEM = R"rawliteral(
         .mode-switch button {
             padding: 10px 20px;
             font-size: 18px;
-            margin: 0 10px;
+            margin: 10px 10px;
             border: none;
             border-radius: 4px;
             cursor: pointer;
@@ -67,6 +67,16 @@ const char webPage[] PROGMEM = R"rawliteral(
         }
         #autonomous-control {
             display: none;
+        }
+        #demo_day-control {
+            display: none;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-top: 20px;
+            width: 80%;
+            text-align: center;
         }
         #manual-control {
             display: flex;
@@ -119,6 +129,7 @@ const char webPage[] PROGMEM = R"rawliteral(
         <div class="mode-switch">
             <button id="manual-btn" class="active" onclick="switchMode('manual')">Manual</button>
             <button id="auto-btn" class="inactive" onclick="switchMode('autonomous')">Autonomous</button>
+            <button id="demo_day-btn" class="inactive" onclick="switchMode('demo')" style="width:200px">Saved Routes</button>
         </div>
 
         <div id="manual-control">
@@ -130,6 +141,9 @@ const char webPage[] PROGMEM = R"rawliteral(
 
         <!-- Move this RTK status panel from autonomous-control to manual-gps-data section -->
         <div id="manual-gps-data" style="margin-top: 20px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center;">
+            <h3>Route Creation</h3>
+            <input type="text" id="route_name" class="coordinate-input" placeholder="Enter name to create route">
+
             <div style="display: flex; gap: 10px; justify-content: center;">
                 <button id="record-waypoint-btn" class="submit-btn" style="background-color: #28a745;" onclick="recordWaypoint()">Record WP</button>
                 <button id="clear-waypoint-btn" class="submit-btn" style="background-color: #dc3545;" onclick="clearWaypoints()">Clear WP</button>
@@ -182,7 +196,50 @@ const char webPage[] PROGMEM = R"rawliteral(
             <div id="avoidance-alert" style="display: none; margin-top: 10px; padding: 10px; background-color: #ffc107; border-radius: 4px;"></div>
             <h3>Input Coords</h3>
             <input type="text" id="coords-input" class="coordinate-input" placeholder="Coordinates (e.g. 42.637088, -72.729328)">
-        </div>        
+        </div>   
+        
+        
+        <div id="demo_day-control">
+            <!---
+            <div style="margin-top: 5px; display: flex; flex-wrap: wrap; justify-content: center; gap: 5px;">
+                <div style="flex: 1; min-width: 250px; max-width: 350px;">
+                    <div style="margin-bottom: 5px;">
+                        <label for="target-pace">Pace (m/s):</label>
+                        <input type="number" id="target-pace" class="coordinate-input" value="0" min="0" step="0.1" style="width: 80px;">
+                    </div>
+                    <div style="margin-bottom: 5px;">
+                        <label for="target-distance">Distance (m):</label>
+                        <input type="number" id="target-distance" class="coordinate-input" value="0" min="0" style="width: 80px;">
+                    </div>
+                    <button id="start-pause-btn" class="submit-btn" onclick="toggleStartPause()">Start</button>
+                    <button id="stop-btn" class="submit-btn" style="background-color: #dc3545;" onclick="stopAutonomousMode()">Stop</button>
+                    <button id="reset-tracking-btn" class="submit-btn" style="background-color: #ffc107;" onclick="resetTracking()">Reset Tracking</button>
+                </div>
+                <div style="flex: 1; min-width: 250px; max-width: 350px;">
+                    <div style="background: #f0f0f0; padding: 10px; border-radius: 4px; margin-bottom: 10px;">
+                        <p>Distance: <span id="total-distance">0.0</span> m</p>
+                        <p>Instantaneous Pace: <span id="current-pace">0.0</span> m/s</p>
+                        <p>Average Pace: <span id="average-pace">0.0</span> m/s</p>
+                        <p>Time: <span id="elapsed-time">00:00:00</span></p>
+                    </div>
+                </div>
+            </div>
+                        
+            <div id="avoidance-alert" style="display: none; margin-top: 10px; padding: 10px; background-color: #ffc107; border-radius: 4px;"></div>
+            --->
+            
+            <h3>Custom Routes</h3>
+            <select id="route-dropdown" class="coordinate-input"></select>
+            <!---<button onclick="startSelectedRoute()" class="submit-btn">Start</button>--->
+
+            <br></br>
+            <button onclick="reinitSD()" class="submit-btn" style="background-color: #ff6600;">Reconnect SD Card</button>
+
+
+            <h3>Predefined Routes</h3>
+            <p>Marcus Triangle:</p>
+            <img src="/marcus_triangle.png" alt="marcus triangle loop" width="300" height="300">
+         </div>
     </div>
 
 <script>
@@ -221,26 +278,67 @@ const char webPage[] PROGMEM = R"rawliteral(
         ctx.fill();
     }
 
+    function reinitSD() {
+        if (!wsConnected) {
+            showAlert("WebSocket disconnected. Cannot reinit SD.");
+            return;
+        }
+
+        sendMessage(251);  // MESSAGE_REINIT_SD
+        showAlert("Reinitializing SD card...");
+    }
+
+
     // Mode switching
     function switchMode(mode) {
+        stopAutonomousMode();
+
         if (mode === 'manual') {
             document.getElementById('manual-control').style.display = 'flex';
+            document.getElementById('manual-gps-data').style.display = 'block';
             document.getElementById('autonomous-control').style.display = 'none';
+            document.getElementById('demo_day-control').style.display = 'none';
             document.getElementById('manual-btn').className = 'active';
             document.getElementById('auto-btn').className = 'inactive';
-            document.getElementById('manual-gps-data').style.display = 'block';
-            stopAutonomousMode();
+            document.getElementById('demo_day-btn').className = 'inactive';
+        } else if (mode === 'demo') {
+            document.getElementById('manual-control').style.display = 'none';
+            document.getElementById('manual-gps-data').style.display = 'none';
+            document.getElementById('autonomous-control').style.display = 'block';
+            document.getElementById('demo_day-control').style.display = 'block';
+            document.getElementById('manual-btn').className = 'inactive';
+            document.getElementById('auto-btn').className = 'inactive';
+            document.getElementById('demo_day-btn').className = 'active';
+
+            sendMessage(3);
+            document.getElementById("route-dropdown").innerHTML = ""; // Clear existing options
         } else {
             document.getElementById('manual-control').style.display = 'none';
+            document.getElementById('manual-gps-data').style.display = 'none';
             document.getElementById('autonomous-control').style.display = 'block';
+            document.getElementById('demo_day-control').style.display = 'none';
             document.getElementById('manual-btn').className = 'inactive';
             document.getElementById('auto-btn').className = 'active';
-            document.getElementById('manual-gps-data').style.display = 'none';
+            document.getElementById('demo_day-btn').className = 'inactive';
         }
     }
 
     // Toggle between start and pause
     function toggleStartPause() {
+        if (document.getElementById('demo_day-btn').className == 'active') {
+            if (!navigationActive) {
+                // Start navigation
+                startAutonomousMode_Routes();
+            } else if (navigationPaused) {
+                // Resume navigation
+                resumeNavigation();
+            } else {
+                // Pause navigation
+                pauseNavigation();
+            }
+            return;
+        }
+
         if (!navigationActive) {
             // Start navigation
             startAutonomousMode();
@@ -251,6 +349,49 @@ const char webPage[] PROGMEM = R"rawliteral(
             // Pause navigation
             pauseNavigation();
         }
+    }
+
+    function startAutonomousMode_Routes() {
+        if (!wsConnected) {
+            showAlert("WebSocket disconnected. Cannot start autonomous mode.");
+            return;
+        }
+
+        const routeName = document.getElementById("route-dropdown").value;
+        if (!routeName) {
+            showAlert("Please select a route");
+            return;
+        }
+
+        const targetPace = document.getElementById('target-pace').value;
+        const targetDistance = document.getElementById('target-distance').value;
+
+        // Send route name to ESP32 & pace & distance
+        const buffer = new ArrayBuffer(1 + 4 + 4 + routeName.length);
+        const view = new DataView(buffer);
+        view.setUint8(0, 249); // START_ROUTE_NAME offset 0, id 249
+        view.setFloat32(1, targetPace, true);
+        view.setFloat32(5, targetDistance, true);
+        for (let i = 0; i < routeName.length; i++) {
+            view.setUint8(9 + i, routeName.charCodeAt(i)); // offset i + 9 bytes before
+        }
+
+        ws.send(buffer);
+        console.log("Sending route name:", routeName);
+        console.log(`Sent route: ${routeName} with pace=${targetPace} m/s, distance=${targetDistance} m`);
+        
+
+        // Update UI state
+        navigationActive = true;
+        navigationPaused = false;
+        document.getElementById('start-pause-btn').textContent = 'Pause';
+        document.getElementById('start-pause-btn').style.backgroundColor = '#ffc107';
+
+        // Reset UI elements
+        document.getElementById('total-distance').textContent = '0.0';
+        document.getElementById('current-pace').textContent = '0.0';
+        document.getElementById('average-pace').textContent = '0.0';
+        document.getElementById('elapsed-time').textContent = '00:00:00';
     }
 
     // Start autonomous navigation
@@ -551,7 +692,7 @@ const char webPage[] PROGMEM = R"rawliteral(
         const display = document.getElementById('fusion-status-display');
         const statusSpan = document.getElementById('fusion-status');
 
-        alert("I'll deal with this later...");
+        //alert("I'll deal with this later...");
 
         
         // button.disabled = true;
@@ -587,7 +728,22 @@ const char webPage[] PROGMEM = R"rawliteral(
         button.disabled = true;
         button.textContent = 'Recording WP...';
         
-        sendMessage(1);
+        // send route name, if there is one, otherwise normal WP
+        const name = document.getElementById('route_name').value.trim();
+        if (name) {
+            // If a name is provided, send it to the ESP32
+            const buffer = new ArrayBuffer(1 + name.length); // 1 byte for id + name length
+            const view = new DataView(buffer);
+            view.setUint8(0, 250); // offset 0, id 250
+            for (let i = 0; i < name.length; i++) {
+                view.setUint8(i + 1, name.charCodeAt(i)); // offset i
+            }
+            ws.send(buffer);
+            console.log("route name sent: " + name);
+        } else {
+            sendMessage(1);
+            console.log("normal WP");
+        }
         
         // Always re-enable the button after a short delay
         setTimeout(() => {
@@ -666,6 +822,24 @@ const char webPage[] PROGMEM = R"rawliteral(
         };
         
         ws.onmessage = function(evt) {
+            if (typeof evt.data === "string") {
+                // Handle text messages
+                if (evt.data.startsWith("routes:[")) {
+                    const jsonText = evt.data.slice(7); // remove "routes:"
+                    const routeArray = JSON.parse(jsonText);
+                    const dropdown = document.getElementById("route-dropdown");
+                    dropdown.innerHTML = "";
+
+                    routeArray.forEach(route => {
+                        const option = document.createElement("option");
+                        option.value = route;
+                        option.textContent = route;
+                        dropdown.appendChild(option);
+                    });
+                }
+                return;
+            }
+
             try {
                 const data = parse_websocket_message(evt.data);
                 

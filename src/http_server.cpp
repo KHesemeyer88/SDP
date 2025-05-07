@@ -4,6 +4,8 @@
 #include "logging.h"
 #include "websocket_handler.h"
 #include "gnss.h"
+#include "SPIFFS.h"
+
 
 // HTTP server instance on port 80
 AsyncWebServer server(80);
@@ -15,6 +17,11 @@ void initHttpServer() {
     server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
         request->send(200, "text/html", webPage);
     });
+
+    server.serveStatic("marcus_triangle.png", SPIFFS, "/marcus_triangle.png");
+    //server.serveStatic("/", SPIFFS, "/");
+
+
     
     // Fusion status endpoint
     // server.on("/fusionStatus", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -44,10 +51,21 @@ void HttpServerTask(void *pvParameters) {
     
     // Initialize server routes and start the server
     initHttpServer();
+
+    delay(2000);
+    
+    // Initialize logging system
+    if (initLogging()) {
+        //LOG_DEBUG("logging init");
+    } else {
+        Serial.printf("logging init fail");
+        Serial.printf("\n");
+    }
+
     
     // Task loop - AsyncWebServer doesn't need polling, but we keep
     // the task alive for future expansion and proper task management
-    for (;;) {        
+    for (;;) {
         // Task heartbeat
         vTaskDelay(pdMS_TO_TICKS(1000));
     }

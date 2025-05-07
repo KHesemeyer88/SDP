@@ -18,6 +18,8 @@ unsigned long lastWSRTKUpdate = 0;
 unsigned long lastWSStatsUpdate = 0;
 static bool wasDisconnected = false;
 
+char currentRouteName[32] = "demo_route";
+
 void initWebSocket() {
     // Set event handler
     ws.onEvent(webSocketEventHandler);
@@ -52,6 +54,28 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
             // ----- handle messages -----
             if (len == sizeof(uint8_t)) { // binary size matches uint, its a MESSAGE
                 switch (*data) {
+                    case MESSAGE_REINIT_SD: {
+                        bool success = initLogging();  // re-attempt SD setup
+                        if (success) {
+                            sendStatusMessage("SD card reinitialized successfully");
+                        } else {
+                            sendErrorMessage("Failed to reinitialize SD card");
+                        }
+                        break;
+                    }
+                    case MESSAGE_REQUEST_ROUTE_LIST: {
+                        auto routes = getRouteFileNames();  // std::vector<String>
+
+                        String payload = "routes:[";
+                        for (size_t i = 0; i < routes.size(); ++i) {
+                            payload += "\"" + routes[i] + "\"";
+                            if (i < routes.size() - 1) payload += ",";
+                        }
+                        payload += "]";
+                    
+                        ws.textAll(payload);
+                        break;
+                    }
                     case MESSAGE_STOP: {
                         // Stop autonomous navigation
                         LOG_NAV("Stop command received");
@@ -155,6 +179,11 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
             } else if (len == sizeof(command_control)){ // Handle control messages (manual driving), binary size matches control struct
                 command_control the_message;
                 memcpy(&the_message, data, sizeof(the_message)); //copy binary data into struct
+
+                if (the_message.id != COMMAND_CONTROL) {
+                    // go to else statement
+                    break;
+                }
                 //Serial.printf("Received command: type=%u value=%.2f\n", my_webpage_data.something, my_webpage_data.something);
                     //if (doc.containsKey("control")) {
                     // LOG_DEBUG("Received control command: v=%f, h=%f", 
@@ -187,10 +216,15 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
                     }
                 }
             } else if (len == sizeof(command_start)) { // Handle autonomous navigation commands
-                // Start autonomous navigation                            
+                // Start autonomous navigation
                 // Get parameters
                 command_start the_message;
                 memcpy(&the_message, data, sizeof(the_message));
+
+                if (the_message.id != COMMAND_START) {
+                    // go to else statement
+                    break;
+                }
                 
                 float targetPace = the_message.target_pace;
                 float targetDistance = the_message.target_distance;
@@ -213,6 +247,77 @@ void webSocketEventHandler(AsyncWebSocket *server, AsyncWebSocketClient *client,
                 } else {
                     // No coordinates or waypoints - send error
                     sendErrorMessage("No destination specified. Please enter coordinates or record waypoints.");
+                }
+            } else if (data[0] == ROUTE_NAME && len > 1 && len < 32) {
+                // Get current position and record as waypoint
+                memcpy(currentRouteName, &data[1], len - 1);
+                currentRouteName[len - 1] = '\0'; // null-terminate
+                LOG_DEBUG("Received route name: %s", currentRouteName);
+
+                if (xSemaphoreTake(gnssMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                    float lat = gnssData.latitude;
+                    float lon = gnssData.longitude;
+                    xSemaphoreGive(gnssMutex);
+                    
+                    vTaskDelay(pdMS_TO_TICKS(50));
+                    
+                    saveWaypointToNamedRoute(currentRouteName, lat, lon, 8, 8/*carrSoln, fixType*/);
+
+                    Waypoint_data response_message;
+                    response_message.count = 0;
+                    response_message.lat = lat;
+                    response_message.lon = lon;
+                    
+                    ws.binaryAll((uint8_t*)&response_message, sizeof(response_message));
+                }
+                break;
+            } else if (data[0] == START_ROUTE_NAME && len > 1 + 4 + 4 && len < 1 + 4 + 4 + 32) {
+                float pace, distance;
+                memcpy(&pace, &data[1], sizeof(float));
+                memcpy(&distance, &data[5], sizeof(float));
+
+                char selectedRoute[32];
+                size_t nameLen = len - 9;
+                memcpy(selectedRoute, &data[9], nameLen);
+                selectedRoute[nameLen] = '\0';
+                LOG_ERROR("HERERERER");
+                LOG_ERROR("Start route request: %s (pace=%.2f, dist=%.2f)", selectedRoute, pace, distance);
+                
+                
+                // Load lat/lon from file
+                float lats[MAX_WAYPOINTS];
+                float lons[MAX_WAYPOINTS];
+                int count = loadRouteWaypoints(lats, lons, MAX_WAYPOINTS, selectedRoute);            
+                
+                if (count > 0) {
+                    clearWaypoints();
+                    for (int i = 0; i < count; ++i) {
+                        if (!addWaypoint(lats[i], lons[i])) {
+                            sendErrorMessage("Too many waypoints. Route partially loaded.");
+                            break;
+                        }
+                    }
+
+                    if (xSemaphoreTake(waypointMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                        targetData.followingWaypoints = true;
+                        LOG_NAV("Set followingWaypoints=true for route");
+                        xSemaphoreGive(waypointMutex);
+                    }
+                    
+                    if (xSemaphoreTake(navDataMutex, pdMS_TO_TICKS(10)) == pdTRUE) {
+                        navStatus.currentWaypoint = 0;
+                        navStatus.totalWaypoints = count;
+                        xSemaphoreGive(navDataMutex);
+                    }
+                    
+                    if (!startWaypointNavigation(pace - 0.5, distance)) {
+                        sendErrorMessage("Failed to start waypoint navigation");
+                    } else {
+                        sendStatusMessage("Started route: " + String(selectedRoute));
+                    }
+
+                } else {
+                    sendErrorMessage("Route not found or empty: " + String(selectedRoute));
                 }
             }
             break;

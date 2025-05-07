@@ -6,6 +6,7 @@
 #define LOG_FILE_PATH "/log.txt"
 #define LOG_QUEUE_SIZE 50
 #define LOG_FLUSH_INTERVAL 5000  // 5 seconds
+#define ROUTES_DIR "/routes"
 
 // Global variables
 LogLevel currentLogLevel = LOG_ERROR; // Default to debug level
@@ -31,6 +32,11 @@ bool initLogging() {
         Serial.printf("\n");
         return true; // Logging disabled
     } 
+
+    // fix brownout? no
+    delay(1000);
+    vTaskDelay(pdMS_TO_TICKS(100));
+
     // Configure SPI for SD card
     static SPIClass sdSPI(VSPI);
     sdSPI.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
@@ -178,6 +184,104 @@ bool logMessage(LogLevel level, const char* format, ...) {
 
     return true;
 }
+
+bool saveWaypointToNamedRoute(const char* routeName, float lat, float lon, int rtkStatus, int fixType) {
+    if (!routeName || strlen(routeName) == 0) return false;
+
+    LOG_DEBUG("Saved waypoint to route %s", routeName);
+    // Use the same shared SPIClass as initLogging
+
+    // Attempt to lock the SD card access mutex
+    if (logFileMutex == nullptr || xSemaphoreTake(logFileMutex, portMAX_DELAY) != pdTRUE) {
+        Serial.println("Failed to take SD card mutex in saveWaypointToNamedRoute");
+        return false;
+    }
+
+    // Ensure routes folder exists
+    if (!SD.exists(ROUTES_DIR)) {
+        if (!SD.mkdir(ROUTES_DIR)) {
+            Serial.println("Failed to create /routes directory");
+            return false;
+        }
+    }
+
+    String filePath = String(ROUTES_DIR) + "/" + String(routeName) + ".csv";
+
+    // If file doesn't exist, create with header
+    if (!SD.exists(filePath)) {
+        File f = SD.open(filePath, FILE_WRITE);
+        if (!f) return false;
+        f.println("latitude,longitude,rtk_status,fix_type");
+        f.close();
+    }
+
+    // Append waypoint
+    File f = SD.open(filePath, FILE_APPEND);
+    if (!f) return false;
+
+    String line = String(lat, 8) + "," +
+                  String(lon, 8) + "," +
+                  String(rtkStatus) + "," +
+                  String(fixType);
+    f.println(line);
+    f.close();
+
+    xSemaphoreGive(logFileMutex);
+
+    return true;
+}
+
+std::vector<String> getRouteFileNames() {
+    std::vector<String> routeNames;
+
+    File dir = SD.open("/routes");
+    if (!dir || !dir.isDirectory()) {
+        Serial.println("getRouteFileNames: Failed to open /routes directory");
+        return routeNames;
+    }
+
+    while (true) {
+        File entry = dir.openNextFile();
+        if (!entry) break;
+
+        if (!entry.isDirectory()) {
+            String name = entry.name();  // "/routes/demo.csv"
+            if (name.endsWith(".csv")) {
+                name.replace("/routes/", "");
+                name.replace(".csv", "");
+                routeNames.push_back(name);
+            }
+        }
+        entry.close();
+    }
+
+    dir.close();
+    return routeNames;
+}
+
+int loadRouteWaypoints(float* lats, float* lons, int maxPoints, const char* routeName) {
+    String path = "/routes/" + String(routeName) + ".csv";
+    File f = SD.open(path);
+    if (!f) return 0;
+
+    int count = 0;
+    while (f.available() && count < maxPoints) {
+        String line = f.readStringUntil('\n');
+        line.trim();
+        if (line.length() == 0 || line.startsWith("latitude")) continue;
+
+        int comma1 = line.indexOf(',');
+        int comma2 = line.indexOf(',', comma1 + 1);
+        if (comma1 == -1 || comma2 == -1) continue;
+
+        lats[count] = line.substring(0, comma1).toFloat();
+        lons[count] = line.substring(comma1 + 1, comma2).toFloat();
+        count++;
+    }
+    f.close();
+    return count;
+}
+
 
 // Close the logging system
 void closeLogging() {
